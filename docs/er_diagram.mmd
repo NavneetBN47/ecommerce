@@ -1,0 +1,38 @@
+erDiagram
+    USERS ||--o| CART : "has"
+    CART ||--o{ CART_ITEMS : "contains"
+    PRODUCTS ||--o{ CART_ITEMS : "included_in"
+    
+    USERS {
+        SERIAL user_id PK
+        VARCHAR username UK
+        VARCHAR password
+        VARCHAR full_name
+        VARCHAR email
+        TIMESTAMP created_at
+    }
+    
+    PRODUCTS {
+        SERIAL product_id PK
+        VARCHAR product_name
+        VARCHAR description
+        DECIMAL price
+        INT available_qty
+        BOOLEAN is_active
+        TIMESTAMP created_at
+    }
+    
+    CART {
+        SERIAL cart_id PK
+        INT user_id FK,UK
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    CART_ITEMS {
+        SERIAL cart_item_id PK
+        INT cart_id FK
+        INT product_id FK
+        INT quantity
+        DECIMAL price_at_addition
+    }
