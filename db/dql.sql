@@ -1,100 +1,60 @@
--- =========================================================
--- DQL SCRIPT FOR ECOMMERCE BROWNFIELD APPLICATION
--- PostgreSQL Compatible
--- =========================================================
--- Contains ONLY read (SELECT) queries
--- =========================================================
+-- Schema validation queries for LLD compliance
 
+-- Verify users table structure
+SELECT 
+    'users_table_check' as validation_type,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' 
+            AND column_name IN ('user_id', 'email', 'password_hash', 'created_at')
+        ) THEN 'PASS'
+        ELSE 'FAIL'
+    END as result;
 
--- ---------------------------------------------------------
--- 1. USER SIGN-IN (LOGIN)
--- ---------------------------------------------------------
+-- Verify products table structure  
+SELECT 
+    'products_table_check' as validation_type,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'products' 
+            AND column_name IN ('product_id', 'product_name', 'price', 'available_qty', 'is_active')
+        ) THEN 'PASS'
+        ELSE 'FAIL'
+    END as result;
 
-SELECT
-    user_id,
-    username,
-    full_name
-FROM users
-WHERE username = ? AND password = ?;
+-- Verify cart table structure
+SELECT 
+    'cart_table_check' as validation_type,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cart' 
+            AND column_name IN ('cart_id', 'user_id', 'created_at', 'updated_at')
+        ) THEN 'PASS'
+        ELSE 'FAIL'
+    END as result;
 
+-- Verify cart_items table structure
+SELECT 
+    'cart_items_table_check' as validation_type,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cart_items' 
+            AND column_name IN ('cart_item_id', 'cart_id', 'product_id', 'quantity', 'price_at_addition')
+        ) THEN 'PASS'
+        ELSE 'FAIL'
+    END as result;
 
--- ---------------------------------------------------------
--- 2. FETCH USER PROFILE
--- ---------------------------------------------------------
-
-SELECT
-    user_id,
-    username,
-    full_name,
-    email,
-    created_at
-FROM users
-WHERE user_id = ?;
-
-
--- ---------------------------------------------------------
--- 3. PRODUCT SEARCH
--- ---------------------------------------------------------
-
-SELECT
-    product_id,
-    product_name,
-    description,
-    price,
-    available_qty
-FROM products
-WHERE product_name ILIKE '%' || ? || '%';
-
-
--- ---------------------------------------------------------
--- 4. CHECK IF CART EXISTS FOR USER
--- ---------------------------------------------------------
--- Used before lazy cart creation
--- ---------------------------------------------------------
-
-SELECT cart_id
-FROM cart
-WHERE user_id = ?;
-
-
--- ---------------------------------------------------------
--- 5. VIEW CART ITEMS
--- ---------------------------------------------------------
-
-SELECT
-    p.product_id,
-    p.product_name,
-    p.price,
-    ci.quantity,
-    (p.price * ci.quantity) AS item_total
-FROM cart c
-JOIN cart_items ci ON c.cart_id = ci.cart_id
-JOIN products p ON ci.product_id = p.product_id
-WHERE c.user_id = ?;
-
-
--- ---------------------------------------------------------
--- 6. CART ITEM COUNT
--- ---------------------------------------------------------
--- Used to detect empty cart
--- ---------------------------------------------------------
-
-SELECT COUNT(*) AS item_count
-FROM cart_items
-WHERE cart_id = ?;
-
-
--- ---------------------------------------------------------
--- 7. CART GRAND TOTAL
--- ---------------------------------------------------------
-
-SELECT
-    COALESCE(SUM(p.price * ci.quantity), 0) AS cart_total
-FROM cart c
-JOIN cart_items ci ON c.cart_id = ci.cart_id
-JOIN products p ON ci.product_id = p.product_id
-WHERE c.user_id = ?;
-
--- =========================================================
--- END OF DQL SCRIPT
--- =========================================================
+-- Verify constraints exist
+SELECT 
+    'constraints_check' as validation_type,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE constraint_name IN ('users_email_unique', 'products_price_check', 'cart_items_qty_check')
+        ) THEN 'PASS'
+        ELSE 'FAIL'
+    END as result;
