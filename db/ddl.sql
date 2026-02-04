@@ -1,51 +1,39 @@
 -- =========================
--- USERS TABLE
+-- SCHEMA RECONCILIATION SCRIPT
+-- Adding missing constraints based on LLD requirements
 -- =========================
-CREATE TABLE users (
-    user_id    SERIAL PRIMARY KEY,
-    username   VARCHAR(50) UNIQUE NOT NULL,
-    password   VARCHAR(100) NOT NULL,
-    full_name  VARCHAR(100),
-    email      VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
--- =========================
--- PRODUCTS TABLE
--- =========================
-CREATE TABLE products (
-    product_id    SERIAL PRIMARY KEY,
-    product_name  VARCHAR(100) NOT NULL,
-    description   VARCHAR(255),
-    price         DECIMAL(10,2) NOT NULL,
-    available_qty INT NOT NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- Add quantity constraint to ensure quantity > 0
+ALTER TABLE cart_items 
+ADD CONSTRAINT chk_cart_items_quantity_positive 
+CHECK (quantity > 0);
 
--- =========================
--- CART TABLE (1:1 with users)
--- =========================
-CREATE TABLE cart (
-    cart_id    SERIAL PRIMARY KEY,
-    user_id    INT UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_cart_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(user_id)
-);
+-- Add price constraint to ensure price >= 0
+ALTER TABLE products 
+ADD CONSTRAINT chk_products_price_non_negative 
+CHECK (price >= 0);
 
--- =========================
--- CART ITEMS TABLE (N:M resolved)
--- =========================
-CREATE TABLE cart_items (
-    cart_item_id SERIAL PRIMARY KEY,
-    cart_id      INT NOT NULL,
-    product_id   INT NOT NULL,
-    quantity     INT NOT NULL,
-    CONSTRAINT fk_cart_items_cart
-        FOREIGN KEY (cart_id)
-        REFERENCES cart(cart_id),
-    CONSTRAINT fk_cart_items_product
-        FOREIGN KEY (product_id)
-        REFERENCES products(product_id)
-);
+-- Add available_qty constraint to ensure available_qty >= 0
+ALTER TABLE products 
+ADD CONSTRAINT chk_products_available_qty_non_negative 
+CHECK (available_qty >= 0);
+
+-- Drop existing foreign key constraint and recreate with CASCADE DELETE
+ALTER TABLE cart_items 
+DROP CONSTRAINT IF EXISTS fk_cart_items_cart;
+
+ALTER TABLE cart_items 
+ADD CONSTRAINT fk_cart_items_cart 
+FOREIGN KEY (cart_id) 
+REFERENCES cart(cart_id) 
+ON DELETE CASCADE;
+
+-- Add index for better performance on cart lookups
+CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
+
+-- Add index for better performance on cart_items lookups
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product_id ON cart_items(product_id);
+
+-- Add index for product search performance
+CREATE INDEX IF NOT EXISTS idx_products_name_search ON products USING gin(to_tsvector('english', product_name));
