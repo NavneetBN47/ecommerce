@@ -1,78 +1,84 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.*;
-import com.ecommerce.security.CurrentUser;
 import com.ecommerce.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * REST Controller for user management operations
+ * User Controller
+ * Handles user management endpoints
+ * API Contracts as per LLD Section 4.1
  */
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
-    
+
     private final UserService userService;
-    
+
     /**
-     * POST /api/users/signup - Register new user
+     * POST /api/users/signup
+     * Register a new user
+     * @param registrationDTO user registration data
+     * @return 201 Created with user response
      */
     @PostMapping("/signup")
-    public ResponseEntity<UserResponse> signup(@Valid @RequestBody UserSignupRequest request) {
-        log.info("Signup request received for username: {}", request.getUsername());
-        UserResponse response = userService.signup(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<UserResponseDTO> signup(@Valid @RequestBody UserRegistrationDTO registrationDTO) {
+        log.info("Signup request for username: {}", registrationDTO.getUsername());
+        UserResponseDTO response = userService.registerUser(registrationDTO);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
-    
+
     /**
-     * POST /api/users/login - Authenticate user
+     * POST /api/users/login
+     * Authenticate user
+     * @param loginDTO user credentials
+     * @return 200 OK with user response and token
      */
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody UserLoginRequest request) {
-        log.info("Login request received for username: {}", request.getUsername());
-        LoginResponse response = userService.login(request);
+    public ResponseEntity<UserResponseDTO> login(@Valid @RequestBody UserLoginDTO loginDTO) {
+        log.info("Login request for username: {}", loginDTO.getUsername());
+        UserResponseDTO response = userService.loginUser(loginDTO);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
-     * GET /api/users/me - Get current user profile
+     * GET /api/users/me
+     * Get current user profile
+     * @param authentication current authenticated user
+     * @return 200 OK with user response
      */
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser(@CurrentUser UUID userId) {
+    public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
         log.info("Get profile request for user: {}", userId);
-        UserResponse response = userService.getUserProfile(userId);
+        UserResponseDTO response = userService.getUserProfile(userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
-     * PUT /api/users/me - Update current user profile
+     * PUT /api/users/me
+     * Update current user profile
+     * @param updateDTO user update data
+     * @param authentication current authenticated user
+     * @return 200 OK with updated user response
      */
     @PutMapping("/me")
-    public ResponseEntity<UserResponse> updateCurrentUser(
-            @CurrentUser UUID userId,
-            @Valid @RequestBody UserUpdateRequest request) {
+    public ResponseEntity<UserResponseDTO> updateCurrentUser(
+            @Valid @RequestBody UserUpdateDTO updateDTO,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
         log.info("Update profile request for user: {}", userId);
-        UserResponse response = userService.updateUserProfile(userId, request);
+        UserResponseDTO response = userService.updateUserProfile(userId, updateDTO);
         return ResponseEntity.ok(response);
-    }
-    
-    /**
-     * POST /api/logout - Logout user and cleanup cart
-     */
-    @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout(@CurrentUser UUID userId) {
-        log.info("Logout request for user: {}", userId);
-        userService.logout(userId);
-        return ResponseEntity.ok(Map.of("message", "Logged out. Cart deleted."));
     }
 }

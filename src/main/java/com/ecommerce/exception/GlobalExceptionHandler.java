@@ -1,6 +1,5 @@
 package com.ecommerce.exception;
 
-import com.ecommerce.dto.ApiErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,132 +13,88 @@ import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 /**
- * Global exception handler for REST API
+ * Global exception handler
+ * Handles all exceptions and returns standardized error responses
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-    
-    @ExceptionHandler(UsernameExistsException.class)
-    public ResponseEntity<ApiErrorResponse> handleUsernameExists(UsernameExistsException ex, WebRequest request) {
-        log.error("Username exists: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("USERNAME_EXISTS")
-                .message(ex.getMessage())
+
+    /**
+     * Handle business exceptions
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException ex, WebRequest request) {
+        
+        log.error("Business exception: {} - {}", ex.getErrorCode().getCode(), ex.getDetails());
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .errorCode(ex.getErrorCode().getCode())
+                .message(ex.getErrorCode().getMessage())
+                .details(ex.getDetails())
                 .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
+                .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+
+        HttpStatus status = mapErrorCodeToHttpStatus(ex.getErrorCode());
+        return new ResponseEntity<>(errorResponse, status);
     }
-    
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex, WebRequest request) {
-        log.error("Invalid credentials: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("INVALID_CREDENTIALS")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-    }
-    
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ApiErrorResponse> handleUnauthorized(UnauthorizedException ex, WebRequest request) {
-        log.error("Unauthorized: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("UNAUTHORIZED")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-    }
-    
-    @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleProductNotFound(ProductNotFoundException ex, WebRequest request) {
-        log.error("Product not found: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("PRODUCT_NOT_FOUND")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-    }
-    
-    @ExceptionHandler(CartNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleCartNotFound(CartNotFoundException ex, WebRequest request) {
-        log.error("Cart not found: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("CART_NOT_FOUND")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-    }
-    
-    @ExceptionHandler(ItemNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleItemNotFound(ItemNotFoundException ex, WebRequest request) {
-        log.error("Item not found: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("ITEM_NOT_FOUND")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-    }
-    
-    @ExceptionHandler(InvalidQuantityException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidQuantity(InvalidQuantityException ex, WebRequest request) {
-        log.error("Invalid quantity: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("INVALID_QUANTITY")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-    }
-    
-    @ExceptionHandler(InvalidInputException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidInput(InvalidInputException ex, WebRequest request) {
-        log.error("Invalid input: {}", ex.getMessage());
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("INVALID_INPUT")
-                .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
-                .build();
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-    }
-    
+
+    /**
+     * Handle validation exceptions
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex, WebRequest request) {
-        String errors = ex.getBindingResult().getFieldErrors().stream()
+    public ResponseEntity<ErrorResponse> handleValidationException(
+            MethodArgumentNotValidException ex, WebRequest request) {
+        
+        log.error("Validation exception: {}", ex.getMessage());
+
+        String details = ex.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
-        log.error("Validation error: {}", errors);
-        ApiErrorResponse error = ApiErrorResponse.builder()
-                .errorCode("INVALID_INPUT")
-                .message(errors)
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .errorCode(ErrorCode.INVALID_INPUT.getCode())
+                .message("Validation failed")
+                .details(details)
                 .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
+                .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
-    
+
+    /**
+     * Handle all other exceptions
+     */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleGenericException(Exception ex, WebRequest request) {
-        log.error("Unexpected error: ", ex);
-        ApiErrorResponse error = ApiErrorResponse.builder()
+    public ResponseEntity<ErrorResponse> handleGlobalException(
+            Exception ex, WebRequest request) {
+        
+        log.error("Unexpected exception: ", ex);
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
                 .errorCode("INTERNAL_ERROR")
                 .message("An unexpected error occurred")
+                .details(ex.getMessage())
                 .timestamp(LocalDateTime.now())
-                .path(request.getDescription(false))
+                .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Map error code to HTTP status
+     */
+    private HttpStatus mapErrorCodeToHttpStatus(ErrorCode errorCode) {
+        return switch (errorCode) {
+            case USERNAME_EXISTS -> HttpStatus.CONFLICT;
+            case INVALID_CREDENTIALS, UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+            case INVALID_INPUT, INVALID_QUANTITY -> HttpStatus.BAD_REQUEST;
+            case PRODUCT_NOT_FOUND, CART_NOT_FOUND, ITEM_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
     }
 }

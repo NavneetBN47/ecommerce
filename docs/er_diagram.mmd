@@ -1,57 +1,84 @@
 erDiagram
-    USERS ||--o{ CARTS : "owns"
-    CARTS ||--|{ CART_ITEMS : "contains"
-    PRODUCTS ||--o{ CART_ITEMS : "referenced_by"
-    
-    USERS {
+    USER ||--o{ CART : "owns"
+    USER ||--o{ USER_ADDRESS : "has"
+    CART ||--|{ CART_ITEM : "contains"
+    PRODUCT ||--o{ CART_ITEM : "referenced_by"
+    PRODUCT_CATEGORY ||--o{ PRODUCT_CATEGORY : "parent_of"
+
+    USER {
         uuid user_id PK
-        varchar username UK "unique, immutable"
-        varchar email UK
-        varchar password_hash
-        varchar first_name
-        varchar last_name
+        varchar username UK "NOT NULL, UNIQUE, IMMUTABLE"
+        varchar email UK "NOT NULL, UNIQUE"
+        varchar password_hash "NOT NULL"
+        varchar first_name "NOT NULL"
+        varchar last_name "NOT NULL"
         varchar phone
         date date_of_birth
-        boolean is_active
-        timestamp created_at
+        boolean is_active "DEFAULT TRUE"
+        timestamp created_at "NOT NULL"
         timestamp updated_at
         timestamp last_login
     }
-    
-    PRODUCTS {
+
+    PRODUCT {
         uuid product_id PK
-        varchar name
+        varchar name "NOT NULL"
         text description
-        decimal price "must be > 0"
-        varchar category
+        decimal price "NOT NULL, > 0"
+        varchar category "NOT NULL"
         varchar brand
-        varchar sku UK
-        integer stock_quantity "must be >= 0"
+        varchar sku UK "NOT NULL, UNIQUE"
+        integer stock_quantity "NOT NULL, >= 0"
         decimal weight
-        boolean is_active
-        timestamp created_at
+        jsonb dimensions
+        text_array image_urls
+        boolean is_active "DEFAULT TRUE"
+        timestamp created_at "NOT NULL"
         timestamp updated_at
     }
-    
-    CARTS {
+
+    CART {
         uuid cart_id PK
-        uuid user_id FK "unique per active cart"
+        uuid user_id FK "NOT NULL, UNIQUE for active"
         varchar session_id
-        varchar status "active, abandoned, converted, expired"
-        decimal total_amount "auto-calculated"
-        integer item_count "auto-calculated"
-        timestamp created_at
+        varchar status "NOT NULL, DEFAULT 'active'"
+        decimal total_amount "DEFAULT 0.00"
+        integer item_count "DEFAULT 0"
+        timestamp created_at "NOT NULL"
         timestamp updated_at
         timestamp expires_at
     }
-    
-    CART_ITEMS {
+
+    CART_ITEM {
         uuid cart_item_id PK
-        uuid cart_id FK
-        uuid product_id FK
-        integer quantity "must be > 0"
-        decimal unit_price "snapshot from product"
-        decimal total_price "quantity * unit_price"
-        timestamp added_at
+        uuid cart_id FK "NOT NULL"
+        uuid product_id FK "NOT NULL"
+        integer quantity "NOT NULL, > 0"
+        decimal unit_price "NOT NULL, > 0"
+        decimal total_price "NOT NULL, > 0"
+        timestamp added_at "NOT NULL"
         timestamp updated_at
+    }
+
+    USER_ADDRESS {
+        uuid address_id PK
+        uuid user_id FK "NOT NULL"
+        varchar address_type "NOT NULL"
+        varchar street_address "NOT NULL"
+        varchar city "NOT NULL"
+        varchar state "NOT NULL"
+        varchar postal_code "NOT NULL"
+        varchar country "NOT NULL, DEFAULT 'US'"
+        boolean is_default "DEFAULT FALSE"
+        timestamp created_at "NOT NULL"
+        timestamp updated_at
+    }
+
+    PRODUCT_CATEGORY {
+        uuid category_id PK
+        varchar name UK "NOT NULL, UNIQUE"
+        text description
+        uuid parent_category_id FK
+        boolean is_active "DEFAULT TRUE"
+        timestamp created_at "NOT NULL"
     }

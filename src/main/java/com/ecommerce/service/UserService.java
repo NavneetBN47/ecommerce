@@ -2,10 +2,8 @@ package com.ecommerce.service;
 
 import com.ecommerce.dto.*;
 import com.ecommerce.entity.User;
-import com.ecommerce.exception.InvalidCredentialsException;
-import com.ecommerce.exception.InvalidInputException;
-import com.ecommerce.exception.UnauthorizedException;
-import com.ecommerce.exception.UsernameExistsException;
+import com.ecommerce.exception.BusinessException;
+import com.ecommerce.exception.ErrorCode;
 import com.ecommerce.repository.UserRepository;
 import com.ecommerce.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -19,133 +17,165 @@ import java.util.UUID;
 
 /**
  * Service for user management operations
+ * Implements business logic for user registration, authentication, and profile management
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class UserService {
-    
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
-    private final CartService cartService;
-    
+
     /**
      * Register a new user
+     * Business Rule: Username must be unique
+     * @param registrationDTO user registration data
+     * @return user response with token
      */
     @Transactional
-    public UserResponse signup(UserSignupRequest request) {
-        log.info("Processing signup for username: {}", request.getUsername());
-        
-        // Validate username uniqueness
-        if (userRepository.existsByUsername(request.getUsername())) {
-            log.warn("Username already exists: {}", request.getUsername());
-            throw new UsernameExistsException("Username already exists");
+    public UserResponseDTO registerUser(UserRegistrationDTO registrationDTO) {
+        log.info("Registering new user: {}", registrationDTO.getUsername());
+
+        // Check if username already exists
+        if (userRepository.existsByUsername(registrationDTO.getUsername())) {
+            log.error("Username already exists: {}", registrationDTO.getUsername());
+            throw new BusinessException(ErrorCode.USERNAME_EXISTS, 
+                "Username '" + registrationDTO.getUsername() + "' is already taken");
         }
-        
-        // Validate email uniqueness
-        if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Email already exists: {}", request.getEmail());
-            throw new InvalidInputException("Email already exists");
+
+        // Check if email already exists
+        if (userRepository.existsByEmail(registrationDTO.getEmail())) {
+            log.error("Email already exists: {}", registrationDTO.getEmail());
+            throw new BusinessException(ErrorCode.INVALID_INPUT, 
+                "Email '" + registrationDTO.getEmail() + "' is already registered");
         }
-        
-        // Create user entity
-        User user = User.builder()
-                .username(request.getUsername())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .email(request.getEmail())
-                .isActive(true)
-                .build();
-        
-        user.setFullName(request.getFullName());
-        
+
+        // Parse full name into first and last name
+        String[] nameParts = registrationDTO.getFullName().trim().split("\\s+", 2);
+        String firstName = nameParts[0];
+        String lastName = nameParts.length > 1 ? nameParts[1] : "";
+
+        // Create new user
+        User user = new User();
+        user.setUsername(registrationDTO.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(registrationDTO.getPassword()));
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(registrationDTO.getEmail());
+        user.setIsActive(true);
+
         user = userRepository.save(user);
-        log.info("User created successfully with ID: {}", user.getId());
-        
-        return mapToUserResponse(user);
+        log.info("User registered successfully: {}", user.getUserId());
+
+        // Generate JWT token
+        String token = jwtTokenProvider.generateToken(user.getUserId().toString());
+
+        return UserResponseDTO.builder()
+                .id(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .createdAt(user.getCreatedAt())
+                .token(token)
+                .build();
     }
-    
+
     /**
-     * Authenticate user and return JWT token
+     * Authenticate user and generate token
+     * Business Rule: Stateless authentication
+     * @param loginDTO user login credentials
+     * @return user response with token
      */
     @Transactional
-    public LoginResponse login(UserLoginRequest request) {
-        log.info("Processing login for username: {}", request.getUsername());
-        
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
-        
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("Invalid password for username: {}", request.getUsername());
-            throw new InvalidCredentialsException("Invalid username or password");
+    public UserResponseDTO loginUser(UserLoginDTO loginDTO) {
+        log.info("User login attempt: {}", loginDTO.getUsername());
+
+        User user = userRepository.findByUsername(loginDTO.getUsername())
+                .orElseThrow(() -> {
+                    log.error("Invalid credentials for username: {}", loginDTO.getUsername());
+                    return new BusinessException(ErrorCode.INVALID_CREDENTIALS, 
+                        "Invalid username or password");
+                });
+
+        // Verify password
+        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPasswordHash())) {
+            log.error("Invalid password for username: {}", loginDTO.getUsername());
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 
+                "Invalid username or password");
         }
-        
-        // Update last login
+
+        // Update last login timestamp
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
-        
+
         // Generate JWT token
-        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
-        
-        log.info("User logged in successfully: {}", user.getUsername());
-        
-        return LoginResponse.builder()
+        String token = jwtTokenProvider.generateToken(user.getUserId().toString());
+
+        log.info("User logged in successfully: {}", user.getUserId());
+
+        return UserResponseDTO.builder()
+                .id(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .createdAt(user.getCreatedAt())
                 .token(token)
-                .user(mapToUserResponse(user))
                 .build();
     }
-    
+
     /**
      * Get user profile
+     * @param userId the user ID
+     * @return user response
      */
     @Transactional(readOnly = true)
-    public UserResponse getUserProfile(UUID userId) {
-        log.info("Fetching profile for user ID: {}", userId);
-        
+    public UserResponseDTO getUserProfile(UUID userId) {
+        log.info("Fetching user profile: {}", userId);
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UnauthorizedException("User not found"));
-        
-        return mapToUserResponse(user);
+                .orElseThrow(() -> {
+                    log.error("User not found: {}", userId);
+                    return new BusinessException(ErrorCode.UNAUTHORIZED, "User not found");
+                });
+
+        return UserResponseDTO.builder()
+                .id(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
-    
+
     /**
      * Update user profile
+     * @param userId the user ID
+     * @param updateDTO user update data
+     * @return updated user response
      */
     @Transactional
-    public UserResponse updateUserProfile(UUID userId, UserUpdateRequest request) {
-        log.info("Updating profile for user ID: {}", userId);
-        
+    public UserResponseDTO updateUserProfile(UUID userId, UserUpdateDTO updateDTO) {
+        log.info("Updating user profile: {}", userId);
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UnauthorizedException("User not found"));
-        
-        user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
-        
+                .orElseThrow(() -> {
+                    log.error("User not found: {}", userId);
+                    return new BusinessException(ErrorCode.UNAUTHORIZED, "User not found");
+                });
+
+        // Parse full name
+        String[] nameParts = updateDTO.getFullName().trim().split("\\s+", 2);
+        user.setFirstName(nameParts[0]);
+        user.setLastName(nameParts.length > 1 ? nameParts[1] : "");
+        user.setEmail(updateDTO.getEmail());
+
         user = userRepository.save(user);
         log.info("User profile updated successfully: {}", userId);
-        
-        return mapToUserResponse(user);
-    }
-    
-    /**
-     * Logout user and cleanup cart
-     */
-    @Transactional
-    public void logout(UUID userId) {
-        log.info("Processing logout for user ID: {}", userId);
-        
-        // Delete user's cart and all items
-        cartService.deleteUserCart(userId);
-        
-        log.info("User logged out and cart deleted: {}", userId);
-    }
-    
-    /**
-     * Map User entity to UserResponse DTO
-     */
-    private UserResponse mapToUserResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
+
+        return UserResponseDTO.builder()
+                .id(user.getUserId())
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .email(user.getEmail())

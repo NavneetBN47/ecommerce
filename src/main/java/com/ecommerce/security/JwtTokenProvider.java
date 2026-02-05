@@ -10,62 +10,66 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.UUID;
 
 /**
- * JWT token provider for authentication
+ * JWT Token Provider
+ * Handles JWT token generation and validation
  */
 @Component
 @Slf4j
 public class JwtTokenProvider {
-    
-    @Value("${jwt.secret:mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}")
+
+    @Value("${jwt.secret:mySecretKeyForJWTTokenGenerationAndValidation1234567890}")
     private String jwtSecret;
-    
-    @Value("${jwt.expiration:86400000}") // 24 hours
+
+    @Value("${jwt.expiration:86400000}") // 24 hours in milliseconds
     private long jwtExpiration;
-    
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    }
+
     /**
      * Generate JWT token for user
+     * @param userId the user ID
+     * @return JWT token
      */
-    public String generateToken(UUID userId, String username) {
+    public String generateToken(String userId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
-        
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-        
+
         return Jwts.builder()
-                .setSubject(userId.toString())
-                .claim("username", username)
+                .setSubject(userId)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
-    
+
     /**
      * Get user ID from JWT token
+     * @param token the JWT token
+     * @return user ID
      */
-    public UUID getUserIdFromToken(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-        
+    public String getUserIdFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-        
-        return UUID.fromString(claims.getSubject());
+
+        return claims.getSubject();
     }
-    
+
     /**
      * Validate JWT token
+     * @param token the JWT token
+     * @return true if valid, false otherwise
      */
     public boolean validateToken(String token) {
         try {
-            SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
             Jwts.parserBuilder()
-                    .setSigningKey(key)
+                    .setSigningKey(getSigningKey())
                     .build()
                     .parseClaimsJws(token);
             return true;
