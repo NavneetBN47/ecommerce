@@ -1,8 +1,6 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,66 +26,37 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CartItem {
-
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cart_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cart_item_cart"))
+    @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "product_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cart_item_product"))
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
-
-    @NotNull(message = "Quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
+    
     @Column(nullable = false)
     private Integer quantity;
-
-    @NotNull(message = "Price is required")
+    
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
-
-    @Column(precision = 10, scale = 2)
-    private BigDecimal subtotal;
-
+    
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
+    
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        calculateSubtotal();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-        calculateSubtotal();
-    }
-
+    
     /**
-     * Calculate subtotal based on quantity and price
+     * Calculate subtotal for this cart item
      */
-    public void calculateSubtotal() {
-        if (price != null && quantity != null) {
-            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
-        }
-    }
-
-    /**
-     * Update quantity and recalculate subtotal
-     */
-    public void updateQuantity(Integer newQuantity) {
-        this.quantity = newQuantity;
-        calculateSubtotal();
+    public BigDecimal getSubtotal() {
+        return price.multiply(BigDecimal.valueOf(quantity));
     }
 }

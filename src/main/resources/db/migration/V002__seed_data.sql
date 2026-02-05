@@ -1,24 +1,20 @@
--- V002__seed_data.sql
--- Seed data for testing and development
+-- Seed Data for E-Commerce Application
 
--- Insert sample users (passwords are BCrypt hashed 'password123')
+-- Insert Sample Users
 INSERT INTO users (username, email, password, first_name, last_name, phone_number, active) VALUES
-('john_doe', 'john.doe@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'John', 'Doe', '+1234567890', true),
-('jane_smith', 'jane.smith@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Jane', 'Smith', '+1234567891', true),
-('bob_wilson', 'bob.wilson@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Bob', 'Wilson', '+1234567892', true);
+('john_doe', 'john.doe@example.com', 'password123', 'John', 'Doe', '+1234567890', TRUE),
+('jane_smith', 'jane.smith@example.com', 'password123', 'Jane', 'Smith', '+1234567891', TRUE),
+('admin_user', 'admin@example.com', 'admin123', 'Admin', 'User', '+1234567892', TRUE);
 
--- Insert sample products
-INSERT INTO products (name, description, sku, price, stock_quantity, category, image_url, active) VALUES
-('Laptop Pro 15', 'High-performance laptop with 15-inch display', 'LAP-001', 1299.99, 50, 'Electronics', 'https://example.com/images/laptop.jpg', true),
-('Wireless Mouse', 'Ergonomic wireless mouse with USB receiver', 'MOU-001', 29.99, 200, 'Electronics', 'https://example.com/images/mouse.jpg', true),
-('Mechanical Keyboard', 'RGB mechanical keyboard with blue switches', 'KEY-001', 89.99, 100, 'Electronics', 'https://example.com/images/keyboard.jpg', true),
-('USB-C Hub', '7-in-1 USB-C hub with HDMI and card reader', 'HUB-001', 49.99, 150, 'Electronics', 'https://example.com/images/hub.jpg', true),
-('Laptop Backpack', 'Water-resistant laptop backpack with multiple compartments', 'BAG-001', 59.99, 75, 'Accessories', 'https://example.com/images/backpack.jpg', true),
-('Webcam HD', '1080p HD webcam with built-in microphone', 'CAM-001', 79.99, 80, 'Electronics', 'https://example.com/images/webcam.jpg', true),
-('Desk Lamp LED', 'Adjustable LED desk lamp with USB charging port', 'LAM-001', 39.99, 120, 'Accessories', 'https://example.com/images/lamp.jpg', true),
-('Phone Stand', 'Adjustable phone stand for desk', 'STD-001', 19.99, 200, 'Accessories', 'https://example.com/images/stand.jpg', true),
-('External SSD 1TB', 'Portable external SSD with 1TB capacity', 'SSD-001', 149.99, 60, 'Storage', 'https://example.com/images/ssd.jpg', true),
-('Monitor 27 inch', '27-inch 4K UHD monitor with HDR support', 'MON-001', 399.99, 40, 'Electronics', 'https://example.com/images/monitor.jpg', true);
-
--- Note: Carts and orders are created dynamically by the application
--- No seed data needed for carts, cart_items, orders, and order_items
+-- Insert Sample Products
+INSERT INTO products (sku, name, description, price, stock, category, image_url, active) VALUES
+('LAPTOP-001', 'Dell XPS 15', 'High-performance laptop with 16GB RAM and 512GB SSD', 1299.99, 50, 'Electronics', 'https://example.com/laptop1.jpg', TRUE),
+('LAPTOP-002', 'MacBook Pro 14', 'Apple MacBook Pro with M2 chip', 1999.99, 30, 'Electronics', 'https://example.com/laptop2.jpg', TRUE),
+('PHONE-001', 'iPhone 14 Pro', 'Latest iPhone with advanced camera system', 999.99, 100, 'Electronics', 'https://example.com/phone1.jpg', TRUE),
+('PHONE-002', 'Samsung Galaxy S23', 'Flagship Android phone with stunning display', 899.99, 80, 'Electronics', 'https://example.com/phone2.jpg', TRUE),
+('HEADPHONE-001', 'Sony WH-1000XM5', 'Premium noise-cancelling headphones', 349.99, 150, 'Audio', 'https://example.com/headphone1.jpg', TRUE),
+('HEADPHONE-002', 'AirPods Pro', 'Apple wireless earbuds with active noise cancellation', 249.99, 200, 'Audio', 'https://example.com/headphone2.jpg', TRUE),
+('TABLET-001', 'iPad Air', 'Versatile tablet with M1 chip', 599.99, 75, 'Electronics', 'https://example.com/tablet1.jpg', TRUE),
+('WATCH-001', 'Apple Watch Series 8', 'Advanced health and fitness tracking', 399.99, 120, 'Wearables', 'https://example.com/watch1.jpg', TRUE),
+('KEYBOARD-001', 'Mechanical Gaming Keyboard', 'RGB backlit mechanical keyboard', 129.99, 90, 'Accessories', 'https://example.com/keyboard1.jpg', TRUE),
+('MOUSE-001', 'Wireless Gaming Mouse', 'High-precision wireless mouse', 79.99, 110, 'Accessories', 'https://example.com/mouse1.jpg', TRUE);

@@ -1,8 +1,6 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Product;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,52 +14,36 @@ import java.util.Optional;
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
-
+    
     /**
      * Find product by SKU
      */
     Optional<Product> findBySku(String sku);
-
+    
+    /**
+     * Find active products by category
+     */
+    List<Product> findByCategoryAndActiveTrue(String category);
+    
     /**
      * Find all active products
      */
     List<Product> findByActiveTrue();
-
+    
     /**
-     * Find active products with pagination
-     */
-    Page<Product> findByActiveTrue(Pageable pageable);
-
-    /**
-     * Find products by category
-     */
-    List<Product> findByCategoryAndActiveTrue(String category);
-
-    /**
-     * Case-insensitive product search by name
+     * Case-insensitive search by product name
      */
     @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.active = true")
     List<Product> searchByName(@Param("searchTerm") String searchTerm);
-
+    
     /**
-     * Case-insensitive product search by name with pagination
+     * Case-insensitive search by product name or category
      */
-    @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.active = true")
-    Page<Product> searchByName(@Param("searchTerm") String searchTerm, Pageable pageable);
-
+    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR LOWER(p.category) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.active = true")
+    List<Product> searchByNameOrCategory(@Param("searchTerm") String searchTerm);
+    
     /**
-     * Search products by name or description (case-insensitive)
+     * Check if SKU exists
      */
-    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.active = true")
-    Page<Product> searchByNameOrDescription(@Param("searchTerm") String searchTerm, Pageable pageable);
-
-    /**
-     * Find products with stock quantity greater than specified amount
-     */
-    List<Product> findByStockQuantityGreaterThanAndActiveTrue(Integer quantity);
-
-    /**
-     * Find products by category with pagination
-     */
-    Page<Product> findByCategoryAndActiveTrue(String category, Pageable pageable);
+    boolean existsBySku(String sku);
 }

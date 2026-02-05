@@ -1,16 +1,15 @@
 package com.ecommerce.exception;
 
 /**
- * Exception thrown when product stock is insufficient
+ * Exception thrown when product stock is insufficient for requested quantity
  */
-public class InsufficientStockException extends BusinessException {
-
+public class InsufficientStockException extends RuntimeException {
+    
     public InsufficientStockException(String message) {
         super(message);
     }
-
-    public InsufficientStockException(String productName, int requested, int available) {
-        super(String.format("Insufficient stock for product '%s'. Requested: %d, Available: %d",
-            productName, requested, available));
+    
+    public InsufficientStockException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

@@ -14,108 +14,78 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Cart Entity representing shopping carts for users
+ * Cart Entity representing shopping cart for users
  * Implements lazy creation and auto-delete when empty
  */
 @Entity
 @Table(name = "carts", indexes = {
-    @Index(name = "idx_cart_user", columnList = "user_id"),
-    @Index(name = "idx_cart_status", columnList = "status")
+    @Index(name = "idx_cart_user", columnList = "user_id", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Cart {
-
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cart_user"))
+    
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private CartStatus status = CartStatus.ACTIVE;
-
+    
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CartItem> items = new ArrayList<>();
+    
     @Column(name = "total_amount", precision = 10, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
-
+    
     @Column(name = "total_items")
     private Integer totalItems = 0;
-
+    
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
+    
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CartItem> items = new ArrayList<>();
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
+    
     /**
-     * Calculate total amount and total items
+     * Helper method to add item to cart
      */
-    public void calculateTotals() {
+    public void addItem(CartItem item) {
+        items.add(item);
+        item.setCart(this);
+        recalculateTotals();
+    }
+    
+    /**
+     * Helper method to remove item from cart
+     */
+    public void removeItem(CartItem item) {
+        items.remove(item);
+        item.setCart(null);
+        recalculateTotals();
+    }
+    
+    /**
+     * Recalculate cart totals
+     */
+    public void recalculateTotals() {
         this.totalAmount = items.stream()
-            .map(CartItem::getSubtotal)
+            .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         this.totalItems = items.stream()
             .mapToInt(CartItem::getQuantity)
             .sum();
     }
-
-    /**
-     * Add item to cart
-     */
-    public void addItem(CartItem item) {
-        items.add(item);
-        item.setCart(this);
-        calculateTotals();
-    }
-
-    /**
-     * Remove item from cart
-     */
-    public void removeItem(CartItem item) {
-        items.remove(item);
-        item.setCart(null);
-        calculateTotals();
-    }
-
+    
     /**
      * Check if cart is empty
      */
     public boolean isEmpty() {
         return items == null || items.isEmpty();
-    }
-
-    /**
-     * Clear all items from cart
-     */
-    public void clear() {
-        items.clear();
-        calculateTotals();
-    }
-
-    public enum CartStatus {
-        ACTIVE,
-        CHECKED_OUT,
-        ABANDONED
     }
 }

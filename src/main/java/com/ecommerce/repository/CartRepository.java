@@ -1,15 +1,11 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Cart;
-import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -17,44 +13,25 @@ import java.util.Optional;
  */
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
-
+    
     /**
-     * Find active cart for user
+     * Find cart by user ID with items eagerly loaded
      */
-    Optional<Cart> findByUserAndStatus(User user, Cart.CartStatus status);
-
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
+    Optional<Cart> findByUserIdWithItems(@Param("userId") Long userId);
+    
     /**
-     * Find active cart by user ID
+     * Find cart by user ID
      */
-    @Query("SELECT c FROM Cart c WHERE c.user.id = :userId AND c.status = :status")
-    Optional<Cart> findActiveCartByUserId(@Param("userId") Long userId, @Param("status") Cart.CartStatus status);
-
+    Optional<Cart> findByUserId(Long userId);
+    
     /**
-     * Find all carts for a user
+     * Delete cart by user ID
      */
-    List<Cart> findByUser(User user);
-
+    void deleteByUserId(Long userId);
+    
     /**
-     * Delete empty carts (auto-cleanup)
+     * Check if cart exists for user
      */
-    @Modifying
-    @Query("DELETE FROM Cart c WHERE c.totalItems = 0 OR c.totalItems IS NULL")
-    void deleteEmptyCarts();
-
-    /**
-     * Delete abandoned carts older than specified date
-     */
-    @Modifying
-    @Query("DELETE FROM Cart c WHERE c.status = 'ABANDONED' AND c.updatedAt < :cutoffDate")
-    void deleteAbandonedCartsOlderThan(@Param("cutoffDate") LocalDateTime cutoffDate);
-
-    /**
-     * Find carts by status
-     */
-    List<Cart> findByStatus(Cart.CartStatus status);
-
-    /**
-     * Count active carts for user
-     */
-    long countByUserAndStatus(User user, Cart.CartStatus status);
+    boolean existsByUserId(Long userId);
 }

@@ -2,9 +2,9 @@ erDiagram
     USERS ||--o| CARTS : has
     USERS ||--o{ ORDERS : places
     CARTS ||--o{ CART_ITEMS : contains
-    PRODUCTS ||--o{ CART_ITEMS : "added to"
-    PRODUCTS ||--o{ ORDER_ITEMS : "ordered in"
+    PRODUCTS ||--o{ CART_ITEMS : "included in"
     ORDERS ||--o{ ORDER_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : "included in"
 
     USERS {
         BIGINT id PK
@@ -13,8 +13,8 @@ erDiagram
         VARCHAR password
         VARCHAR first_name
         VARCHAR last_name
-        BOOLEAN is_active
-        BOOLEAN is_deleted
+        VARCHAR phone_number
+        BOOLEAN active
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -23,13 +23,12 @@ erDiagram
         BIGINT id PK
         VARCHAR sku UK
         VARCHAR name
-        VARCHAR description
+        TEXT description
         DECIMAL price
-        INT stock_quantity
+        INT stock
         VARCHAR category
         VARCHAR image_url
-        BOOLEAN is_active
-        BOOLEAN is_deleted
+        BOOLEAN active
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -48,8 +47,7 @@ erDiagram
         BIGINT cart_id FK
         BIGINT product_id FK
         INT quantity
-        DECIMAL unit_price
-        DECIMAL subtotal
+        DECIMAL price
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -59,9 +57,8 @@ erDiagram
         VARCHAR order_number UK
         BIGINT user_id FK
         DECIMAL total_amount
-        INT total_items
         VARCHAR status
-        VARCHAR shipping_address
+        TEXT shipping_address
         VARCHAR payment_method
         TIMESTAMP created_at
         TIMESTAMP updated_at
@@ -72,7 +69,7 @@ erDiagram
         BIGINT order_id FK
         BIGINT product_id FK
         INT quantity
-        DECIMAL unit_price
+        DECIMAL price
         DECIMAL subtotal
         TIMESTAMP created_at
     }
