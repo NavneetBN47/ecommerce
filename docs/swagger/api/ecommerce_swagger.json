@@ -1,0 +1,34 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "E-commerce API",
+    "description": "A comprehensive REST API for e-commerce operations including user management, product catalog, and shopping cart functionality",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "support@ecommerce.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.ecommerce.com/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "https://staging-api.ecommerce.com/v1",
+      "description": "Staging server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": { ... }  // (full JSON content as above)
+  "components": { ... },
+  "tags": [ ... ]
+}
