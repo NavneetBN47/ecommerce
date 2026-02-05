@@ -1,206 +1,262 @@
--- Shopping Cart System Data Query Language (DQL)
--- Validation queries and common business queries as per LLD specifications
+-- DQL SCRIPT FOR SHOPPING CART SYSTEM
+-- Contains read (SELECT) queries for validation and application use
+-- Generated from Low Level Design (LLD)
 
--- =====================================================
--- SCHEMA VALIDATION QUERIES
--- =====================================================
+-- ========================================
+-- VALIDATION QUERIES FOR ALL TABLES
+-- ========================================
 
--- Verify all required tables exist
+-- Validate users table structure and data
+SELECT 'Users Table Validation' as validation_type;
 SELECT 
-    table_name,
-    table_type
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-    AND table_name IN ('users', 'products', 'cart', 'cart_items')
-ORDER BY table_name;
+    COUNT(*) as total_users,
+    COUNT(CASE WHEN roles IS NOT NULL THEN 1 END) as users_with_roles,
+    COUNT(CASE WHEN email IS NOT NULL THEN 1 END) as users_with_email,
+    COUNT(CASE WHEN created_at IS NOT NULL THEN 1 END) as users_with_created_at,
+    COUNT(CASE WHEN updated_at IS NOT NULL THEN 1 END) as users_with_updated_at
+FROM users;
 
--- Verify all required columns exist with correct data types
+-- Validate products table structure and data
+SELECT 'Products Table Validation' as validation_type;
 SELECT 
-    table_name,
-    column_name,
-    data_type,
-    is_nullable,
-    column_default
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-    AND table_name IN ('users', 'products', 'cart', 'cart_items')
-ORDER BY table_name, ordinal_position;
+    COUNT(*) as total_products,
+    COUNT(CASE WHEN category IS NOT NULL THEN 1 END) as products_with_category,
+    COUNT(CASE WHEN price > 0 THEN 1 END) as products_with_valid_price,
+    COUNT(CASE WHEN available_qty >= 0 THEN 1 END) as products_with_valid_stock,
+    COUNT(CASE WHEN updated_at IS NOT NULL THEN 1 END) as products_with_updated_at
+FROM products;
 
--- Verify foreign key constraints
+-- Validate cart table structure and data
+SELECT 'Cart Table Validation' as validation_type;
 SELECT 
-    tc.constraint_name,
-    tc.table_name,
-    kcu.column_name,
-    ccu.table_name AS foreign_table_name,
-    ccu.column_name AS foreign_column_name
-FROM information_schema.table_constraints AS tc
-JOIN information_schema.key_column_usage AS kcu
-    ON tc.constraint_name = kcu.constraint_name
-JOIN information_schema.constraint_column_usage AS ccu
-    ON ccu.constraint_name = tc.constraint_name
-WHERE tc.constraint_type = 'FOREIGN KEY'
-    AND tc.table_schema = 'public'
-ORDER BY tc.table_name;
+    COUNT(*) as total_carts,
+    COUNT(CASE WHEN status IS NOT NULL THEN 1 END) as carts_with_status,
+    COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active_carts,
+    COUNT(CASE WHEN status = 'CHECKED_OUT' THEN 1 END) as checked_out_carts,
+    COUNT(CASE WHEN updated_at IS NOT NULL THEN 1 END) as carts_with_updated_at
+FROM cart;
 
--- Verify check constraints for business rules
+-- Validate cart_items table structure and data
+SELECT 'Cart Items Table Validation' as validation_type;
 SELECT 
-    constraint_name,
-    table_name,
-    check_clause
-FROM information_schema.check_constraints
-WHERE constraint_schema = 'public'
-ORDER BY table_name;
-
--- =====================================================
--- BUSINESS VALIDATION QUERIES
--- =====================================================
-
--- Verify cart status constraints (only ACTIVE or CHECKED_OUT)
-SELECT 
-    status,
-    COUNT(*) as count
-FROM cart
-GROUP BY status
-ORDER BY status;
-
--- Verify quantity constraints (1-10 per cart item)
-SELECT 
-    MIN(quantity) as min_quantity,
-    MAX(quantity) as max_quantity,
-    AVG(quantity) as avg_quantity
+    COUNT(*) as total_cart_items,
+    COUNT(CASE WHEN price_at_addition IS NOT NULL THEN 1 END) as items_with_price_at_addition,
+    COUNT(CASE WHEN quantity > 0 AND quantity <= 10 THEN 1 END) as items_with_valid_quantity,
+    COUNT(CASE WHEN created_at IS NOT NULL THEN 1 END) as items_with_created_at,
+    COUNT(CASE WHEN updated_at IS NOT NULL THEN 1 END) as items_with_updated_at
 FROM cart_items;
 
--- Verify no duplicate products per cart
+-- ========================================
+-- RELATIONSHIP VALIDATION QUERIES
+-- ========================================
+
+-- Validate foreign key relationships
+SELECT 'Foreign Key Validation' as validation_type;
+
+-- Check cart -> users relationship
+SELECT 
+    'Cart-Users FK' as relationship,
+    COUNT(*) as total_carts,
+    COUNT(u.user_id) as valid_user_references
+FROM cart c
+LEFT JOIN users u ON c.user_id = u.user_id;
+
+-- Check cart_items -> cart relationship
+SELECT 
+    'CartItems-Cart FK' as relationship,
+    COUNT(*) as total_cart_items,
+    COUNT(c.cart_id) as valid_cart_references
+FROM cart_items ci
+LEFT JOIN cart c ON ci.cart_id = c.cart_id;
+
+-- Check cart_items -> products relationship
+SELECT 
+    'CartItems-Products FK' as relationship,
+    COUNT(*) as total_cart_items,
+    COUNT(p.product_id) as valid_product_references
+FROM cart_items ci
+LEFT JOIN products p ON ci.product_id = p.product_id;
+
+-- ========================================
+-- BUSINESS RULE VALIDATION QUERIES
+-- ========================================
+
+-- Validate unique active cart per user
+SELECT 'Unique Active Cart Validation' as validation_type;
+SELECT 
+    user_id,
+    COUNT(*) as active_carts_count
+FROM cart 
+WHERE status = 'ACTIVE'
+GROUP BY user_id
+HAVING COUNT(*) > 1;
+
+-- Validate quantity limits (max 10 per product per cart)
+SELECT 'Quantity Limit Validation' as validation_type;
 SELECT 
     cart_id,
     product_id,
-    COUNT(*) as duplicate_count
+    quantity
 FROM cart_items
-GROUP BY cart_id, product_id
-HAVING COUNT(*) > 1;
+WHERE quantity > 10;
 
--- Verify price consistency (price_at_addition should be positive)
+-- ========================================
+-- APPLICATION QUERIES
+-- ========================================
+
+-- Get user profile with role information
+CREATE OR REPLACE VIEW user_profiles AS
 SELECT 
-    COUNT(*) as total_items,
-    COUNT(CASE WHEN price_at_addition <= 0 THEN 1 END) as invalid_prices
-FROM cart_items;
+    user_id,
+    username,
+    full_name,
+    email,
+    roles,
+    created_at,
+    updated_at
+FROM users
+ORDER BY created_at DESC;
 
--- =====================================================
--- COMMON BUSINESS QUERIES
--- =====================================================
-
--- Get user's active cart with items
+-- Get product catalog with availability
+CREATE OR REPLACE VIEW product_catalog AS
 SELECT 
+    product_id,
+    product_name,
+    description,
+    price,
+    available_qty,
+    category,
+    CASE 
+        WHEN available_qty > 0 THEN 'In Stock'
+        ELSE 'Out of Stock'
+    END as availability_status,
+    created_at,
+    updated_at
+FROM products
+ORDER BY category, product_name;
+
+-- Get active cart details for a user
+CREATE OR REPLACE VIEW active_cart_details AS
+SELECT 
+    c.cart_id,
+    c.user_id,
     u.username,
-    c.id as cart_id,
-    c.status,
-    p.name as product_name,
+    ci.cart_item_id,
+    p.product_id,
+    p.product_name,
+    p.description,
     ci.quantity,
     ci.price_at_addition,
-    (ci.quantity * ci.price_at_addition) as line_total
-FROM users u
-JOIN cart c ON u.id = c.user_id
-JOIN cart_items ci ON c.id = ci.cart_id
-JOIN products p ON ci.product_id = p.id
+    (ci.quantity * ci.price_at_addition) as item_total,
+    p.available_qty as current_stock,
+    ci.created_at as added_at,
+    ci.updated_at as last_modified
+FROM cart c
+JOIN users u ON c.user_id = u.user_id
+JOIN cart_items ci ON c.cart_id = ci.cart_id
+JOIN products p ON ci.product_id = p.product_id
 WHERE c.status = 'ACTIVE'
-ORDER BY u.username, p.name;
+ORDER BY c.cart_id, ci.created_at;
 
--- Get cart totals by user
+-- Get cart summary for active carts
+CREATE OR REPLACE VIEW cart_summary AS
 SELECT 
+    c.cart_id,
+    c.user_id,
     u.username,
-    c.status,
-    COUNT(ci.id) as total_items,
+    COUNT(ci.cart_item_id) as total_items,
     SUM(ci.quantity) as total_quantity,
-    SUM(ci.quantity * ci.price_at_addition) as cart_total
-FROM users u
-JOIN cart c ON u.id = c.user_id
-LEFT JOIN cart_items ci ON c.id = ci.cart_id
-GROUP BY u.id, u.username, c.id, c.status
-ORDER BY u.username;
-
--- Get product inventory status
-SELECT 
-    p.name,
-    p.category,
-    p.stock_quantity,
-    COALESCE(SUM(ci.quantity), 0) as quantity_in_active_carts,
-    (p.stock_quantity - COALESCE(SUM(ci.quantity), 0)) as available_stock
-FROM products p
-LEFT JOIN cart_items ci ON p.id = ci.product_id
-LEFT JOIN cart c ON ci.cart_id = c.id AND c.status = 'ACTIVE'
-GROUP BY p.id, p.name, p.category, p.stock_quantity
-ORDER BY p.category, p.name;
-
--- Get top products by quantity in carts
-SELECT 
-    p.name,
-    p.category,
-    SUM(ci.quantity) as total_quantity_in_carts,
-    COUNT(DISTINCT ci.cart_id) as number_of_carts
-FROM products p
-JOIN cart_items ci ON p.id = ci.product_id
-JOIN cart c ON ci.cart_id = c.id
+    SUM(ci.quantity * ci.price_at_addition) as total_amount,
+    c.created_at as cart_created,
+    c.updated_at as last_updated
+FROM cart c
+JOIN users u ON c.user_id = u.user_id
+LEFT JOIN cart_items ci ON c.cart_id = ci.cart_id
 WHERE c.status = 'ACTIVE'
-GROUP BY p.id, p.name, p.category
-ORDER BY total_quantity_in_carts DESC;
-
--- Get users without active carts
-SELECT 
-    u.id,
-    u.username,
-    u.email,
-    u.created_at
-FROM users u
-LEFT JOIN cart c ON u.id = c.user_id AND c.status = 'ACTIVE'
-WHERE c.id IS NULL
-ORDER BY u.created_at DESC;
-
--- Get checkout history (checked out carts)
-SELECT 
-    u.username,
-    c.id as cart_id,
-    c.updated_at as checkout_date,
-    COUNT(ci.id) as items_count,
-    SUM(ci.quantity * ci.price_at_addition) as total_amount
-FROM users u
-JOIN cart c ON u.id = c.user_id
-LEFT JOIN cart_items ci ON c.id = ci.cart_id
-WHERE c.status = 'CHECKED_OUT'
-GROUP BY u.id, u.username, c.id, c.updated_at
+GROUP BY c.cart_id, c.user_id, u.username, c.created_at, c.updated_at
 ORDER BY c.updated_at DESC;
 
--- =====================================================
--- DATA QUALITY CHECKS
--- =====================================================
-
--- Check for orphaned cart items (should be none due to FK constraints)
-SELECT COUNT(*) as orphaned_cart_items
-FROM cart_items ci
-LEFT JOIN cart c ON ci.cart_id = c.id
-WHERE c.id IS NULL;
-
--- Check for products with zero or negative stock
+-- Get order history (checked out carts)
+CREATE OR REPLACE VIEW order_history AS
 SELECT 
-    name,
-    stock_quantity
-FROM products
-WHERE stock_quantity <= 0
-ORDER BY stock_quantity;
+    c.cart_id as order_id,
+    c.user_id,
+    u.username,
+    u.full_name,
+    COUNT(ci.cart_item_id) as total_items,
+    SUM(ci.quantity) as total_quantity,
+    SUM(ci.quantity * ci.price_at_addition) as order_total,
+    c.created_at as order_date,
+    c.updated_at as checkout_date
+FROM cart c
+JOIN users u ON c.user_id = u.user_id
+LEFT JOIN cart_items ci ON c.cart_id = ci.cart_id
+WHERE c.status = 'CHECKED_OUT'
+GROUP BY c.cart_id, c.user_id, u.username, u.full_name, c.created_at, c.updated_at
+ORDER BY c.updated_at DESC;
 
--- Check for users with invalid email formats (basic check)
+-- Get product popularity (based on cart additions)
+CREATE OR REPLACE VIEW product_popularity AS
 SELECT 
-    username,
-    email
-FROM users
-WHERE email NOT LIKE '%@%.%'
-ORDER BY username;
+    p.product_id,
+    p.product_name,
+    p.category,
+    COUNT(ci.cart_item_id) as times_added_to_cart,
+    SUM(ci.quantity) as total_quantity_requested,
+    AVG(ci.quantity) as avg_quantity_per_addition,
+    p.available_qty as current_stock
+FROM products p
+LEFT JOIN cart_items ci ON p.product_id = ci.product_id
+GROUP BY p.product_id, p.product_name, p.category, p.available_qty
+ORDER BY times_added_to_cart DESC, total_quantity_requested DESC;
 
--- Check for cart items exceeding business rule limits
+-- ========================================
+-- SAMPLE QUERIES FOR TESTING
+-- ========================================
+
+-- Get all users
+SELECT * FROM user_profiles LIMIT 10;
+
+-- Get all products by category
+SELECT * FROM product_catalog WHERE category = 'Electronics' LIMIT 10;
+
+-- Get active cart for specific user
+SELECT * FROM active_cart_details WHERE username = 'john_doe';
+
+-- Get cart summary for all active carts
+SELECT * FROM cart_summary;
+
+-- Get order history
+SELECT * FROM order_history LIMIT 10;
+
+-- Get product popularity report
+SELECT * FROM product_popularity LIMIT 10;
+
+-- Search products by name or category
+SELECT * FROM product_catalog 
+WHERE product_name ILIKE '%laptop%' OR category ILIKE '%electronics%'
+ORDER BY price DESC;
+
+-- Get low stock products
+SELECT * FROM product_catalog 
+WHERE available_qty < 20
+ORDER BY available_qty ASC;
+
+-- Get users with active carts
+SELECT DISTINCT u.username, u.full_name, u.email
+FROM users u
+JOIN cart c ON u.user_id = c.user_id
+WHERE c.status = 'ACTIVE';
+
+-- Get total sales by product (from checked out carts)
 SELECT 
-    ci.id,
-    ci.cart_id,
-    ci.product_id,
-    ci.quantity
-FROM cart_items ci
-WHERE ci.quantity > 10 OR ci.quantity <= 0
-ORDER BY ci.quantity DESC;
+    p.product_name,
+    p.category,
+    SUM(ci.quantity) as total_sold,
+    SUM(ci.quantity * ci.price_at_addition) as total_revenue
+FROM products p
+JOIN cart_items ci ON p.product_id = ci.product_id
+JOIN cart c ON ci.cart_id = c.cart_id
+WHERE c.status = 'CHECKED_OUT'
+GROUP BY p.product_id, p.product_name, p.category
+ORDER BY total_revenue DESC;
