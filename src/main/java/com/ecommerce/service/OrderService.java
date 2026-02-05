@@ -1,22 +1,20 @@
 package com.ecommerce.service;
 
 import com.ecommerce.dto.OrderDTO;
+import com.ecommerce.dto.OrderItemDTO;
 import com.ecommerce.entity.*;
-import com.ecommerce.exception.InsufficientStockException;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.mapper.OrderMapper;
+import com.ecommerce.exception.ValidationException;
 import com.ecommerce.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -30,174 +28,171 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final UserRepository userRepository;
     private final CartRepository cartRepository;
+    private final UserRepository userRepository;
     private final ProductRepository productRepository;
-    private final AddressRepository addressRepository;
-    private final OrderMapper orderMapper;
 
     /**
-     * Create order from cart
+     * Create order from active cart
      */
-    public OrderDTO createOrderFromCart(Long userId, Long shippingAddressId) {
+    public OrderDTO createOrderFromCart(Long userId, String shippingAddress, String billingAddress) {
         log.info("Creating order from cart for user ID: {}", userId);
 
-        // Get user
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-        // Get cart
-        Cart cart = cartRepository.findByUserId(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
+        Cart cart = cartRepository.findActiveCartByUserId(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("No active cart found for user ID: " + userId));
 
         if (cart.isEmpty()) {
-            throw new IllegalStateException("Cannot create order from empty cart");
+            throw new ValidationException("Cannot create order from empty cart");
         }
 
-        // Get shipping address
-        Address shippingAddress = addressRepository.findById(shippingAddressId)
-            .orElseThrow(() -> new ResourceNotFoundException("Address not found with ID: " + shippingAddressId));
-
-        // Create order
-        Order order = Order.builder()
-            .orderNumber(generateOrderNumber())
-            .user(user)
-            .shippingAddress(shippingAddress)
-            .status(Order.OrderStatus.PENDING)
-            .orderDate(LocalDateTime.now())
-            .build();
-
-        // Create order items from cart items and reduce stock
+        // Validate stock for all items
         for (CartItem cartItem : cart.getItems()) {
             Product product = cartItem.getProduct();
-
-            // Check stock availability
-            if (!product.hasStock(cartItem.getQuantity())) {
-                throw new InsufficientStockException("Insufficient stock for product: " + product.getName());
+            if (product.getStockQuantity() < cartItem.getQuantity()) {
+                throw new ValidationException("Insufficient stock for product: " + product.getName());
             }
+        }
 
-            // Reduce stock
-            product.reduceStock(cartItem.getQuantity());
-            productRepository.save(product);
+        // Create order
+        String orderNumber = generateOrderNumber();
+        Order order = Order.builder()
+            .orderNumber(orderNumber)
+            .user(user)
+            .status(Order.OrderStatus.PENDING)
+            .totalAmount(cart.getTotalAmount())
+            .shippingAddress(shippingAddress)
+            .billingAddress(billingAddress)
+            .build();
 
-            // Create order item
+        Order savedOrder = orderRepository.save(order);
+
+        // Create order items and update stock
+        for (CartItem cartItem : cart.getItems()) {
             OrderItem orderItem = OrderItem.builder()
-                .order(order)
-                .product(product)
+                .order(savedOrder)
+                .product(cartItem.getProduct())
                 .quantity(cartItem.getQuantity())
                 .price(cartItem.getPrice())
                 .build();
+            orderItemRepository.save(orderItem);
 
-            order.addItem(orderItem);
+            // Update product stock
+            Product product = cartItem.getProduct();
+            product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
+            productRepository.save(product);
         }
 
-        // Calculate totals
-        order.calculateTotalAmount();
-
-        // Save order
-        Order savedOrder = orderRepository.save(order);
-
-        // Clear cart after order creation
+        // Mark cart as checked out and delete
+        cart.setStatus(Cart.CartStatus.CHECKED_OUT);
+        cartRepository.save(cart);
         cartRepository.delete(cart);
-        log.info("Order created successfully: {}", savedOrder.getOrderNumber());
 
-        return orderMapper.toDTO(savedOrder);
+        log.info("Order created successfully with order number: {}", orderNumber);
+
+        return convertToDTO(savedOrder);
     }
 
-    /**
-     * Get order by ID
-     */
     @Transactional(readOnly = true)
-    public OrderDTO getOrderById(Long id) {
-        log.debug("Fetching order by ID: {}", id);
-        Order order = orderRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + id));
-        return orderMapper.toDTO(order);
+    public OrderDTO getOrderById(Long orderId) {
+        log.info("Fetching order by ID: {}", orderId);
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+        return convertToDTO(order);
     }
 
-    /**
-     * Get order by order number
-     */
     @Transactional(readOnly = true)
     public OrderDTO getOrderByOrderNumber(String orderNumber) {
-        log.debug("Fetching order by order number: {}", orderNumber);
+        log.info("Fetching order by order number: {}", orderNumber);
         Order order = orderRepository.findByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with order number: " + orderNumber));
-        return orderMapper.toDTO(order);
+        return convertToDTO(order);
     }
 
-    /**
-     * Get all orders for a user
-     */
     @Transactional(readOnly = true)
-    public List<OrderDTO> getOrdersByUserId(Long userId) {
-        log.debug("Fetching orders for user ID: {}", userId);
-        return orderRepository.findByUserId(userId).stream()
-            .map(orderMapper::toDTO)
+    public List<OrderDTO> getUserOrders(Long userId) {
+        log.info("Fetching orders for user ID: {}", userId);
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+            .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
 
-    /**
-     * Get orders for a user with pagination
-     */
-    @Transactional(readOnly = true)
-    public Page<OrderDTO> getOrdersByUserId(Long userId, Pageable pageable) {
-        log.debug("Fetching orders for user ID with pagination: {}", userId);
-        return orderRepository.findByUserId(userId, pageable)
-            .map(orderMapper::toDTO);
-    }
-
-    /**
-     * Update order status
-     */
     public OrderDTO updateOrderStatus(Long orderId, Order.OrderStatus status) {
-        log.info("Updating order status for order ID: {} to {}", orderId, status);
+        log.info("Updating order ID: {} to status: {}", orderId, status);
 
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
 
         order.setStatus(status);
         Order updatedOrder = orderRepository.save(order);
-        log.info("Order status updated successfully: {}", updatedOrder.getOrderNumber());
 
-        return orderMapper.toDTO(updatedOrder);
+        log.info("Order status updated successfully");
+
+        return convertToDTO(updatedOrder);
     }
 
-    /**
-     * Cancel order
-     */
-    public OrderDTO cancelOrder(Long orderId) {
-        log.info("Cancelling order with ID: {}", orderId);
+    public void cancelOrder(Long orderId) {
+        log.info("Cancelling order ID: {}", orderId);
 
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
 
-        // Only allow cancellation for pending or confirmed orders
-        if (order.getStatus() != Order.OrderStatus.PENDING && 
-            order.getStatus() != Order.OrderStatus.CONFIRMED) {
-            throw new IllegalStateException("Cannot cancel order with status: " + order.getStatus());
+        if (order.getStatus() == Order.OrderStatus.DELIVERED || order.getStatus() == Order.OrderStatus.CANCELLED) {
+            throw new ValidationException("Cannot cancel order with status: " + order.getStatus());
         }
 
-        // Restore stock for cancelled order
-        for (OrderItem orderItem : order.getItems()) {
-            Product product = orderItem.getProduct();
-            product.increaseStock(orderItem.getQuantity());
+        // Restore stock
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
             productRepository.save(product);
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
-        Order cancelledOrder = orderRepository.save(order);
-        log.info("Order cancelled successfully: {}", cancelledOrder.getOrderNumber());
+        orderRepository.save(order);
 
-        return orderMapper.toDTO(cancelledOrder);
+        log.info("Order cancelled successfully: {}", orderId);
     }
 
-    /**
-     * Generate unique order number
-     */
     private String generateOrderNumber() {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        String random = String.format("%04d", (int) (Math.random() * 10000));
-        return "ORD-" + timestamp + "-" + random;
+        return "ORD-" + LocalDateTime.now().getYear() +
+            String.format("%02d", LocalDateTime.now().getMonthValue()) +
+            "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    private OrderDTO convertToDTO(Order order) {
+        List<OrderItemDTO> itemDTOs = order.getItems().stream()
+            .map(this::convertItemToDTO)
+            .collect(Collectors.toList());
+
+        return OrderDTO.builder()
+            .id(order.getId())
+            .orderNumber(order.getOrderNumber())
+            .userId(order.getUser().getId())
+            .username(order.getUser().getUsername())
+            .items(itemDTOs)
+            .status(order.getStatus())
+            .totalAmount(order.getTotalAmount())
+            .shippingAddress(order.getShippingAddress())
+            .billingAddress(order.getBillingAddress())
+            .createdAt(order.getCreatedAt())
+            .updatedAt(order.getUpdatedAt())
+            .build();
+    }
+
+    private OrderItemDTO convertItemToDTO(OrderItem item) {
+        return OrderItemDTO.builder()
+            .id(item.getId())
+            .orderId(item.getOrder().getId())
+            .productId(item.getProduct().getId())
+            .productName(item.getProduct().getName())
+            .productSku(item.getProduct().getSku())
+            .quantity(item.getQuantity())
+            .price(item.getPrice())
+            .subtotal(item.getSubtotal())
+            .createdAt(item.getCreatedAt())
+            .build();
     }
 }

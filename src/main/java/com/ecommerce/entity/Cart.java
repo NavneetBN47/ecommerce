@@ -1,27 +1,31 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Cart entity representing user's shopping cart
+ * Cart entity representing user shopping carts
  * Implements lazy creation and auto-delete when empty
  */
 @Entity
 @Table(name = "carts", indexes = {
-    @Index(name = "idx_cart_user", columnList = "user_id", unique = true)
+    @Index(name = "idx_cart_user", columnList = "user_id"),
+    @Index(name = "idx_cart_status", columnList = "status")
 })
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -31,17 +35,27 @@ public class Cart {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @NotNull(message = "User is required")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private Set<CartItem> items = new HashSet<>();
+    private List<CartItem> items = new ArrayList<>();
+
+    @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private CartStatus status = CartStatus.ACTIVE;
 
     @Column(name = "total_amount", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    @Column(name = "total_items")
+    @Builder.Default
+    private Integer totalItems = 0;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -52,38 +66,33 @@ public class Cart {
     private LocalDateTime updatedAt;
 
     /**
-     * Add item to cart
+     * Helper method to add item to cart
      */
     public void addItem(CartItem item) {
         items.add(item);
         item.setCart(this);
-        recalculateTotal();
+        recalculateTotals();
     }
 
     /**
-     * Remove item from cart
+     * Helper method to remove item from cart
      */
     public void removeItem(CartItem item) {
         items.remove(item);
         item.setCart(null);
-        recalculateTotal();
+        recalculateTotals();
     }
 
     /**
-     * Clear all items from cart
+     * Recalculate cart totals
      */
-    public void clearItems() {
-        items.clear();
-        recalculateTotal();
-    }
-
-    /**
-     * Recalculate total amount
-     */
-    public void recalculateTotal() {
+    public void recalculateTotals() {
         this.totalAmount = items.stream()
-            .map(CartItem::getSubtotal)
+            .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+        this.totalItems = items.stream()
+            .mapToInt(CartItem::getQuantity)
+            .sum();
     }
 
     /**
@@ -93,12 +102,9 @@ public class Cart {
         return items == null || items.isEmpty();
     }
 
-    /**
-     * Get total item count
-     */
-    public int getTotalItemCount() {
-        return items.stream()
-            .mapToInt(CartItem::getQuantity)
-            .sum();
+    public enum CartStatus {
+        ACTIVE,
+        CHECKED_OUT,
+        ABANDONED
     }
 }

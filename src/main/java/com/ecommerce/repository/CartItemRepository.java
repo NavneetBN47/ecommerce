@@ -16,28 +16,18 @@ import java.util.Optional;
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
-    /**
-     * Find cart item by cart ID and product ID
-     */
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId")
-    Optional<CartItem> findByCartIdAndProductId(@Param("cartId") Long cartId, @Param("productId") Long productId);
+    List<CartItem> findByCartId(Long cartId);
 
-    /**
-     * Find all items in a cart
-     */
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.id = :cartId")
-    List<CartItem> findByCartId(@Param("cartId") Long cartId);
+    Optional<CartItem> findByCartIdAndProductId(Long cartId, Long productId);
 
-    /**
-     * Delete all items from a cart
-     */
     @Modifying
     @Query("DELETE FROM CartItem ci WHERE ci.cart.id = :cartId")
     void deleteByCartId(@Param("cartId") Long cartId);
 
-    /**
-     * Count items in a cart
-     */
-    @Query("SELECT COUNT(ci) FROM CartItem ci WHERE ci.cart.id = :cartId")
-    Long countByCartId(@Param("cartId") Long cartId);
+    @Modifying
+    @Query("DELETE FROM CartItem ci WHERE ci.cart.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT ci FROM CartItem ci JOIN FETCH ci.product WHERE ci.cart.id = :cartId")
+    List<CartItem> findByCartIdWithProduct(@Param("cartId") Long cartId);
 }

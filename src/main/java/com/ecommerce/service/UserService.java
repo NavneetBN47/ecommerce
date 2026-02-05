@@ -2,9 +2,8 @@ package com.ecommerce.service;
 
 import com.ecommerce.dto.UserDTO;
 import com.ecommerce.entity.User;
-import com.ecommerce.exception.ResourceAlreadyExistsException;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.mapper.UserMapper;
+import com.ecommerce.exception.ValidationException;
 import com.ecommerce.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,114 +24,90 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
-    /**
-     * Register a new user
-     */
-    public UserDTO registerUser(UserDTO userDTO) {
-        log.info("Registering new user: {}", userDTO.getUsername());
+    public UserDTO createUser(UserDTO userDTO) {
+        log.info("Creating new user: {}", userDTO.getUsername());
 
-        // Check if username already exists
         if (userRepository.existsByUsername(userDTO.getUsername())) {
-            throw new ResourceAlreadyExistsException("Username already exists: " + userDTO.getUsername());
+            throw new ValidationException("Username already exists: " + userDTO.getUsername());
         }
 
-        // Check if email already exists
         if (userRepository.existsByEmail(userDTO.getEmail())) {
-            throw new ResourceAlreadyExistsException("Email already exists: " + userDTO.getEmail());
+            throw new ValidationException("Email already exists: " + userDTO.getEmail());
         }
 
-        // Map DTO to entity
-        User user = userMapper.toEntity(userDTO);
+        User user = User.builder()
+            .username(userDTO.getUsername())
+            .email(userDTO.getEmail())
+            .password(passwordEncoder.encode(userDTO.getPassword()))
+            .firstName(userDTO.getFirstName())
+            .lastName(userDTO.getLastName())
+            .phoneNumber(userDTO.getPhoneNumber())
+            .active(true)
+            .build();
 
-        // Encode password
-        user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
-
-        // Set default values
-        user.setActive(true);
-        user.setEmailVerified(false);
-
-        // Save user
         User savedUser = userRepository.save(user);
-        log.info("User registered successfully: {}", savedUser.getUsername());
+        log.info("User created successfully with ID: {}", savedUser.getId());
 
-        return userMapper.toDTO(savedUser);
+        return convertToDTO(savedUser);
     }
 
-    /**
-     * Get user by ID
-     */
     @Transactional(readOnly = true)
     public UserDTO getUserById(Long id) {
-        log.debug("Fetching user by ID: {}", id);
+        log.info("Fetching user by ID: {}", id);
         User user = userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
-        return userMapper.toDTO(user);
+        return convertToDTO(user);
     }
 
-    /**
-     * Get user by username
-     */
     @Transactional(readOnly = true)
     public UserDTO getUserByUsername(String username) {
-        log.debug("Fetching user by username: {}", username);
+        log.info("Fetching user by username: {}", username);
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
-        return userMapper.toDTO(user);
+        return convertToDTO(user);
     }
 
-    /**
-     * Get all users
-     */
     @Transactional(readOnly = true)
     public List<UserDTO> getAllUsers() {
-        log.debug("Fetching all users");
+        log.info("Fetching all users");
         return userRepository.findAll().stream()
-            .map(userMapper::toDTO)
+            .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
 
-    /**
-     * Update user
-     */
     public UserDTO updateUser(Long id, UserDTO userDTO) {
         log.info("Updating user with ID: {}", id);
 
-        User existingUser = userRepository.findById(id)
+        User user = userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
 
-        // Update fields
-        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(existingUser.getEmail())) {
+        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(userDTO.getEmail())) {
-                throw new ResourceAlreadyExistsException("Email already exists: " + userDTO.getEmail());
+                throw new ValidationException("Email already exists: " + userDTO.getEmail());
             }
-            existingUser.setEmail(userDTO.getEmail());
-            existingUser.setEmailVerified(false);
+            user.setEmail(userDTO.getEmail());
         }
 
         if (userDTO.getFirstName() != null) {
-            existingUser.setFirstName(userDTO.getFirstName());
+            user.setFirstName(userDTO.getFirstName());
         }
 
         if (userDTO.getLastName() != null) {
-            existingUser.setLastName(userDTO.getLastName());
+            user.setLastName(userDTO.getLastName());
         }
 
         if (userDTO.getPhoneNumber() != null) {
-            existingUser.setPhoneNumber(userDTO.getPhoneNumber());
+            user.setPhoneNumber(userDTO.getPhoneNumber());
         }
 
-        User updatedUser = userRepository.save(existingUser);
-        log.info("User updated successfully: {}", updatedUser.getUsername());
+        User updatedUser = userRepository.save(user);
+        log.info("User updated successfully: {}", updatedUser.getId());
 
-        return userMapper.toDTO(updatedUser);
+        return convertToDTO(updatedUser);
     }
 
-    /**
-     * Delete user
-     */
     public void deleteUser(Long id) {
         log.info("Deleting user with ID: {}", id);
 
@@ -141,38 +116,20 @@ public class UserService {
         }
 
         userRepository.deleteById(id);
-        log.info("User deleted successfully with ID: {}", id);
+        log.info("User deleted successfully: {}", id);
     }
 
-    /**
-     * Deactivate user
-     */
-    public UserDTO deactivateUser(Long id) {
-        log.info("Deactivating user with ID: {}", id);
-
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
-
-        user.setActive(false);
-        User deactivatedUser = userRepository.save(user);
-        log.info("User deactivated successfully: {}", deactivatedUser.getUsername());
-
-        return userMapper.toDTO(deactivatedUser);
-    }
-
-    /**
-     * Activate user
-     */
-    public UserDTO activateUser(Long id) {
-        log.info("Activating user with ID: {}", id);
-
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
-
-        user.setActive(true);
-        User activatedUser = userRepository.save(user);
-        log.info("User activated successfully: {}", activatedUser.getUsername());
-
-        return userMapper.toDTO(activatedUser);
+    private UserDTO convertToDTO(User user) {
+        return UserDTO.builder()
+            .id(user.getId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
+            .phoneNumber(user.getPhoneNumber())
+            .active(user.getActive())
+            .createdAt(user.getCreatedAt())
+            .updatedAt(user.getUpdatedAt())
+            .build();
     }
 }

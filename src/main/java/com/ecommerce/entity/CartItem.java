@@ -1,7 +1,12 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -10,7 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * CartItem entity representing individual items in a shopping cart
+ * CartItem entity representing individual items in a cart
  */
 @Entity
 @Table(name = "cart_items", indexes = {
@@ -20,8 +25,7 @@ import java.time.LocalDateTime;
     @UniqueConstraint(name = "uk_cart_product", columnNames = {"cart_id", "product_id"})
 })
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -31,22 +35,24 @@ public class CartItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotNull(message = "Cart is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
+    @NotNull(message = "Product is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @NotNull(message = "Quantity is required")
+    @Min(value = 1, message = "Quantity must be at least 1")
     @Column(nullable = false)
     private Integer quantity;
 
+    @NotNull(message = "Price is required")
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
-
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal subtotal;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -56,19 +62,10 @@ public class CartItem {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @PrePersist
-    @PreUpdate
-    protected void calculateSubtotal() {
-        if (price != null && quantity != null) {
-            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
-        }
-    }
-
     /**
-     * Update quantity and recalculate subtotal
+     * Calculate subtotal for this item
      */
-    public void updateQuantity(Integer newQuantity) {
-        this.quantity = newQuantity;
-        calculateSubtotal();
+    public BigDecimal getSubtotal() {
+        return price.multiply(BigDecimal.valueOf(quantity));
     }
 }

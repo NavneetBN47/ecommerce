@@ -10,16 +10,18 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Data Transfer Object for OrderItem entity
+ * OrderItem Data Transfer Object
  */
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class OrderItemDTO {
 
     private Long id;
+
+    private Long orderId;
 
     private Long productId;
 

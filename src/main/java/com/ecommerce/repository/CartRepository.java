@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -15,28 +16,24 @@ import java.util.Optional;
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
 
-    /**
-     * Find cart by user ID
-     */
-    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
-    Optional<Cart> findByUserId(@Param("userId") Long userId);
+    Optional<Cart> findByUserIdAndStatus(Long userId, Cart.CartStatus status);
 
-    /**
-     * Delete cart by user ID
-     */
+    List<Cart> findByUserId(Long userId);
+
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId AND c.status = :status")
+    Optional<Cart> findActiveCartByUserIdWithItems(@Param("userId") Long userId, @Param("status") Cart.CartStatus status);
+
+    @Query("SELECT c FROM Cart c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
+    Optional<Cart> findActiveCartByUserId(@Param("userId") Long userId);
+
     @Modifying
-    @Query("DELETE FROM Cart c WHERE c.user.id = :userId")
-    void deleteByUserId(@Param("userId") Long userId);
+    @Query("DELETE FROM Cart c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
+    void deleteActiveCartsByUserId(@Param("userId") Long userId);
 
-    /**
-     * Check if user has a cart
-     */
-    boolean existsByUserId(Long userId);
-
-    /**
-     * Delete empty carts (carts with no items)
-     */
     @Modifying
-    @Query("DELETE FROM Cart c WHERE c.id NOT IN (SELECT DISTINCT ci.cart.id FROM CartItem ci)")
-    void deleteEmptyCarts();
+    @Query("DELETE FROM Cart c WHERE c.id IN (SELECT cart.id FROM Cart cart WHERE cart.user.id = :userId AND SIZE(cart.items) = 0)")
+    void deleteEmptyCartsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COUNT(c) FROM Cart c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
+    long countActiveCartsByUserId(@Param("userId") Long userId);
 }
