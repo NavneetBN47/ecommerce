@@ -12,11 +12,11 @@
         <relativePath/>
     </parent>
     
-    <groupId>com.ecommerce</groupId>
-    <artifactId>ecommerce-backend</artifactId>
+    <groupId>com.example</groupId>
+    <artifactId>ecommerce</artifactId>
     <version>1.0.0</version>
-    <name>E-Commerce Backend</name>
-    <description>Spring Boot MVC E-Commerce Application</description>
+    <name>E-Commerce Application</name>
+    <description>Spring Boot MVC E-Commerce Application with Cart Management</description>
     
     <properties>
         <java.version>17</java.version>
@@ -26,38 +26,45 @@
     </properties>
     
     <dependencies>
-        <!-- Spring Boot Starter Web -->
+        <!-- Spring Boot Web Starter -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         
-        <!-- Spring Boot Starter Data JPA -->
+        <!-- Spring Boot Data JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
         
-        <!-- Spring Boot Starter Validation -->
+        <!-- Spring Boot Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         
-        <!-- Spring Boot Starter Security -->
+        <!-- Spring Boot Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         
-        <!-- MySQL Connector -->
+        <!-- MySQL Driver -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
         
-        <!-- Flyway for Database Migration -->
+        <!-- H2 Database (for testing) -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Flyway Migration -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -75,7 +82,7 @@
             <optional>true</optional>
         </dependency>
         
-        <!-- MapStruct for DTO Mapping -->
+        <!-- MapStruct for DTO mapping -->
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
@@ -89,14 +96,26 @@
             <scope>provided</scope>
         </dependency>
         
-        <!-- Springdoc OpenAPI for API Documentation -->
+        <!-- Springdoc OpenAPI (Swagger) -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.3.0</version>
+            <version>2.2.0</version>
         </dependency>
         
-        <!-- Spring Boot Starter Test -->
+        <!-- Apache Commons Lang -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+        
+        <!-- Spring Boot Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        
+        <!-- Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -107,13 +126,6 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        
-        <!-- H2 Database for Testing -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -153,6 +165,11 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

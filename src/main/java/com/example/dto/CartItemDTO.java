@@ -1,40 +1,40 @@
 package com.example.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 /**
- * Data Transfer Object for CartItem entity.
+ * Data Transfer Object for Cart Item
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CartItemDTO {
-    
-    private Long id;
-    
-    @NotNull(message = "Product ID is required")
+
+    @JsonProperty("item_id")
+    private Long itemId;
+
+    @JsonProperty("product_id")
     private Long productId;
-    
+
+    @JsonProperty("product_name")
     private String productName;
+
+    @JsonProperty("product_sku")
     private String productSku;
-    private String productImageUrl;
-    
-    @Min(value = 1, message = "Quantity must be at least 1")
+
+    @JsonProperty("quantity")
     private Integer quantity;
-    
+
+    @JsonProperty("unit_price")
     private BigDecimal unitPrice;
+
+    @JsonProperty("subtotal")
     private BigDecimal subtotal;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+
+    @JsonProperty("stock_available")
+    private Integer stockAvailable;
 }

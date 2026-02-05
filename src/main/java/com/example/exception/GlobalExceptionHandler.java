@@ -13,50 +13,43 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Global exception handler for REST controllers.
+ * Global exception handler for REST controllers
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-    
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(ResourceNotFoundException ex) {
         log.error("Resource not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(ApiResponse.error("Resource not found", ex.getMessage()));
+            .body(ApiResponse.error(ex.getMessage()));
     }
-    
-    @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDuplicateResourceException(DuplicateResourceException ex) {
-        log.error("Duplicate resource: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(ApiResponse.error("Duplicate resource", ex.getMessage()));
-    }
-    
+
     @ExceptionHandler(InsufficientStockException.class)
     public ResponseEntity<ApiResponse<Void>> handleInsufficientStockException(InsufficientStockException ex) {
         log.error("Insufficient stock: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error("Insufficient stock", ex.getMessage()));
+            .body(ApiResponse.error(ex.getMessage()));
     }
-    
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
-        log.error("Business exception: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error("Business rule violation", ex.getMessage()));
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorizedException(UnauthorizedException ex) {
+        log.error("Unauthorized: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse.error(ex.getMessage()));
     }
-    
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
             MethodArgumentNotValidException ex) {
-        log.error("Validation error: {}", ex.getMessage());
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
+        log.error("Validation failed: {}", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ApiResponse.<Map<String, String>>builder()
                 .success(false)
@@ -64,18 +57,11 @@ public class GlobalExceptionHandler {
                 .data(errors)
                 .build());
     }
-    
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.error("Illegal argument: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error("Invalid argument", ex.getMessage()));
-    }
-    
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
-        log.error("Unexpected error: {}", ex.getMessage(), ex);
+        log.error("Unexpected error occurred", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.error("Internal server error", "An unexpected error occurred"));
+            .body(ApiResponse.error("An unexpected error occurred: " + ex.getMessage()));
     }
 }

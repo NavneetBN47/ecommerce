@@ -1,7 +1,7 @@
 package com.example.exception;
 
 /**
- * Exception thrown when a requested resource is not found.
+ * Exception thrown when a requested resource is not found
  */
 public class ResourceNotFoundException extends RuntimeException {
     

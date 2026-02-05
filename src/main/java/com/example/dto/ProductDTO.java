@@ -1,56 +1,50 @@
 package com.example.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Data Transfer Object for Product entity.
+ * Data Transfer Object for Product
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProductDTO {
-    
-    private Long id;
-    
-    @NotBlank(message = "Product name is required")
-    @Size(max = 200)
-    private String name;
-    
-    private String description;
-    
-    @NotBlank(message = "SKU is required")
+
+    @JsonProperty("product_id")
+    private Long productId;
+
+    @JsonProperty("sku")
     private String sku;
-    
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("description")
+    private String description;
+
+    @JsonProperty("price")
     private BigDecimal price;
-    
-    private BigDecimal discountPrice;
-    private BigDecimal effectivePrice;
-    
-    @Min(value = 0, message = "Stock quantity cannot be negative")
+
+    @JsonProperty("stock_quantity")
     private Integer stockQuantity;
-    
+
+    @JsonProperty("category")
     private String category;
-    private String brand;
+
+    @JsonProperty("image_url")
     private String imageUrl;
-    private Boolean active;
-    private Boolean featured;
-    private Boolean inStock;
-    private BigDecimal rating;
-    private Integer reviewCount;
+
+    @JsonProperty("is_active")
+    private Boolean isActive;
+
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 }

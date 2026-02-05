@@ -1,48 +1,40 @@
 package com.example.dto;
 
-import com.example.entity.User;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 /**
- * Data Transfer Object for User entity.
+ * Data Transfer Object for User
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserDTO {
-    
-    private Long id;
-    
-    @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 50)
+
+    @JsonProperty("user_id")
+    private Long userId;
+
+    @JsonProperty("username")
     private String username;
-    
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email should be valid")
+
+    @JsonProperty("email")
     private String email;
-    
+
+    @JsonProperty("first_name")
     private String firstName;
+
+    @JsonProperty("last_name")
     private String lastName;
-    private String phoneNumber;
-    private String address;
-    private String city;
-    private String state;
-    private String zipCode;
-    private String country;
-    private User.UserRole role;
-    private User.UserStatus status;
-    private LocalDateTime lastLogin;
+
+    @JsonProperty("is_active")
+    private Boolean isActive;
+
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 }

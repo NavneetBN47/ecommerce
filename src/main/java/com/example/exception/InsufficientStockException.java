@@ -1,7 +1,7 @@
 package com.example.exception;
 
 /**
- * Exception thrown when there is insufficient stock for a product.
+ * Exception thrown when product stock is insufficient
  */
 public class InsufficientStockException extends RuntimeException {
     
