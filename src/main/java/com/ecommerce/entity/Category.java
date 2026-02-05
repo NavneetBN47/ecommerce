@@ -1,25 +1,28 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Category entity for product categorization
+ * Category Entity representing categories table
  */
 @Entity
 @Table(name = "categories", indexes = {
-    @Index(name = "idx_category_name", columnList = "name", unique = true)
+    @Index(name = "idx_parent", columnList = "parent_category_id"),
+    @Index(name = "idx_status", columnList = "status")
 })
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -29,19 +32,24 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "name", nullable = false, unique = true, length = 100)
     private String name;
 
-    @Column(length = 500)
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private Boolean active = true;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_category_id")
+    private Category parentCategory;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "parentCategory", cascade = CascadeType.ALL)
     @Builder.Default
-    private Set<Product> products = new HashSet<>();
+    private List<Category> subCategories = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    @Builder.Default
+    private CategoryStatus status = CategoryStatus.ACTIVE;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -50,4 +58,12 @@ public class Category {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "category")
+    @Builder.Default
+    private List<Product> products = new ArrayList<>();
+
+    public enum CategoryStatus {
+        ACTIVE, INACTIVE
+    }
 }

@@ -3,6 +3,7 @@ package com.ecommerce.repository;
 import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -13,17 +14,19 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByUsername(String username);
-
     Optional<User> findByEmail(String email);
 
-    boolean existsByUsername(String username);
+    Optional<User> findByUsername(String username);
+
+    Optional<User> findByEmailOrUsername(String email, String username);
 
     boolean existsByEmail(String email);
 
-    @Query("SELECT u FROM User u WHERE LOWER(u.username) = LOWER(:username)")
-    Optional<User> findByUsernameIgnoreCase(String username);
+    boolean existsByUsername(String username);
 
-    @Query("SELECT u FROM User u WHERE LOWER(u.email) = LOWER(:email)")
-    Optional<User> findByEmailIgnoreCase(String email);
+    @Query("SELECT u FROM User u WHERE u.email = :email AND u.status = 'ACTIVE'")
+    Optional<User> findActiveUserByEmail(@Param("email") String email);
+
+    @Query("SELECT u FROM User u WHERE u.username = :username AND u.status = 'ACTIVE'")
+    Optional<User> findActiveUserByUsername(@Param("username") String username);
 }

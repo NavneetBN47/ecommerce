@@ -1,32 +1,37 @@
--- V002: Insert seed data for E-Commerce application
--- Author: Backend Automation Agent
--- Date: 2024
+-- V002__insert_seed_data.sql
+-- Insert seed data for testing and development
 
 -- Insert sample categories
-INSERT INTO categories (name, description, active) VALUES
-('Electronics', 'Electronic devices and accessories', TRUE),
-('Clothing', 'Apparel and fashion items', TRUE),
-('Books', 'Books and publications', TRUE),
-('Home & Garden', 'Home improvement and garden supplies', TRUE),
-('Sports & Outdoors', 'Sports equipment and outdoor gear', TRUE);
+INSERT INTO categories (name, description, parent_category_id, status) VALUES
+('Electronics', 'Electronic devices and accessories', NULL, 'ACTIVE'),
+('Clothing', 'Apparel and fashion items', NULL, 'ACTIVE'),
+('Books', 'Books and publications', NULL, 'ACTIVE'),
+('Home & Garden', 'Home improvement and garden supplies', NULL, 'ACTIVE'),
+('Sports & Outdoors', 'Sports equipment and outdoor gear', NULL, 'ACTIVE');
 
 -- Insert sample products
-INSERT INTO products (sku, name, description, price, stock_quantity, category_id, active) VALUES
-('ELEC-001', 'Wireless Bluetooth Headphones', 'High-quality wireless headphones with noise cancellation', 79.99, 50, 1, TRUE),
-('ELEC-002', 'Smart Watch', 'Fitness tracking smart watch with heart rate monitor', 199.99, 30, 1, TRUE),
-('ELEC-003', 'Laptop Stand', 'Ergonomic aluminum laptop stand', 39.99, 100, 1, TRUE),
-('CLOTH-001', 'Cotton T-Shirt', 'Comfortable 100% cotton t-shirt', 19.99, 200, 2, TRUE),
-('CLOTH-002', 'Denim Jeans', 'Classic fit denim jeans', 49.99, 150, 2, TRUE),
-('CLOTH-003', 'Running Shoes', 'Lightweight running shoes with cushioned sole', 89.99, 75, 2, TRUE),
-('BOOK-001', 'Programming Guide', 'Comprehensive guide to modern programming', 44.99, 60, 3, TRUE),
-('BOOK-002', 'Cookbook', 'Collection of healthy recipes', 29.99, 80, 3, TRUE),
-('HOME-001', 'LED Desk Lamp', 'Adjustable LED desk lamp with USB charging', 34.99, 120, 4, TRUE),
-('SPORT-001', 'Yoga Mat', 'Non-slip yoga mat with carrying strap', 24.99, 90, 5, TRUE);
+INSERT INTO products (sku, name, description, price, stock_quantity, category_id, brand, image_url, status) VALUES
+('ELEC-001', 'Wireless Mouse', 'Ergonomic wireless mouse with USB receiver', 29.99, 100, 1, 'TechBrand', 'https://example.com/mouse.jpg', 'ACTIVE'),
+('ELEC-002', 'Bluetooth Keyboard', 'Slim bluetooth keyboard for all devices', 49.99, 50, 1, 'TechBrand', 'https://example.com/keyboard.jpg', 'ACTIVE'),
+('ELEC-003', 'USB-C Hub', '7-in-1 USB-C hub with HDMI and card reader', 39.99, 75, 1, 'TechBrand', 'https://example.com/hub.jpg', 'ACTIVE'),
+('ELEC-004', 'Wireless Headphones', 'Noise-cancelling wireless headphones', 149.99, 30, 1, 'AudioPro', 'https://example.com/headphones.jpg', 'ACTIVE'),
+('CLOTH-001', 'Cotton T-Shirt', 'Comfortable cotton t-shirt', 19.99, 200, 2, 'FashionCo', 'https://example.com/tshirt.jpg', 'ACTIVE'),
+('CLOTH-002', 'Denim Jeans', 'Classic fit denim jeans', 59.99, 150, 2, 'FashionCo', 'https://example.com/jeans.jpg', 'ACTIVE'),
+('CLOTH-003', 'Running Shoes', 'Lightweight running shoes', 89.99, 80, 2, 'SportWear', 'https://example.com/shoes.jpg', 'ACTIVE'),
+('BOOK-001', 'Spring Boot Guide', 'Comprehensive guide to Spring Boot', 39.99, 75, 3, 'TechBooks', 'https://example.com/springboot.jpg', 'ACTIVE'),
+('BOOK-002', 'Java Programming', 'Complete Java programming reference', 49.99, 60, 3, 'TechBooks', 'https://example.com/java.jpg', 'ACTIVE'),
+('HOME-001', 'LED Desk Lamp', 'Adjustable LED desk lamp', 34.99, 120, 4, 'HomeLux', 'https://example.com/lamp.jpg', 'ACTIVE'),
+('HOME-002', 'Coffee Maker', '12-cup programmable coffee maker', 79.99, 45, 4, 'KitchenPro', 'https://example.com/coffee.jpg', 'ACTIVE'),
+('SPORT-001', 'Yoga Mat', 'Non-slip exercise yoga mat', 24.99, 150, 5, 'FitGear', 'https://example.com/yogamat.jpg', 'ACTIVE'),
+('SPORT-002', 'Dumbbell Set', '20lb adjustable dumbbell set', 129.99, 40, 5, 'FitGear', 'https://example.com/dumbbells.jpg', 'ACTIVE');
 
 -- Insert sample user (password: Test@1234)
-INSERT INTO users (username, email, password, first_name, last_name, phone_number, active, email_verified) VALUES
-('testuser', 'test@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Test', 'User', '+1234567890', TRUE, TRUE);
+INSERT INTO users (username, email, password_hash, first_name, last_name, phone, status) VALUES
+('testuser', 'test@example.com', '$2a$10$XYZ123...', 'Test', 'User', '1234567890', 'ACTIVE'),
+('johndoe', 'john.doe@example.com', '$2a$10$ABC456...', 'John', 'Doe', '9876543210', 'ACTIVE');
 
--- Insert sample address for test user
-INSERT INTO addresses (user_id, address_line1, address_line2, city, state, postal_code, country, is_default, type) VALUES
-(1, '123 Main Street', 'Apt 4B', 'New York', 'NY', '10001', 'USA', TRUE, 'BOTH');
+-- Insert sample addresses
+INSERT INTO addresses (user_id, address_type, street_address, city, state, postal_code, country, is_default) VALUES
+(1, 'SHIPPING', '123 Main Street', 'New York', 'NY', '10001', 'USA', TRUE),
+(1, 'BILLING', '456 Oak Avenue', 'New York', 'NY', '10002', 'USA', FALSE),
+(2, 'SHIPPING', '789 Pine Road', 'Los Angeles', 'CA', '90001', 'USA', TRUE);

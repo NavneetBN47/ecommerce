@@ -1,7 +1,6 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,13 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Order entity representing completed purchases
+ * Order Entity representing orders table
  */
 @Entity
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_order_user", columnList = "user_id"),
-    @Index(name = "idx_order_status", columnList = "status"),
-    @Index(name = "idx_order_number", columnList = "order_number", unique = true)
+    @Index(name = "idx_user", columnList = "user_id"),
+    @Index(name = "idx_order_number", columnList = "order_number"),
+    @Index(name = "idx_status", columnList = "status"),
+    @Index(name = "idx_created", columnList = "created_at")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -35,32 +35,42 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull(message = "Order number is required")
-    @Column(name = "order_number", nullable = false, unique = true, length = 50)
-    private String orderNumber;
-
-    @NotNull(message = "User is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<OrderItem> items = new ArrayList<>();
+    @Column(name = "order_number", nullable = false, unique = true, length = 50)
+    private String orderNumber;
 
-    @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
-    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
-    private BigDecimal totalAmount;
+    @Column(name = "subtotal", nullable = false, precision = 10, scale = 2)
+    private BigDecimal subtotal;
 
-    @Column(name = "shipping_address", columnDefinition = "TEXT")
+    @Column(name = "tax", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal tax = BigDecimal.ZERO;
+
+    @Column(name = "shipping_cost", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingCost = BigDecimal.ZERO;
+
+    @Column(name = "total", nullable = false, precision = 10, scale = 2)
+    private BigDecimal total;
+
+    @Column(name = "shipping_address", nullable = false, columnDefinition = "TEXT")
     private String shippingAddress;
 
-    @Column(name = "billing_address", columnDefinition = "TEXT")
-    private String billingAddress;
+    @Column(name = "payment_method", length = 50)
+    private String paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 20)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -70,12 +80,27 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<OrderItem> items = new ArrayList<>();
+
     public enum OrderStatus {
-        PENDING,
-        CONFIRMED,
-        PROCESSING,
-        SHIPPED,
-        DELIVERED,
-        CANCELLED
+        PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+    }
+
+    public enum PaymentStatus {
+        PENDING, COMPLETED, FAILED, REFUNDED
+    }
+
+    public boolean canBeCancelled() {
+        return status == OrderStatus.PENDING || status == OrderStatus.CONFIRMED;
+    }
+
+    public void addItem(OrderItem item) {
+        if (items == null) {
+            items = new ArrayList<>();
+        }
+        items.add(item);
+        item.setOrder(this);
     }
 }

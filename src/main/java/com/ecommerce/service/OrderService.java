@@ -1,13 +1,23 @@
 package com.ecommerce.service;
 
-import com.ecommerce.dto.OrderDTO;
-import com.ecommerce.dto.OrderItemDTO;
+import com.ecommerce.dto.request.CheckoutRequest;
+import com.ecommerce.dto.response.OrderItemResponse;
+import com.ecommerce.dto.response.OrderResponse;
 import com.ecommerce.entity.*;
+import com.ecommerce.exception.BusinessException;
+import com.ecommerce.exception.InsufficientStockException;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.exception.ValidationException;
-import com.ecommerce.repository.*;
+import com.ecommerce.repository.AddressRepository;
+import com.ecommerce.repository.OrderRepository;
+import com.ecommerce.repository.ProductRepository;
+import com.ecommerce.repository.ShoppingCartRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,132 +28,153 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Service class for Order operations
+ * Service for order management operations
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
-    private final CartRepository cartRepository;
-    private final UserRepository userRepository;
+    private final ShoppingCartRepository cartRepository;
+    private final AddressRepository addressRepository;
     private final ProductRepository productRepository;
+    private final UserService userService;
 
-    /**
-     * Create order from active cart
-     */
-    public OrderDTO createOrderFromCart(Long userId, String shippingAddress, String billingAddress) {
-        log.info("Creating order from cart for user ID: {}", userId);
+    @Value("${app.order.tax-rate:0.08}")
+    private double taxRate;
 
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+    @Value("${app.order.default-shipping-cost:5.99}")
+    private double defaultShippingCost;
 
-        Cart cart = cartRepository.findActiveCartByUserId(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("No active cart found for user ID: " + userId));
+    @Value("${app.order.free-shipping-threshold:50.00}")
+    private double freeShippingThreshold;
+
+    @Transactional
+    public OrderResponse checkout(CheckoutRequest request) {
+        User currentUser = userService.getCurrentUser();
+        log.info("Processing checkout for user {}", currentUser.getId());
+
+        // Get active cart with items
+        ShoppingCart cart = cartRepository.findActiveCartByUserIdWithItems(currentUser.getId())
+            .orElseThrow(() -> new BusinessException("No active cart found"));
 
         if (cart.isEmpty()) {
-            throw new ValidationException("Cannot create order from empty cart");
+            throw new BusinessException("Cannot checkout with empty cart");
         }
 
-        // Validate stock for all items
-        for (CartItem cartItem : cart.getItems()) {
-            Product product = cartItem.getProduct();
-            if (product.getStockQuantity() < cartItem.getQuantity()) {
-                throw new ValidationException("Insufficient stock for product: " + product.getName());
+        // Validate all items are in stock
+        for (CartItem item : cart.getItems()) {
+            Product product = item.getProduct();
+            if (!product.hasStock(item.getQuantity())) {
+                throw new InsufficientStockException(
+                    product.getName(), item.getQuantity(), product.getStockQuantity());
             }
         }
 
+        // Get shipping address
+        Address address = addressRepository.findById(request.getAddressId())
+            .orElseThrow(() -> new ResourceNotFoundException("Address", "id", request.getAddressId()));
+
+        if (!address.getUser().getId().equals(currentUser.getId())) {
+            throw new BusinessException("Address does not belong to current user");
+        }
+
+        // Calculate totals
+        BigDecimal subtotal = cart.calculateTotal();
+        BigDecimal tax = subtotal.multiply(BigDecimal.valueOf(taxRate));
+        BigDecimal shippingCost = subtotal.compareTo(BigDecimal.valueOf(freeShippingThreshold)) >= 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(defaultShippingCost);
+        BigDecimal total = subtotal.add(tax).add(shippingCost);
+
         // Create order
-        String orderNumber = generateOrderNumber();
         Order order = Order.builder()
-            .orderNumber(orderNumber)
-            .user(user)
+            .user(currentUser)
+            .orderNumber(generateOrderNumber())
             .status(Order.OrderStatus.PENDING)
-            .totalAmount(cart.getTotalAmount())
-            .shippingAddress(shippingAddress)
-            .billingAddress(billingAddress)
+            .subtotal(subtotal)
+            .tax(tax)
+            .shippingCost(shippingCost)
+            .total(total)
+            .shippingAddress(address.getFullAddress())
+            .paymentMethod(request.getPaymentMethod())
+            .paymentStatus(Order.PaymentStatus.PENDING)
             .build();
 
-        Order savedOrder = orderRepository.save(order);
-
-        // Create order items and update stock
+        // Create order items and update product stock
         for (CartItem cartItem : cart.getItems()) {
+            Product product = cartItem.getProduct();
+            
             OrderItem orderItem = OrderItem.builder()
-                .order(savedOrder)
-                .product(cartItem.getProduct())
+                .order(order)
+                .product(product)
                 .quantity(cartItem.getQuantity())
                 .price(cartItem.getPrice())
+                .subtotal(cartItem.getSubtotal())
                 .build();
-            orderItemRepository.save(orderItem);
+            
+            order.addItem(orderItem);
 
             // Update product stock
-            Product product = cartItem.getProduct();
             product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
             productRepository.save(product);
         }
 
-        // Mark cart as checked out and delete
-        cart.setStatus(Cart.CartStatus.CHECKED_OUT);
+        order = orderRepository.save(order);
+
+        // Clear cart and mark as checked out
+        cart.clearItems();
+        cart.setStatus(ShoppingCart.CartStatus.CHECKED_OUT);
         cartRepository.save(cart);
-        cartRepository.delete(cart);
 
-        log.info("Order created successfully with order number: {}", orderNumber);
-
-        return convertToDTO(savedOrder);
+        log.info("Order created successfully: {}", order.getOrderNumber());
+        return mapToOrderResponse(order);
     }
 
     @Transactional(readOnly = true)
-    public OrderDTO getOrderById(Long orderId) {
-        log.info("Fetching order by ID: {}", orderId);
-        Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
-        return convertToDTO(order);
+    public Page<OrderResponse> getUserOrders(int page, int size) {
+        User currentUser = userService.getCurrentUser();
+        log.info("Fetching orders for user {}", currentUser.getId());
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return orderRepository.findByUserId(currentUser.getId(), pageable)
+            .map(this::mapToOrderResponse);
     }
 
     @Transactional(readOnly = true)
-    public OrderDTO getOrderByOrderNumber(String orderNumber) {
-        log.info("Fetching order by order number: {}", orderNumber);
-        Order order = orderRepository.findByOrderNumber(orderNumber)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with order number: " + orderNumber));
-        return convertToDTO(order);
-    }
+    public OrderResponse getOrderById(Long orderId) {
+        User currentUser = userService.getCurrentUser();
+        log.info("Fetching order {} for user {}", orderId, currentUser.getId());
 
-    @Transactional(readOnly = true)
-    public List<OrderDTO> getUserOrders(Long userId) {
-        log.info("Fetching orders for user ID: {}", userId);
-        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-    }
+        Order order = orderRepository.findByIdWithItems(orderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
-    public OrderDTO updateOrderStatus(Long orderId, Order.OrderStatus status) {
-        log.info("Updating order ID: {} to status: {}", orderId, status);
-
-        Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
-
-        order.setStatus(status);
-        Order updatedOrder = orderRepository.save(order);
-
-        log.info("Order status updated successfully");
-
-        return convertToDTO(updatedOrder);
-    }
-
-    public void cancelOrder(Long orderId) {
-        log.info("Cancelling order ID: {}", orderId);
-
-        Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
-
-        if (order.getStatus() == Order.OrderStatus.DELIVERED || order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new ValidationException("Cannot cancel order with status: " + order.getStatus());
+        if (!order.getUser().getId().equals(currentUser.getId())) {
+            throw new BusinessException("Order does not belong to current user");
         }
 
-        // Restore stock
+        return mapToOrderResponse(order);
+    }
+
+    @Transactional
+    public OrderResponse cancelOrder(Long orderId) {
+        User currentUser = userService.getCurrentUser();
+        log.info("Cancelling order {} for user {}", orderId, currentUser.getId());
+
+        Order order = orderRepository.findByIdWithItems(orderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (!order.getUser().getId().equals(currentUser.getId())) {
+            throw new BusinessException("Order does not belong to current user");
+        }
+
+        if (!order.canBeCancelled()) {
+            throw new BusinessException(
+                "Order cannot be cancelled. Current status: " + order.getStatus());
+        }
+
+        // Restore product stock
         for (OrderItem item : order.getItems()) {
             Product product = item.getProduct();
             product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
@@ -151,48 +182,49 @@ public class OrderService {
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
-        orderRepository.save(order);
+        order = orderRepository.save(order);
 
-        log.info("Order cancelled successfully: {}", orderId);
+        log.info("Order cancelled successfully: {}", order.getOrderNumber());
+        return mapToOrderResponse(order);
     }
 
     private String generateOrderNumber() {
-        return "ORD-" + LocalDateTime.now().getYear() +
-            String.format("%02d", LocalDateTime.now().getMonthValue()) +
-            "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        return "ORD-" + LocalDateTime.now().toString().replaceAll("[^0-9]", "").substring(0, 14)
+            + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
     }
 
-    private OrderDTO convertToDTO(Order order) {
-        List<OrderItemDTO> itemDTOs = order.getItems().stream()
-            .map(this::convertItemToDTO)
+    private OrderResponse mapToOrderResponse(Order order) {
+        List<OrderItemResponse> items = order.getItems().stream()
+            .map(this::mapToOrderItemResponse)
             .collect(Collectors.toList());
 
-        return OrderDTO.builder()
+        return OrderResponse.builder()
             .id(order.getId())
             .orderNumber(order.getOrderNumber())
             .userId(order.getUser().getId())
-            .username(order.getUser().getUsername())
-            .items(itemDTOs)
-            .status(order.getStatus())
-            .totalAmount(order.getTotalAmount())
+            .status(order.getStatus().name())
+            .subtotal(order.getSubtotal())
+            .tax(order.getTax())
+            .shippingCost(order.getShippingCost())
+            .total(order.getTotal())
             .shippingAddress(order.getShippingAddress())
-            .billingAddress(order.getBillingAddress())
+            .paymentMethod(order.getPaymentMethod())
+            .paymentStatus(order.getPaymentStatus().name())
+            .items(items)
             .createdAt(order.getCreatedAt())
             .updatedAt(order.getUpdatedAt())
             .build();
     }
 
-    private OrderItemDTO convertItemToDTO(OrderItem item) {
-        return OrderItemDTO.builder()
+    private OrderItemResponse mapToOrderItemResponse(OrderItem item) {
+        return OrderItemResponse.builder()
             .id(item.getId())
-            .orderId(item.getOrder().getId())
             .productId(item.getProduct().getId())
             .productName(item.getProduct().getName())
             .productSku(item.getProduct().getSku())
             .quantity(item.getQuantity())
             .price(item.getPrice())
             .subtotal(item.getSubtotal())
-            .createdAt(item.getCreatedAt())
             .build();
     }
 }

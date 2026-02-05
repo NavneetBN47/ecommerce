@@ -1,10 +1,6 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,13 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Product entity representing items available for purchase
+ * Product Entity representing products table
  */
 @Entity
 @Table(name = "products", indexes = {
-    @Index(name = "idx_product_name", columnList = "name"),
-    @Index(name = "idx_product_category", columnList = "category"),
-    @Index(name = "idx_product_sku", columnList = "sku", unique = true)
+    @Index(name = "idx_sku", columnList = "sku"),
+    @Index(name = "idx_category", columnList = "category_id"),
+    @Index(name = "idx_status", columnList = "status"),
+    @Index(name = "idx_name", columnList = "name")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -38,44 +35,36 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Product name is required")
-    @Column(nullable = false, length = 200)
-    private String name;
-
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
-    @NotBlank(message = "SKU is required")
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(name = "sku", nullable = false, unique = true, length = 50)
     private String sku;
 
-    @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "name", nullable = false, length = 255)
+    private String name;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @NotNull(message = "Stock quantity is required")
-    @Min(value = 0, message = "Stock quantity cannot be negative")
     @Column(name = "stock_quantity", nullable = false)
-    private Integer stockQuantity;
+    @Builder.Default
+    private Integer stockQuantity = 0;
 
-    @Column(length = 100)
-    private String category;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    @Column(name = "brand", length = 100)
+    private String brand;
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
     @Builder.Default
-    private Boolean active = true;
-
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    @Builder.Default
-    private List<CartItem> cartItems = new ArrayList<>();
-
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    @Builder.Default
-    private List<OrderItem> orderItems = new ArrayList<>();
+    private ProductStatus status = ProductStatus.ACTIVE;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -84,4 +73,24 @@ public class Product {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<CartItem> cartItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product")
+    @Builder.Default
+    private List<OrderItem> orderItems = new ArrayList<>();
+
+    public enum ProductStatus {
+        ACTIVE, INACTIVE, OUT_OF_STOCK, DISCONTINUED
+    }
+
+    public boolean isInStock() {
+        return stockQuantity != null && stockQuantity > 0;
+    }
+
+    public boolean hasStock(int quantity) {
+        return stockQuantity != null && stockQuantity >= quantity;
+    }
 }

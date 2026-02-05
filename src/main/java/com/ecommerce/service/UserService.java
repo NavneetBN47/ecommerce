@@ -1,135 +1,139 @@
 package com.ecommerce.service;
 
-import com.ecommerce.dto.UserDTO;
+import com.ecommerce.dto.request.LoginRequest;
+import com.ecommerce.dto.request.UserRegistrationRequest;
+import com.ecommerce.dto.response.LoginResponse;
+import com.ecommerce.dto.response.UserResponse;
 import com.ecommerce.entity.User;
+import com.ecommerce.exception.DuplicateResourceException;
+import com.ecommerce.exception.InvalidCredentialsException;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.exception.ValidationException;
 import com.ecommerce.repository.UserRepository;
+import com.ecommerce.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 /**
- * Service class for User operations
+ * Service for user management operations
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final CartService cartService;
 
-    public UserDTO createUser(UserDTO userDTO) {
-        log.info("Creating new user: {}", userDTO.getUsername());
+    @Transactional
+    public UserResponse registerUser(UserRegistrationRequest request) {
+        log.info("Registering new user with email: {}", request.getEmail());
 
-        if (userRepository.existsByUsername(userDTO.getUsername())) {
-            throw new ValidationException("Username already exists: " + userDTO.getUsername());
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateResourceException("User", "email", request.getEmail());
         }
 
-        if (userRepository.existsByEmail(userDTO.getEmail())) {
-            throw new ValidationException("Email already exists: " + userDTO.getEmail());
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new DuplicateResourceException("User", "username", request.getUsername());
         }
 
         User user = User.builder()
-            .username(userDTO.getUsername())
-            .email(userDTO.getEmail())
-            .password(passwordEncoder.encode(userDTO.getPassword()))
-            .firstName(userDTO.getFirstName())
-            .lastName(userDTO.getLastName())
-            .phoneNumber(userDTO.getPhoneNumber())
-            .active(true)
+            .username(request.getUsername())
+            .email(request.getEmail())
+            .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .firstName(request.getFirstName())
+            .lastName(request.getLastName())
+            .phone(request.getPhone())
+            .status(User.UserStatus.ACTIVE)
             .build();
 
-        User savedUser = userRepository.save(user);
-        log.info("User created successfully with ID: {}", savedUser.getId());
+        user = userRepository.save(user);
+        log.info("User registered successfully with ID: {}", user.getId());
 
-        return convertToDTO(savedUser);
+        return mapToUserResponse(user);
+    }
+
+    @Transactional
+    public LoginResponse login(LoginRequest request) {
+        log.info("User login attempt: {}", request.getUsernameOrEmail());
+
+        Authentication authentication = authenticationManager.authenticate(
+            new UsernamePasswordAuthenticationToken(
+                request.getUsernameOrEmail(),
+                request.getPassword()
+            )
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        User user = userRepository.findByEmailOrUsername(
+            request.getUsernameOrEmail(), request.getUsernameOrEmail())
+            .orElseThrow(InvalidCredentialsException::new);
+
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        log.info("User logged in successfully: {}", user.getUsername());
+
+        return LoginResponse.builder()
+            .token(token)
+            .tokenType("Bearer")
+            .expiresIn(jwtTokenProvider.getJwtExpirationMs())
+            .user(mapToUserResponse(user))
+            .build();
+    }
+
+    @Transactional
+    public void logout(Long userId) {
+        log.info("User logout: {}", userId);
+        
+        // Clear user's cart on logout
+        cartService.clearCartOnLogout(userId);
+        
+        // Clear security context
+        SecurityContextHolder.clearContext();
+        
+        log.info("User logged out successfully: {}", userId);
     }
 
     @Transactional(readOnly = true)
-    public UserDTO getUserById(Long id) {
-        log.info("Fetching user by ID: {}", id);
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
-        return convertToDTO(user);
+    public UserResponse getUserProfile(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        return mapToUserResponse(user);
     }
 
     @Transactional(readOnly = true)
-    public UserDTO getUserByUsername(String username) {
-        log.info("Fetching user by username: {}", username);
-        User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
-        return convertToDTO(user);
+    public User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        return userRepository.findByUsername(username)
+            .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
     }
 
-    @Transactional(readOnly = true)
-    public List<UserDTO> getAllUsers() {
-        log.info("Fetching all users");
-        return userRepository.findAll().stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-    }
-
-    public UserDTO updateUser(Long id, UserDTO userDTO) {
-        log.info("Updating user with ID: {}", id);
-
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
-
-        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
-            if (userRepository.existsByEmail(userDTO.getEmail())) {
-                throw new ValidationException("Email already exists: " + userDTO.getEmail());
-            }
-            user.setEmail(userDTO.getEmail());
-        }
-
-        if (userDTO.getFirstName() != null) {
-            user.setFirstName(userDTO.getFirstName());
-        }
-
-        if (userDTO.getLastName() != null) {
-            user.setLastName(userDTO.getLastName());
-        }
-
-        if (userDTO.getPhoneNumber() != null) {
-            user.setPhoneNumber(userDTO.getPhoneNumber());
-        }
-
-        User updatedUser = userRepository.save(user);
-        log.info("User updated successfully: {}", updatedUser.getId());
-
-        return convertToDTO(updatedUser);
-    }
-
-    public void deleteUser(Long id) {
-        log.info("Deleting user with ID: {}", id);
-
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found with ID: " + id);
-        }
-
-        userRepository.deleteById(id);
-        log.info("User deleted successfully: {}", id);
-    }
-
-    private UserDTO convertToDTO(User user) {
-        return UserDTO.builder()
+    private UserResponse mapToUserResponse(User user) {
+        return UserResponse.builder()
             .id(user.getId())
             .username(user.getUsername())
             .email(user.getEmail())
             .firstName(user.getFirstName())
             .lastName(user.getLastName())
-            .phoneNumber(user.getPhoneNumber())
-            .active(user.getActive())
+            .phone(user.getPhone())
+            .status(user.getStatus().name())
             .createdAt(user.getCreatedAt())
-            .updatedAt(user.getUpdatedAt())
+            .lastLoginAt(user.getLastLoginAt())
             .build();
     }
 }

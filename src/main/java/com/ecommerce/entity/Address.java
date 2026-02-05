@@ -1,7 +1,10 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -9,15 +12,15 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 /**
- * Address entity for user shipping and billing addresses
+ * Address Entity representing addresses table
  */
 @Entity
 @Table(name = "addresses", indexes = {
-    @Index(name = "idx_address_user", columnList = "user_id")
+    @Index(name = "idx_user", columnList = "user_id"),
+    @Index(name = "idx_default", columnList = "is_default")
 })
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -31,32 +34,29 @@ public class Address {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "address_line1", nullable = false, length = 200)
-    private String addressLine1;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "address_type", length = 20)
+    @Builder.Default
+    private AddressType addressType = AddressType.SHIPPING;
 
-    @Column(name = "address_line2", length = 200)
-    private String addressLine2;
+    @Column(name = "street_address", nullable = false, length = 255)
+    private String streetAddress;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "city", nullable = false, length = 100)
     private String city;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "state", nullable = false, length = 100)
     private String state;
 
     @Column(name = "postal_code", nullable = false, length = 20)
     private String postalCode;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "country", nullable = false, length = 100)
     private String country;
 
     @Column(name = "is_default")
     @Builder.Default
     private Boolean isDefault = false;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    @Builder.Default
-    private AddressType type = AddressType.SHIPPING;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -67,8 +67,11 @@ public class Address {
     private LocalDateTime updatedAt;
 
     public enum AddressType {
-        SHIPPING,
-        BILLING,
-        BOTH
+        SHIPPING, BILLING, BOTH
+    }
+
+    public String getFullAddress() {
+        return String.format("%s, %s, %s %s, %s", 
+            streetAddress, city, state, postalCode, country);
     }
 }

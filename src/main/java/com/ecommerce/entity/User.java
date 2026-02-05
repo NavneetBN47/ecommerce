@@ -1,8 +1,6 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,12 +14,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * User entity representing registered users in the system
+ * User Entity representing users table
  */
 @Entity
 @Table(name = "users", indexes = {
-    @Index(name = "idx_user_email", columnList = "email", unique = true),
-    @Index(name = "idx_user_username", columnList = "username", unique = true)
+    @Index(name = "idx_email", columnList = "email"),
+    @Index(name = "idx_username", columnList = "username"),
+    @Index(name = "idx_status", columnList = "status")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -34,39 +33,28 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Username is required")
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email should be valid")
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
 
-    @NotBlank(message = "Password is required")
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "password_hash", nullable = false, length = 255)
+    private String passwordHash;
 
-    @Column(name = "first_name", length = 50)
+    @Column(name = "first_name", length = 100)
     private String firstName;
 
-    @Column(name = "last_name", length = 50)
+    @Column(name = "last_name", length = 100)
     private String lastName;
 
-    @Column(name = "phone_number", length = 20)
-    private String phoneNumber;
+    @Column(name = "phone", length = 20)
+    private String phone;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
     @Builder.Default
-    private Boolean active = true;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Cart> carts = new ArrayList<>();
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    @Builder.Default
-    private List<Order> orders = new ArrayList<>();
+    private UserStatus status = UserStatus.ACTIVE;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -75,4 +63,23 @@ public class User {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ShoppingCart> shoppingCarts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Order> orders = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Address> addresses = new ArrayList<>();
+
+    public enum UserStatus {
+        ACTIVE, INACTIVE, SUSPENDED, DELETED
+    }
 }

@@ -1,75 +1,113 @@
+```mermaid
 erDiagram
-    USERS ||--o{ CARTS : "has"
+    USERS ||--o{ SHOPPING_CARTS : "has"
     USERS ||--o{ ORDERS : "places"
-    CARTS ||--o{ CART_ITEMS : "contains"
-    PRODUCTS ||--o{ CART_ITEMS : "included in"
-    PRODUCTS ||--o{ ORDER_ITEMS : "included in"
+    USERS ||--o{ ADDRESSES : "has"
+    
+    CATEGORIES ||--o{ CATEGORIES : "contains"
+    CATEGORIES ||--o{ PRODUCTS : "categorizes"
+    
+    PRODUCTS ||--o{ CART_ITEMS : "included_in"
+    PRODUCTS ||--o{ ORDER_ITEMS : "ordered_as"
+    
+    SHOPPING_CARTS ||--o{ CART_ITEMS : "contains"
+    
     ORDERS ||--o{ ORDER_ITEMS : "contains"
-
+    
     USERS {
-        bigint id PK
-        varchar username UK "NOT NULL"
-        varchar email UK "NOT NULL"
-        varchar password "NOT NULL"
-        varchar first_name
-        varchar last_name
-        varchar phone_number
-        boolean active "DEFAULT TRUE"
-        timestamp created_at "NOT NULL"
-        timestamp updated_at
+        BIGINT id PK
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR first_name
+        VARCHAR last_name
+        VARCHAR phone
+        VARCHAR status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        TIMESTAMP last_login_at
     }
-
+    
+    CATEGORIES {
+        BIGINT id PK
+        VARCHAR name UK
+        TEXT description
+        BIGINT parent_category_id FK
+        VARCHAR status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
     PRODUCTS {
-        bigint id PK
-        varchar name "NOT NULL"
-        text description
-        varchar sku UK "NOT NULL"
-        decimal price "NOT NULL CHECK > 0"
-        integer stock_quantity "NOT NULL CHECK >= 0"
-        varchar category
-        varchar image_url
-        boolean active "DEFAULT TRUE"
-        timestamp created_at "NOT NULL"
-        timestamp updated_at
+        BIGINT id PK
+        VARCHAR sku UK
+        VARCHAR name
+        TEXT description
+        DECIMAL price
+        INT stock_quantity
+        BIGINT category_id FK
+        VARCHAR brand
+        VARCHAR image_url
+        VARCHAR status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
-    CARTS {
-        bigint id PK
-        bigint user_id FK "NOT NULL"
-        varchar status "DEFAULT ACTIVE"
-        decimal total_amount "DEFAULT 0.00"
-        integer total_items "DEFAULT 0"
-        timestamp created_at "NOT NULL"
-        timestamp updated_at
+    
+    SHOPPING_CARTS {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
     CART_ITEMS {
-        bigint id PK
-        bigint cart_id FK "NOT NULL"
-        bigint product_id FK "NOT NULL"
-        integer quantity "NOT NULL CHECK >= 1"
-        decimal price "NOT NULL"
-        timestamp created_at "NOT NULL"
-        timestamp updated_at
+        BIGINT id PK
+        BIGINT cart_id FK
+        BIGINT product_id FK
+        INT quantity
+        DECIMAL price
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
     ORDERS {
-        bigint id PK
-        varchar order_number UK "NOT NULL"
-        bigint user_id FK "NOT NULL"
-        varchar status "DEFAULT PENDING"
-        decimal total_amount "NOT NULL"
-        text shipping_address
-        text billing_address
-        timestamp created_at "NOT NULL"
-        timestamp updated_at
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR order_number UK
+        VARCHAR status
+        DECIMAL subtotal
+        DECIMAL tax
+        DECIMAL shipping_cost
+        DECIMAL total
+        TEXT shipping_address
+        VARCHAR payment_method
+        VARCHAR payment_status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
     ORDER_ITEMS {
-        bigint id PK
-        bigint order_id FK "NOT NULL"
-        bigint product_id FK "NOT NULL"
-        integer quantity "NOT NULL CHECK >= 1"
-        decimal price "NOT NULL"
-        timestamp created_at "NOT NULL"
+        BIGINT id PK
+        BIGINT order_id FK
+        BIGINT product_id FK
+        INT quantity
+        DECIMAL price
+        DECIMAL subtotal
+        TIMESTAMP created_at
     }
+    
+    ADDRESSES {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR address_type
+        VARCHAR street_address
+        VARCHAR city
+        VARCHAR state
+        VARCHAR postal_code
+        VARCHAR country
+        BOOLEAN is_default
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+```
