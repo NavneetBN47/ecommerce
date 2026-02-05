@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * DTO for Product entity
+ * Data Transfer Object for Product entity
  */
 @Data
 @Builder
@@ -23,43 +23,33 @@ public class ProductDTO {
     private Long id;
 
     @NotBlank(message = "SKU is required")
+    @Size(max = 50, message = "SKU must not exceed 50 characters")
     private String sku;
 
     @NotBlank(message = "Product name is required")
     @Size(max = 200, message = "Product name must not exceed 200 characters")
     private String name;
 
+    @Size(max = 2000, message = "Description must not exceed 2000 characters")
     private String description;
 
     @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @DecimalMin(value = "0.01", message = "Price must be greater than 0")
+    @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 integer digits and 2 decimal places")
     private BigDecimal price;
-
-    private BigDecimal discountPrice;
 
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")
     private Integer stockQuantity;
 
+    @Size(max = 500, message = "Image URL must not exceed 500 characters")
+    private String imageUrl;
+
     private Long categoryId;
 
     private String categoryName;
 
-    private String imageUrl;
-
     private Boolean active;
-
-    private Boolean featured;
-
-    private String brand;
-
-    private BigDecimal rating;
-
-    private Integer reviewCount;
-
-    private BigDecimal effectivePrice;
-
-    private Boolean inStock;
 
     private LocalDateTime createdAt;
 

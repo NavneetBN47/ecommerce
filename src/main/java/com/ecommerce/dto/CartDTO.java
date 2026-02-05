@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO for Cart entity
+ * Data Transfer Object for Cart entity
  */
 @Data
 @Builder
@@ -26,11 +26,9 @@ public class CartDTO {
 
     private List<CartItemDTO> items;
 
-    private Integer totalItems;
+    private BigDecimal totalAmount;
 
-    private BigDecimal totalPrice;
-
-    private Boolean isEmpty;
+    private Integer totalItemCount;
 
     private LocalDateTime createdAt;
 

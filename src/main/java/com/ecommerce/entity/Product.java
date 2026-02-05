@@ -16,8 +16,8 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "products", indexes = {
-    @Index(name = "idx_product_sku", columnList = "sku", unique = true),
     @Index(name = "idx_product_name", columnList = "name"),
+    @Index(name = "idx_product_sku", columnList = "sku", unique = true),
     @Index(name = "idx_product_category", columnList = "category_id")
 })
 @EntityListeners(AuditingEntityListener.class)
@@ -38,43 +38,26 @@ public class Product {
     @Column(nullable = false, length = 200)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(length = 2000)
     private String description;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "discount_price", precision = 10, scale = 2)
-    private BigDecimal discountPrice;
-
     @Column(name = "stock_quantity", nullable = false)
     @Builder.Default
     private Integer stockQuantity = 0;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
-
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;
-
-    @Column(nullable = false)
-    @Builder.Default
-    private Boolean featured = false;
-
-    @Column(length = 100)
-    private String brand;
-
-    @Column(precision = 3, scale = 2)
-    private BigDecimal rating;
-
-    @Column(name = "review_count")
-    @Builder.Default
-    private Integer reviewCount = 0;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -92,27 +75,42 @@ public class Product {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Business logic methods
-    public boolean isInStock() {
-        return stockQuantity != null && stockQuantity > 0;
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
     }
 
-    public boolean hasStock(int quantity) {
-        return stockQuantity != null && stockQuantity >= quantity;
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
-    public BigDecimal getEffectivePrice() {
-        return discountPrice != null ? discountPrice : price;
+    /**
+     * Check if product has sufficient stock
+     */
+    public boolean hasStock(Integer quantity) {
+        return this.stockQuantity >= quantity;
     }
 
-    public void decreaseStock(int quantity) {
+    /**
+     * Reduce stock quantity
+     */
+    public void reduceStock(Integer quantity) {
         if (!hasStock(quantity)) {
-            throw new IllegalStateException("Insufficient stock for product: " + name);
+            throw new IllegalStateException("Insufficient stock for product: " + this.name);
         }
         this.stockQuantity -= quantity;
     }
 
-    public void increaseStock(int quantity) {
+    /**
+     * Increase stock quantity
+     */
+    public void increaseStock(Integer quantity) {
         this.stockQuantity += quantity;
     }
 }

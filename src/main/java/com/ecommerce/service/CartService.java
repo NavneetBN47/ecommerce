@@ -8,296 +8,214 @@ import com.ecommerce.entity.Product;
 import com.ecommerce.entity.User;
 import com.ecommerce.exception.InsufficientStockException;
 import com.ecommerce.exception.ResourceNotFoundException;
+import com.ecommerce.mapper.CartMapper;
 import com.ecommerce.repository.CartItemRepository;
 import com.ecommerce.repository.CartRepository;
 import com.ecommerce.repository.ProductRepository;
 import com.ecommerce.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 /**
- * Service layer for Cart operations
- * Implements lazy cart creation, auto-delete empty cart, and logout cleanup logic
+ * Service class for Cart operations
+ * Implements lazy cart creation and auto-delete when empty
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-
-    @Value("${app.cart.auto-delete-empty:true}")
-    private boolean autoDeleteEmptyCart;
-
-    @Value("${app.cart.cleanup-on-logout:true}")
-    private boolean cleanupOnLogout;
+    private final CartMapper cartMapper;
 
     /**
-     * Get or create cart for user (lazy cart creation)
+     * Get or create cart for user (lazy creation)
      */
-    @Transactional
     public CartDTO getOrCreateCart(Long userId) {
         log.debug("Getting or creating cart for user ID: {}", userId);
-        
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-            .orElseGet(() -> createCartForUser(userId));
-        
-        return mapToDTO(cart);
+
+        // Verify user exists
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        // Try to find existing cart
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                // Create new cart if not exists (lazy creation)
+                log.info("Creating new cart for user ID: {}", userId);
+                Cart newCart = Cart.builder()
+                    .user(user)
+                    .build();
+                return cartRepository.save(newCart);
+            });
+
+        return cartMapper.toDTO(cart);
     }
 
+    /**
+     * Add item to cart
+     */
+    public CartDTO addItemToCart(Long userId, CartItemDTO cartItemDTO) {
+        log.info("Adding item to cart for user ID: {}", userId);
+
+        // Get or create cart
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+                Cart newCart = Cart.builder().user(user).build();
+                return cartRepository.save(newCart);
+            });
+
+        // Get product
+        Product product = productRepository.findById(cartItemDTO.getProductId())
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + cartItemDTO.getProductId()));
+
+        // Check stock availability
+        if (!product.hasStock(cartItemDTO.getQuantity())) {
+            throw new InsufficientStockException("Insufficient stock for product: " + product.getName());
+        }
+
+        // Check if item already exists in cart
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cart.getId(), product.getId())
+            .orElse(null);
+
+        if (cartItem != null) {
+            // Update quantity if item exists
+            int newQuantity = cartItem.getQuantity() + cartItemDTO.getQuantity();
+            if (!product.hasStock(newQuantity)) {
+                throw new InsufficientStockException("Insufficient stock for product: " + product.getName());
+            }
+            cartItem.updateQuantity(newQuantity);
+            log.info("Updated cart item quantity for product: {}", product.getName());
+        } else {
+            // Create new cart item
+            cartItem = CartItem.builder()
+                .cart(cart)
+                .product(product)
+                .quantity(cartItemDTO.getQuantity())
+                .price(product.getPrice())
+                .build();
+            cart.addItem(cartItem);
+            log.info("Added new item to cart: {}", product.getName());
+        }
+
+        cartItemRepository.save(cartItem);
+        cart.recalculateTotal();
+        Cart savedCart = cartRepository.save(cart);
+
+        return cartMapper.toDTO(savedCart);
+    }
+
+    /**
+     * Update cart item quantity
+     */
+    public CartDTO updateCartItemQuantity(Long userId, Long cartItemId, Integer quantity) {
+        log.info("Updating cart item quantity for user ID: {}", userId);
+
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
+
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart item not found with ID: " + cartItemId));
+
+        // Verify cart item belongs to user's cart
+        if (!cartItem.getCart().getId().equals(cart.getId())) {
+            throw new IllegalArgumentException("Cart item does not belong to user's cart");
+        }
+
+        // Check stock availability
+        if (!cartItem.getProduct().hasStock(quantity)) {
+            throw new InsufficientStockException("Insufficient stock for product: " + cartItem.getProduct().getName());
+        }
+
+        // Update quantity
+        cartItem.updateQuantity(quantity);
+        cartItemRepository.save(cartItem);
+
+        cart.recalculateTotal();
+        Cart savedCart = cartRepository.save(cart);
+
+        return cartMapper.toDTO(savedCart);
+    }
+
+    /**
+     * Remove item from cart
+     */
+    public CartDTO removeItemFromCart(Long userId, Long cartItemId) {
+        log.info("Removing item from cart for user ID: {}", userId);
+
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
+
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart item not found with ID: " + cartItemId));
+
+        // Verify cart item belongs to user's cart
+        if (!cartItem.getCart().getId().equals(cart.getId())) {
+            throw new IllegalArgumentException("Cart item does not belong to user's cart");
+        }
+
+        cart.removeItem(cartItem);
+        cartItemRepository.delete(cartItem);
+
+        // Auto-delete cart if empty
+        if (cart.isEmpty()) {
+            log.info("Cart is empty, deleting cart for user ID: {}", userId);
+            cartRepository.delete(cart);
+            return CartDTO.builder().userId(userId).build();
+        }
+
+        cart.recalculateTotal();
+        Cart savedCart = cartRepository.save(cart);
+
+        return cartMapper.toDTO(savedCart);
+    }
+
+    /**
+     * Clear cart (remove all items)
+     */
+    public void clearCart(Long userId) {
+        log.info("Clearing cart for user ID: {}", userId);
+
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
+
+        cartItemRepository.deleteByCartId(cart.getId());
+        
+        // Auto-delete cart when cleared
+        cartRepository.delete(cart);
+        log.info("Cart cleared and deleted for user ID: {}", userId);
+    }
+
+    /**
+     * Get cart by user ID
+     */
     @Transactional(readOnly = true)
     public CartDTO getCartByUserId(Long userId) {
         log.debug("Fetching cart for user ID: {}", userId);
-        
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cart", "userId", userId));
-        
-        return mapToDTO(cart);
+
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
+
+        return cartMapper.toDTO(cart);
     }
 
     /**
-     * Add item to cart with quantity check
+     * Delete cart on logout (cleanup)
      */
-    @Transactional
-    public CartDTO addItemToCart(Long userId, Long productId, Integer quantity) {
-        log.info("Adding product ID {} with quantity {} to cart for user ID: {}", productId, quantity, userId);
-        
-        // Get or create cart (lazy creation)
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-            .orElseGet(() -> createCartForUser(userId));
-        
-        // Validate product and stock
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
-        
-        if (!product.hasStock(quantity)) {
-            throw new InsufficientStockException(
-                String.format("Insufficient stock for product '%s'. Available: %d, Requested: %d",
-                    product.getName(), product.getStockQuantity(), quantity));
-        }
-        
-        // Check if item already exists in cart
-        CartItem existingItem = cart.findItemByProduct(product);
-        
-        if (existingItem != null) {
-            // Update quantity
-            int newQuantity = existingItem.getQuantity() + quantity;
-            if (!product.hasStock(newQuantity)) {
-                throw new InsufficientStockException(
-                    String.format("Insufficient stock for product '%s'. Available: %d, Requested: %d",
-                        product.getName(), product.getStockQuantity(), newQuantity));
-            }
-            existingItem.setQuantity(newQuantity);
-            existingItem.updateSubtotal();
-            cartItemRepository.save(existingItem);
-        } else {
-            // Create new cart item
-            CartItem cartItem = CartItem.builder()
-                .cart(cart)
-                .product(product)
-                .quantity(quantity)
-                .unitPrice(product.getEffectivePrice())
-                .build();
-            cartItem.updateSubtotal();
-            cart.addItem(cartItem);
-            cartItemRepository.save(cartItem);
-        }
-        
-        cart.recalculateTotals();
-        Cart savedCart = cartRepository.save(cart);
-        
-        log.info("Item added to cart successfully for user ID: {}", userId);
-        return mapToDTO(savedCart);
-    }
+    public void deleteCartOnLogout(Long userId) {
+        log.info("Deleting cart on logout for user ID: {}", userId);
 
-    @Transactional
-    public CartDTO updateCartItemQuantity(Long userId, Long productId, Integer quantity) {
-        log.info("Updating cart item quantity for user ID: {}, product ID: {}, new quantity: {}", 
-            userId, productId, quantity);
-        
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cart", "userId", userId));
-        
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
-        
-        CartItem cartItem = cart.findItemByProduct(product);
-        if (cartItem == null) {
-            throw new ResourceNotFoundException("CartItem", "productId", productId);
-        }
-        
-        if (quantity <= 0) {
-            // Remove item if quantity is 0 or negative
-            cart.removeItem(cartItem);
-            cartItemRepository.delete(cartItem);
-        } else {
-            // Validate stock
-            if (!product.hasStock(quantity)) {
-                throw new InsufficientStockException(
-                    String.format("Insufficient stock for product '%s'. Available: %d, Requested: %d",
-                        product.getName(), product.getStockQuantity(), quantity));
-            }
-            cartItem.setQuantity(quantity);
-            cartItem.updateSubtotal();
-            cartItemRepository.save(cartItem);
-        }
-        
-        cart.recalculateTotals();
-        Cart savedCart = cartRepository.save(cart);
-        
-        // Auto-delete empty cart if enabled
-        if (autoDeleteEmptyCart && savedCart.isEmpty()) {
-            log.info("Auto-deleting empty cart for user ID: {}", userId);
-            cartRepository.delete(savedCart);
-            return CartDTO.builder().userId(userId).isEmpty(true).build();
-        }
-        
-        log.info("Cart item quantity updated successfully for user ID: {}", userId);
-        return mapToDTO(savedCart);
-    }
-
-    @Transactional
-    public CartDTO removeItemFromCart(Long userId, Long productId) {
-        log.info("Removing product ID {} from cart for user ID: {}", productId, userId);
-        
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cart", "userId", userId));
-        
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
-        
-        CartItem cartItem = cart.findItemByProduct(product);
-        if (cartItem == null) {
-            throw new ResourceNotFoundException("CartItem", "productId", productId);
-        }
-        
-        cart.removeItem(cartItem);
-        cartItemRepository.delete(cartItem);
-        cart.recalculateTotals();
-        Cart savedCart = cartRepository.save(cart);
-        
-        // Auto-delete empty cart if enabled
-        if (autoDeleteEmptyCart && savedCart.isEmpty()) {
-            log.info("Auto-deleting empty cart for user ID: {}", userId);
-            cartRepository.delete(savedCart);
-            return CartDTO.builder().userId(userId).isEmpty(true).build();
-        }
-        
-        log.info("Item removed from cart successfully for user ID: {}", userId);
-        return mapToDTO(savedCart);
-    }
-
-    @Transactional
-    public void clearCart(Long userId) {
-        log.info("Clearing cart for user ID: {}", userId);
-        
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cart", "userId", userId));
-        
-        cart.clearItems();
-        cartItemRepository.deleteByCartId(cart.getId());
-        
-        // Auto-delete empty cart if enabled
-        if (autoDeleteEmptyCart) {
-            log.info("Auto-deleting empty cart for user ID: {}", userId);
-            cartRepository.delete(cart);
-        } else {
-            cartRepository.save(cart);
-        }
-        
-        log.info("Cart cleared successfully for user ID: {}", userId);
-    }
-
-    /**
-     * Cleanup cart on user logout
-     * Implements logout cleanup business rule
-     */
-    @Transactional
-    public void cleanupCartOnLogout(Long userId) {
-        if (!cleanupOnLogout) {
-            log.debug("Cart cleanup on logout is disabled");
-            return;
-        }
-        
-        log.info("Cleaning up cart for user ID {} on logout", userId);
-        
         cartRepository.findByUserId(userId).ifPresent(cart -> {
-            if (cart.isEmpty()) {
-                log.info("Deleting empty cart for user ID {} on logout", userId);
-                cartRepository.delete(cart);
-            }
+            cartRepository.delete(cart);
+            log.info("Cart deleted on logout for user ID: {}", userId);
         });
-    }
-
-    /**
-     * Scheduled cleanup of abandoned empty carts
-     */
-    @Transactional
-    public int cleanupAbandonedEmptyCarts() {
-        if (!autoDeleteEmptyCart) {
-            log.debug("Auto-delete empty cart is disabled");
-            return 0;
-        }
-        
-        log.info("Running cleanup for abandoned empty carts");
-        int deletedCount = cartRepository.deleteEmptyCarts();
-        log.info("Deleted {} abandoned empty carts", deletedCount);
-        return deletedCount;
-    }
-
-    private Cart createCartForUser(Long userId) {
-        log.info("Creating new cart for user ID: {}", userId);
-        
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        
-        Cart cart = Cart.builder()
-            .user(user)
-            .build();
-        
-        return cartRepository.save(cart);
-    }
-
-    private CartDTO mapToDTO(Cart cart) {
-        List<CartItemDTO> itemDTOs = cart.getItems().stream()
-            .map(this::mapItemToDTO)
-            .collect(Collectors.toList());
-        
-        return CartDTO.builder()
-            .id(cart.getId())
-            .userId(cart.getUser().getId())
-            .items(itemDTOs)
-            .totalItems(cart.getTotalItems())
-            .totalPrice(cart.getTotalPrice())
-            .isEmpty(cart.isEmpty())
-            .createdAt(cart.getCreatedAt())
-            .updatedAt(cart.getUpdatedAt())
-            .build();
-    }
-
-    private CartItemDTO mapItemToDTO(CartItem item) {
-        return CartItemDTO.builder()
-            .id(item.getId())
-            .cartId(item.getCart().getId())
-            .productId(item.getProduct().getId())
-            .productName(item.getProduct().getName())
-            .productSku(item.getProduct().getSku())
-            .productImageUrl(item.getProduct().getImageUrl())
-            .quantity(item.getQuantity())
-            .unitPrice(item.getUnitPrice())
-            .subtotal(item.getSubtotal())
-            .availableStock(item.getProduct().getStockQuantity())
-            .createdAt(item.getCreatedAt())
-            .updatedAt(item.getUpdatedAt())
-            .build();
     }
 }

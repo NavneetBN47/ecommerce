@@ -12,8 +12,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Cart entity representing user shopping cart
- * Implements lazy creation and auto-delete empty cart logic
+ * Cart entity representing user's shopping cart
+ * Implements lazy creation and auto-delete when empty
  */
 @Entity
 @Table(name = "carts", indexes = {
@@ -39,13 +39,9 @@ public class Cart {
     @Builder.Default
     private Set<CartItem> items = new HashSet<>();
 
-    @Column(name = "total_items")
+    @Column(name = "total_amount", precision = 10, scale = 2)
     @Builder.Default
-    private Integer totalItems = 0;
-
-    @Column(name = "total_price", precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal totalPrice = BigDecimal.ZERO;
+    private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -55,42 +51,54 @@ public class Cart {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Business logic methods
+    /**
+     * Add item to cart
+     */
     public void addItem(CartItem item) {
         items.add(item);
         item.setCart(this);
-        recalculateTotals();
+        recalculateTotal();
     }
 
+    /**
+     * Remove item from cart
+     */
     public void removeItem(CartItem item) {
         items.remove(item);
         item.setCart(null);
-        recalculateTotals();
+        recalculateTotal();
     }
 
+    /**
+     * Clear all items from cart
+     */
     public void clearItems() {
         items.clear();
-        recalculateTotals();
+        recalculateTotal();
     }
 
-    public void recalculateTotals() {
-        this.totalItems = items.stream()
-            .mapToInt(CartItem::getQuantity)
-            .sum();
-        
-        this.totalPrice = items.stream()
+    /**
+     * Recalculate total amount
+     */
+    public void recalculateTotal() {
+        this.totalAmount = items.stream()
             .map(CartItem::getSubtotal)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    /**
+     * Check if cart is empty
+     */
     public boolean isEmpty() {
-        return items.isEmpty() || totalItems == 0;
+        return items == null || items.isEmpty();
     }
 
-    public CartItem findItemByProduct(Product product) {
+    /**
+     * Get total item count
+     */
+    public int getTotalItemCount() {
         return items.stream()
-            .filter(item -> item.getProduct().getId().equals(product.getId()))
-            .findFirst()
-            .orElse(null);
+            .mapToInt(CartItem::getQuantity)
+            .sum();
     }
 }

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO for Order entity
+ * Data Transfer Object for Order entity
  */
 @Data
 @Builder
@@ -28,37 +28,26 @@ public class OrderDTO {
 
     private Long userId;
 
-    private String username;
-
     private List<OrderItemDTO> items;
+
+    @NotNull(message = "Shipping address ID is required")
+    private Long shippingAddressId;
+
+    private AddressDTO shippingAddress;
 
     private Order.OrderStatus status;
 
-    @NotNull(message = "Total amount is required")
     private BigDecimal totalAmount;
 
-    private BigDecimal shippingAmount;
+    private BigDecimal shippingCost;
 
     private BigDecimal taxAmount;
 
-    private BigDecimal discountAmount;
-
-    private BigDecimal grandTotal;
-
-    @NotNull(message = "Shipping address is required")
-    private Long shippingAddressId;
-
-    private Long billingAddressId;
-
-    private Order.PaymentMethod paymentMethod;
-
-    private Order.PaymentStatus paymentStatus;
-
     private LocalDateTime orderDate;
 
-    private LocalDateTime shippedDate;
+    private String paymentMethod;
 
-    private LocalDateTime deliveredDate;
+    private String paymentStatus;
 
     private String notes;
 

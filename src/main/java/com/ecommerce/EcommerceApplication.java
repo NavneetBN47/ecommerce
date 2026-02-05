@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
- * Main application class for E-Commerce Backend
+ * Main application class for E-Commerce Spring Boot Application
  * 
  * @author Backend Automation Agent
  * @version 1.0.0

@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * DTO for CartItem entity
+ * Data Transfer Object for CartItem entity
  */
 @Data
 @Builder
@@ -23,8 +23,6 @@ public class CartItemDTO {
 
     private Long id;
 
-    private Long cartId;
-
     @NotNull(message = "Product ID is required")
     private Long productId;
 
@@ -32,17 +30,13 @@ public class CartItemDTO {
 
     private String productSku;
 
-    private String productImageUrl;
+    private BigDecimal price;
 
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
 
-    private BigDecimal unitPrice;
-
     private BigDecimal subtotal;
-
-    private Integer availableStock;
 
     private LocalDateTime createdAt;
 

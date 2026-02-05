@@ -18,14 +18,11 @@ import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
 
-    private Boolean success;
-
+    private boolean success;
     private String message;
-
     private T data;
-
-    private String error;
-
+    private Object errors;
+    
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
 
@@ -46,19 +43,19 @@ public class ApiResponse<T> {
             .build();
     }
 
-    public static <T> ApiResponse<T> error(String error) {
+    public static <T> ApiResponse<T> error(String message) {
         return ApiResponse.<T>builder()
             .success(false)
-            .error(error)
+            .message(message)
             .timestamp(LocalDateTime.now())
             .build();
     }
 
-    public static <T> ApiResponse<T> error(String message, String error) {
+    public static <T> ApiResponse<T> error(String message, Object errors) {
         return ApiResponse.<T>builder()
             .success(false)
             .message(message)
-            .error(error)
+            .errors(errors)
             .timestamp(LocalDateTime.now())
             .build();
     }

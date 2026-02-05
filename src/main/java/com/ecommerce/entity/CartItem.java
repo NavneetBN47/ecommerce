@@ -42,8 +42,8 @@ public class CartItem {
     @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal unitPrice;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
@@ -56,23 +56,19 @@ public class CartItem {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Business logic methods
-    public void updateSubtotal() {
-        this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+    @PrePersist
+    @PreUpdate
+    protected void calculateSubtotal() {
+        if (price != null && quantity != null) {
+            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
+        }
     }
 
-    public void increaseQuantity(int amount) {
-        this.quantity += amount;
-        updateSubtotal();
-    }
-
-    public void decreaseQuantity(int amount) {
-        this.quantity = Math.max(0, this.quantity - amount);
-        updateSubtotal();
-    }
-
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
-        updateSubtotal();
+    /**
+     * Update quantity and recalculate subtotal
+     */
+    public void updateQuantity(Integer newQuantity) {
+        this.quantity = newQuantity;
+        calculateSubtotal();
     }
 }

@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
  * Address entity for user shipping and billing addresses
  */
 @Entity
-@Table(name = "addresses")
+@Table(name = "addresses", indexes = {
+    @Index(name = "idx_address_user", columnList = "user_id")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -29,10 +31,10 @@ public class Address {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "address_line1", nullable = false, length = 255)
+    @Column(name = "address_line1", nullable = false, length = 200)
     private String addressLine1;
 
-    @Column(name = "address_line2", length = 255)
+    @Column(name = "address_line2", length = 200)
     private String addressLine2;
 
     @Column(nullable = false, length = 100)
@@ -52,8 +54,9 @@ public class Address {
     private Boolean isDefault = false;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "address_type", nullable = false)
-    private AddressType addressType;
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private AddressType type = AddressType.SHIPPING;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -64,6 +67,8 @@ public class Address {
     private LocalDateTime updatedAt;
 
     public enum AddressType {
-        SHIPPING, BILLING, BOTH
+        SHIPPING,
+        BILLING,
+        BOTH
     }
 }

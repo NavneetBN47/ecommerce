@@ -1,82 +1,62 @@
 package com.ecommerce.service;
 
 import com.ecommerce.dto.OrderDTO;
-import com.ecommerce.dto.OrderItemDTO;
 import com.ecommerce.entity.*;
 import com.ecommerce.exception.InsufficientStockException;
 import com.ecommerce.exception.ResourceNotFoundException;
+import com.ecommerce.mapper.OrderMapper;
 import com.ecommerce.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Order Service with checkout and order management
+ * Service class for Order operations
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final UserRepository userRepository;
     private final CartRepository cartRepository;
     private final ProductRepository productRepository;
-    private final UserRepository userRepository;
     private final AddressRepository addressRepository;
-
-    @Transactional(readOnly = true)
-    public List<OrderDTO> getAllOrders() {
-        log.info("Fetching all orders");
-        return orderRepository.findAll().stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderDTO> getUserOrders(Long userId) {
-        log.info("Fetching orders for user: {}", userId);
-        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public OrderDTO getOrderById(Long orderId) {
-        log.info("Fetching order by id: {}", orderId);
-        Order order = orderRepository.findByIdWithItems(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
-        return convertToDTO(order);
-    }
+    private final OrderMapper orderMapper;
 
     /**
-     * Checkout cart and create order
+     * Create order from cart
      */
-    @Transactional
-    public OrderDTO checkoutCart(Long userId, Long shippingAddressId, String paymentMethod) {
-        log.info("Checking out cart for user: {}", userId);
-        
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+    public OrderDTO createOrderFromCart(Long userId, Long shippingAddressId) {
+        log.info("Creating order from cart for user ID: {}", userId);
 
-        Cart cart = cartRepository.findActiveCartByUserId(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("No active cart found for user"));
+        // Get user
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        // Get cart
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
 
         if (cart.isEmpty()) {
-            throw new IllegalStateException("Cannot checkout empty cart");
+            throw new IllegalStateException("Cannot create order from empty cart");
         }
 
-        Address shippingAddress = null;
-        if (shippingAddressId != null) {
-            shippingAddress = addressRepository.findById(shippingAddressId)
-                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
-        }
+        // Get shipping address
+        Address shippingAddress = addressRepository.findById(shippingAddressId)
+            .orElseThrow(() -> new ResourceNotFoundException("Address not found with ID: " + shippingAddressId));
 
         // Create order
         Order order = Order.builder()
@@ -84,14 +64,13 @@ public class OrderService {
             .user(user)
             .shippingAddress(shippingAddress)
             .status(Order.OrderStatus.PENDING)
-            .paymentMethod(paymentMethod)
-            .paymentStatus("PENDING")
+            .orderDate(LocalDateTime.now())
             .build();
 
-        // Convert cart items to order items and reduce stock
+        // Create order items from cart items and reduce stock
         for (CartItem cartItem : cart.getItems()) {
             Product product = cartItem.getProduct();
-            
+
             // Check stock availability
             if (!product.hasStock(cartItem.getQuantity())) {
                 throw new InsufficientStockException("Insufficient stock for product: " + product.getName());
@@ -108,99 +87,117 @@ public class OrderService {
                 .quantity(cartItem.getQuantity())
                 .price(cartItem.getPrice())
                 .build();
+
             order.addItem(orderItem);
         }
 
         // Calculate totals
-        order.calculateTotals();
+        order.calculateTotalAmount();
+
+        // Save order
         Order savedOrder = orderRepository.save(order);
 
-        // Mark cart as checked out and delete
-        cart.setStatus(Cart.CartStatus.CHECKED_OUT);
+        // Clear cart after order creation
         cartRepository.delete(cart);
-
         log.info("Order created successfully: {}", savedOrder.getOrderNumber());
-        return convertToDTO(savedOrder);
+
+        return orderMapper.toDTO(savedOrder);
     }
 
-    @Transactional
+    /**
+     * Get order by ID
+     */
+    @Transactional(readOnly = true)
+    public OrderDTO getOrderById(Long id) {
+        log.debug("Fetching order by ID: {}", id);
+        Order order = orderRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + id));
+        return orderMapper.toDTO(order);
+    }
+
+    /**
+     * Get order by order number
+     */
+    @Transactional(readOnly = true)
+    public OrderDTO getOrderByOrderNumber(String orderNumber) {
+        log.debug("Fetching order by order number: {}", orderNumber);
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResourceNotFoundException("Order not found with order number: " + orderNumber));
+        return orderMapper.toDTO(order);
+    }
+
+    /**
+     * Get all orders for a user
+     */
+    @Transactional(readOnly = true)
+    public List<OrderDTO> getOrdersByUserId(Long userId) {
+        log.debug("Fetching orders for user ID: {}", userId);
+        return orderRepository.findByUserId(userId).stream()
+            .map(orderMapper::toDTO)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Get orders for a user with pagination
+     */
+    @Transactional(readOnly = true)
+    public Page<OrderDTO> getOrdersByUserId(Long userId, Pageable pageable) {
+        log.debug("Fetching orders for user ID with pagination: {}", userId);
+        return orderRepository.findByUserId(userId, pageable)
+            .map(orderMapper::toDTO);
+    }
+
+    /**
+     * Update order status
+     */
     public OrderDTO updateOrderStatus(Long orderId, Order.OrderStatus status) {
-        log.info("Updating order status: {}, new status: {}", orderId, status);
-        
+        log.info("Updating order status for order ID: {} to {}", orderId, status);
+
         Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
 
         order.setStatus(status);
         Order updatedOrder = orderRepository.save(order);
-        
-        log.info("Order status updated successfully");
-        return convertToDTO(updatedOrder);
+        log.info("Order status updated successfully: {}", updatedOrder.getOrderNumber());
+
+        return orderMapper.toDTO(updatedOrder);
     }
 
-    @Transactional
+    /**
+     * Cancel order
+     */
     public OrderDTO cancelOrder(Long orderId) {
-        log.info("Cancelling order: {}", orderId);
-        
-        Order order = orderRepository.findByIdWithItems(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+        log.info("Cancelling order with ID: {}", orderId);
 
-        if (order.getStatus() == Order.OrderStatus.DELIVERED || 
-            order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new IllegalStateException("Cannot cancel order in current status: " + order.getStatus());
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+
+        // Only allow cancellation for pending or confirmed orders
+        if (order.getStatus() != Order.OrderStatus.PENDING && 
+            order.getStatus() != Order.OrderStatus.CONFIRMED) {
+            throw new IllegalStateException("Cannot cancel order with status: " + order.getStatus());
         }
 
-        // Restore stock
-        for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-            product.increaseStock(item.getQuantity());
+        // Restore stock for cancelled order
+        for (OrderItem orderItem : order.getItems()) {
+            Product product = orderItem.getProduct();
+            product.increaseStock(orderItem.getQuantity());
             productRepository.save(product);
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
         Order cancelledOrder = orderRepository.save(order);
-        
-        log.info("Order cancelled successfully");
-        return convertToDTO(cancelledOrder);
+        log.info("Order cancelled successfully: {}", cancelledOrder.getOrderNumber());
+
+        return orderMapper.toDTO(cancelledOrder);
     }
 
+    /**
+     * Generate unique order number
+     */
     private String generateOrderNumber() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        return "ORD-" + timestamp;
-    }
-
-    private OrderDTO convertToDTO(Order order) {
-        List<OrderItemDTO> itemDTOs = order.getItems().stream()
-            .map(this::convertItemToDTO)
-            .collect(Collectors.toList());
-
-        return OrderDTO.builder()
-            .id(order.getId())
-            .orderNumber(order.getOrderNumber())
-            .userId(order.getUser().getId())
-            .items(itemDTOs)
-            .shippingAddressId(order.getShippingAddress() != null ? order.getShippingAddress().getId() : null)
-            .status(order.getStatus())
-            .totalAmount(order.getTotalAmount())
-            .totalItems(order.getTotalItems())
-            .paymentMethod(order.getPaymentMethod())
-            .paymentStatus(order.getPaymentStatus())
-            .notes(order.getNotes())
-            .createdAt(order.getCreatedAt())
-            .updatedAt(order.getUpdatedAt())
-            .build();
-    }
-
-    private OrderItemDTO convertItemToDTO(OrderItem item) {
-        return OrderItemDTO.builder()
-            .id(item.getId())
-            .orderId(item.getOrder().getId())
-            .productId(item.getProduct().getId())
-            .productName(item.getProduct().getName())
-            .productSku(item.getProduct().getSku())
-            .quantity(item.getQuantity())
-            .price(item.getPrice())
-            .subtotal(item.getSubtotal())
-            .createdAt(item.getCreatedAt())
-            .build();
+        String random = String.format("%04d", (int) (Math.random() * 10000));
+        return "ORD-" + timestamp + "-" + random;
     }
 }

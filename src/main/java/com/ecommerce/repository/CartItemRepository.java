@@ -16,17 +16,28 @@ import java.util.Optional;
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
-    Optional<CartItem> findByCartIdAndProductId(Long cartId, Long productId);
+    /**
+     * Find cart item by cart ID and product ID
+     */
+    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId")
+    Optional<CartItem> findByCartIdAndProductId(@Param("cartId") Long cartId, @Param("productId") Long productId);
 
-    List<CartItem> findByCartId(Long cartId);
+    /**
+     * Find all items in a cart
+     */
+    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.id = :cartId")
+    List<CartItem> findByCartId(@Param("cartId") Long cartId);
 
+    /**
+     * Delete all items from a cart
+     */
     @Modifying
     @Query("DELETE FROM CartItem ci WHERE ci.cart.id = :cartId")
-    int deleteByCartId(@Param("cartId") Long cartId);
+    void deleteByCartId(@Param("cartId") Long cartId);
 
-    @Modifying
-    @Query("DELETE FROM CartItem ci WHERE ci.cart.user.id = :userId")
-    int deleteByUserId(@Param("userId") Long userId);
-
-    boolean existsByCartIdAndProductId(Long cartId, Long productId);
+    /**
+     * Count items in a cart
+     */
+    @Query("SELECT COUNT(ci) FROM CartItem ci WHERE ci.cart.id = :cartId")
+    Long countByCartId(@Param("cartId") Long cartId);
 }

@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * DTO for OrderItem entity
+ * Data Transfer Object for OrderItem entity
  */
 @Data
 @Builder
@@ -21,8 +21,6 @@ public class OrderItemDTO {
 
     private Long id;
 
-    private Long orderId;
-
     private Long productId;
 
     private String productName;
@@ -31,7 +29,7 @@ public class OrderItemDTO {
 
     private Integer quantity;
 
-    private BigDecimal unitPrice;
+    private BigDecimal price;
 
     private BigDecimal subtotal;
 

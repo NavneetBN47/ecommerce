@@ -39,19 +39,21 @@ public class OrderItem {
     @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal unitPrice;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
-    @Column(name = "product_name", nullable = false, length = 200)
-    private String productName;
-
-    @Column(name = "product_sku", length = 50)
-    private String productSku;
-
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    @PreUpdate
+    protected void calculateSubtotal() {
+        if (price != null && quantity != null) {
+            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
+        }
+    }
 }

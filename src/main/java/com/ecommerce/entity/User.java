@@ -15,8 +15,8 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "users", indexes = {
-    @Index(name = "idx_user_email", columnList = "email", unique = true),
-    @Index(name = "idx_user_username", columnList = "username", unique = true)
+    @Index(name = "idx_email", columnList = "email", unique = true),
+    @Index(name = "idx_username", columnList = "username", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
 @Getter
@@ -75,17 +75,18 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "last_login")
-    private LocalDateTime lastLogin;
-
-    // Helper methods
-    public void addAddress(Address address) {
-        addresses.add(address);
-        address.setUser(this);
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
     }
 
-    public void removeAddress(Address address) {
-        addresses.remove(address);
-        address.setUser(null);
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

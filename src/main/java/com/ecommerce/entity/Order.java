@@ -16,10 +16,9 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_order_number", columnList = "order_number", unique = true),
     @Index(name = "idx_order_user", columnList = "user_id"),
-    @Index(name = "idx_order_status", columnList = "status"),
-    @Index(name = "idx_order_date", columnList = "order_date")
+    @Index(name = "idx_order_number", columnList = "order_number", unique = true),
+    @Index(name = "idx_order_status", columnList = "status")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Getter
@@ -44,6 +43,10 @@ public class Order {
     @Builder.Default
     private Set<OrderItem> items = new HashSet<>();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipping_address_id")
+    private Address shippingAddress;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
@@ -52,45 +55,25 @@ public class Order {
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
-    @Column(name = "shipping_amount", precision = 10, scale = 2)
+    @Column(name = "shipping_cost", precision = 10, scale = 2)
     @Builder.Default
-    private BigDecimal shippingAmount = BigDecimal.ZERO;
+    private BigDecimal shippingCost = BigDecimal.ZERO;
 
     @Column(name = "tax_amount", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
-    @Column(name = "discount_amount", precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal discountAmount = BigDecimal.ZERO;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "shipping_address_id")
-    private Address shippingAddress;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "billing_address_id")
-    private Address billingAddress;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", length = 20)
-    private PaymentMethod paymentMethod;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status", length = 20)
-    @Builder.Default
-    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
-
     @Column(name = "order_date", nullable = false)
     private LocalDateTime orderDate;
 
-    @Column(name = "shipped_date")
-    private LocalDateTime shippedDate;
+    @Column(name = "payment_method", length = 50)
+    private String paymentMethod;
 
-    @Column(name = "delivered_date")
-    private LocalDateTime deliveredDate;
+    @Column(name = "payment_status", length = 20)
+    @Builder.Default
+    private String paymentStatus = "PENDING";
 
-    @Column(columnDefinition = "TEXT")
+    @Column(length = 1000)
     private String notes;
 
     @CreatedDate
@@ -101,30 +84,38 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public enum OrderStatus {
-        PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+    @PrePersist
+    protected void onCreate() {
+        if (orderDate == null) {
+            orderDate = LocalDateTime.now();
+        }
     }
 
-    public enum PaymentMethod {
-        CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER, CASH_ON_DELIVERY
-    }
-
-    public enum PaymentStatus {
-        PENDING, COMPLETED, FAILED, REFUNDED
-    }
-
-    // Business logic methods
+    /**
+     * Add item to order
+     */
     public void addItem(OrderItem item) {
         items.add(item);
         item.setOrder(this);
     }
 
-    public void removeItem(OrderItem item) {
-        items.remove(item);
-        item.setOrder(null);
+    /**
+     * Calculate total amount
+     */
+    public void calculateTotalAmount() {
+        BigDecimal itemsTotal = items.stream()
+            .map(OrderItem::getSubtotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        this.totalAmount = itemsTotal.add(shippingCost).add(taxAmount);
     }
 
-    public BigDecimal calculateGrandTotal() {
-        return totalAmount.add(shippingAmount).add(taxAmount).subtract(discountAmount);
+    public enum OrderStatus {
+        PENDING,
+        CONFIRMED,
+        PROCESSING,
+        SHIPPED,
+        DELIVERED,
+        CANCELLED,
+        REFUNDED
     }
 }

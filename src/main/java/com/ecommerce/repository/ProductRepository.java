@@ -13,33 +13,53 @@ import java.util.Optional;
 
 /**
  * Repository interface for Product entity
- * Implements case-insensitive search as per business requirements
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+    /**
+     * Find product by SKU
+     */
     Optional<Product> findBySku(String sku);
 
-    // Case-insensitive search for product name
+    /**
+     * Find all active products
+     */
+    List<Product> findByActiveTrue();
+
+    /**
+     * Find products by category
+     */
+    @Query("SELECT p FROM Product p WHERE p.category.id = :categoryId AND p.active = true")
+    List<Product> findByCategoryId(@Param("categoryId") Long categoryId);
+
+    /**
+     * Search products by name (case-insensitive)
+     */
     @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.active = true")
-    Page<Product> searchByNameIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
+    Page<Product> searchByName(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-    // Case-insensitive search across multiple fields
-    @Query("SELECT p FROM Product p WHERE " +
-           "(LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(p.sku) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
-           "p.active = true")
-    Page<Product> searchProductsIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
+    /**
+     * Search products by name or description (case-insensitive)
+     */
+    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "OR LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.active = true")
+    Page<Product> searchByNameOrDescription(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-    Page<Product> findByActiveTrue(Pageable pageable);
+    /**
+     * Find products with stock greater than specified quantity
+     */
+    @Query("SELECT p FROM Product p WHERE p.stockQuantity > :quantity AND p.active = true")
+    List<Product> findByStockQuantityGreaterThan(@Param("quantity") Integer quantity);
 
-    Page<Product> findByCategoryIdAndActiveTrue(Long categoryId, Pageable pageable);
+    /**
+     * Find products by category with pagination
+     */
+    @Query("SELECT p FROM Product p WHERE p.category.id = :categoryId AND p.active = true")
+    Page<Product> findByCategoryId(@Param("categoryId") Long categoryId, Pageable pageable);
 
-    Page<Product> findByFeaturedTrueAndActiveTrue(Pageable pageable);
-
-    @Query("SELECT p FROM Product p WHERE p.stockQuantity > 0 AND p.active = true")
-    Page<Product> findInStockProducts(Pageable pageable);
-
-    List<Product> findByIdIn(List<Long> ids);
+    /**
+     * Check if SKU exists
+     */
+    boolean existsBySku(String sku);
 }
