@@ -1,0 +1,1 @@
+<updated DDL snapshot content>
