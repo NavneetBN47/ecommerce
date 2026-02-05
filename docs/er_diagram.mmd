@@ -1,11 +1,17 @@
 erDiagram
-    USERS ||--o{ CARTS : "has"
+    USERS ||--o{ ADDRESSES : "has"
+    USERS ||--o| CARTS : "has"
     USERS ||--o{ ORDERS : "places"
+    
+    CATEGORIES ||--o{ PRODUCTS : "contains"
+    
     CARTS ||--o{ CART_ITEMS : "contains"
     PRODUCTS ||--o{ CART_ITEMS : "in"
-    PRODUCTS ||--o{ ORDER_ITEMS : "in"
+    
     ORDERS ||--o{ ORDER_ITEMS : "contains"
-
+    PRODUCTS ||--o{ ORDER_ITEMS : "in"
+    ADDRESSES ||--o{ ORDERS : "ships_to"
+    
     USERS {
         BIGINT id PK
         VARCHAR username UK
@@ -14,84 +20,92 @@ erDiagram
         VARCHAR first_name
         VARCHAR last_name
         VARCHAR phone_number
-        VARCHAR address
-        VARCHAR city
-        VARCHAR state
-        VARCHAR zip_code
-        VARCHAR country
-        ENUM role
-        ENUM status
-        DATETIME last_login
-        DATETIME created_at
-        DATETIME updated_at
+        BOOLEAN active
+        BOOLEAN email_verified
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
+    CATEGORIES {
+        BIGINT id PK
+        VARCHAR name UK
+        VARCHAR description
+        BOOLEAN active
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
     PRODUCTS {
         BIGINT id PK
-        VARCHAR name
-        TEXT description
         VARCHAR sku UK
+        VARCHAR name
+        VARCHAR description
         DECIMAL price
-        DECIMAL discount_price
         INT stock_quantity
-        VARCHAR category
-        VARCHAR brand
         VARCHAR image_url
+        BIGINT category_id FK
         BOOLEAN active
-        BOOLEAN featured
-        DECIMAL rating
-        INT review_count
-        DATETIME created_at
-        DATETIME updated_at
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
+    ADDRESSES {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR address_line1
+        VARCHAR address_line2
+        VARCHAR city
+        VARCHAR state
+        VARCHAR postal_code
+        VARCHAR country
+        BOOLEAN is_default
+        VARCHAR type
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
     CARTS {
         BIGINT id PK
-        BIGINT user_id FK,UK
+        BIGINT user_id FK UK
         DECIMAL total_amount
-        INT total_items
-        DATETIME created_at
-        DATETIME updated_at
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
     CART_ITEMS {
         BIGINT id PK
         BIGINT cart_id FK
         BIGINT product_id FK
         INT quantity
-        DECIMAL unit_price
+        DECIMAL price
         DECIMAL subtotal
-        DATETIME created_at
-        DATETIME updated_at
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
     ORDERS {
         BIGINT id PK
         VARCHAR order_number UK
         BIGINT user_id FK
-        ENUM status
+        BIGINT shipping_address_id FK
+        VARCHAR status
         DECIMAL total_amount
-        INT total_items
-        TEXT shipping_address
-        TEXT billing_address
-        ENUM payment_method
-        ENUM payment_status
-        DATETIME order_date
-        DATETIME shipped_date
-        DATETIME delivered_date
-        TEXT notes
-        DATETIME created_at
-        DATETIME updated_at
+        DECIMAL shipping_cost
+        DECIMAL tax_amount
+        TIMESTAMP order_date
+        VARCHAR payment_method
+        VARCHAR payment_status
+        VARCHAR notes
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-
+    
     ORDER_ITEMS {
         BIGINT id PK
         BIGINT order_id FK
         BIGINT product_id FK
-        VARCHAR product_name
-        VARCHAR product_sku
         INT quantity
-        DECIMAL unit_price
+        DECIMAL price
         DECIMAL subtotal
-        DATETIME created_at
+        TIMESTAMP created_at
     }

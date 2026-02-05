@@ -7,66 +7,79 @@ import com.ecommerce.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * Order REST Controller
+ * REST controller for Order operations
  */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping("/orders")
 @RequiredArgsConstructor
 @Tag(name = "Order Management", description = "APIs for managing orders")
 public class OrderController {
 
     private final OrderService orderService;
 
-    @GetMapping
-    @Operation(summary = "Get all orders")
-    public ResponseEntity<ApiResponse<List<OrderDTO>>> getAllOrders() {
-        List<OrderDTO> orders = orderService.getAllOrders();
-        return ResponseEntity.ok(ApiResponse.success(orders));
+    @PostMapping("/user/{userId}")
+    @Operation(summary = "Create order from cart")
+    public ResponseEntity<ApiResponse<OrderDTO>> createOrderFromCart(
+            @PathVariable Long userId,
+            @RequestParam Long shippingAddressId) {
+        OrderDTO order = orderService.createOrderFromCart(userId, shippingAddressId);
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success("Order created successfully", order));
     }
 
-    @GetMapping("/user/{userId}")
-    @Operation(summary = "Get user orders")
-    public ResponseEntity<ApiResponse<List<OrderDTO>>> getUserOrders(@PathVariable Long userId) {
-        List<OrderDTO> orders = orderService.getUserOrders(userId);
-        return ResponseEntity.ok(ApiResponse.success(orders));
-    }
-
-    @GetMapping("/{orderId}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get order by ID")
-    public ResponseEntity<ApiResponse<OrderDTO>> getOrderById(@PathVariable Long orderId) {
-        OrderDTO order = orderService.getOrderById(orderId);
+    public ResponseEntity<ApiResponse<OrderDTO>> getOrderById(@PathVariable Long id) {
+        OrderDTO order = orderService.getOrderById(id);
         return ResponseEntity.ok(ApiResponse.success(order));
     }
 
-    @PostMapping("/checkout")
-    @Operation(summary = "Checkout cart and create order")
-    public ResponseEntity<ApiResponse<OrderDTO>> checkoutCart(
-            @RequestParam Long userId,
-            @RequestParam(required = false) Long shippingAddressId,
-            @RequestParam(required = false) String paymentMethod) {
-        OrderDTO order = orderService.checkoutCart(userId, shippingAddressId, paymentMethod);
-        return ResponseEntity.ok(ApiResponse.success("Order created successfully", order));
+    @GetMapping("/number/{orderNumber}")
+    @Operation(summary = "Get order by order number")
+    public ResponseEntity<ApiResponse<OrderDTO>> getOrderByOrderNumber(@PathVariable String orderNumber) {
+        OrderDTO order = orderService.getOrderByOrderNumber(orderNumber);
+        return ResponseEntity.ok(ApiResponse.success(order));
     }
 
-    @PutMapping("/{orderId}/status")
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "Get all orders for a user")
+    public ResponseEntity<ApiResponse<List<OrderDTO>>> getOrdersByUserId(@PathVariable Long userId) {
+        List<OrderDTO> orders = orderService.getOrdersByUserId(userId);
+        return ResponseEntity.ok(ApiResponse.success(orders));
+    }
+
+    @GetMapping("/user/{userId}/page")
+    @Operation(summary = "Get orders for a user with pagination")
+    public ResponseEntity<ApiResponse<Page<OrderDTO>>> getOrdersByUserIdPaged(
+            @PathVariable Long userId,
+            Pageable pageable) {
+        Page<OrderDTO> orders = orderService.getOrdersByUserId(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(orders));
+    }
+
+    @PatchMapping("/{orderId}/status")
     @Operation(summary = "Update order status")
     public ResponseEntity<ApiResponse<OrderDTO>> updateOrderStatus(
             @PathVariable Long orderId,
             @RequestParam Order.OrderStatus status) {
         OrderDTO order = orderService.updateOrderStatus(orderId, status);
-        return ResponseEntity.ok(ApiResponse.success("Order status updated", order));
+        return ResponseEntity.ok(ApiResponse.success("Order status updated successfully", order));
     }
 
     @PostMapping("/{orderId}/cancel")
     @Operation(summary = "Cancel order")
     public ResponseEntity<ApiResponse<OrderDTO>> cancelOrder(@PathVariable Long orderId) {
         OrderDTO order = orderService.cancelOrder(orderId);
-        return ResponseEntity.ok(ApiResponse.success("Order cancelled", order));
+        return ResponseEntity.ok(ApiResponse.success("Order cancelled successfully", order));
     }
 }

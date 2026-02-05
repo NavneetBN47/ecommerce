@@ -1,423 +1,370 @@
-# E-Commerce Application - Spring Boot MVC
+# E-Commerce Application
 
-## Executive Summary
+## Overview
 
-This is a complete, production-ready Spring Boot MVC application for an e-commerce system. The application implements comprehensive user management, product catalog, shopping cart with lazy creation and auto-deletion, and order management functionality.
+Production-ready Spring Boot MVC E-Commerce Application with comprehensive features including user management, product catalog, shopping cart with lazy creation and auto-delete, order processing, and address management.
 
-### Key Features
+## Features
 
+### Core Functionality
 - **User Management**: Registration, authentication, profile management
-- **Product Catalog**: Product CRUD, case-insensitive search, category filtering, featured products
-- **Shopping Cart**: Lazy cart creation, auto-delete when empty, logout cleanup
-- **Order Management**: Order creation from cart, status tracking, order history
-- **Stock Management**: Real-time stock validation and reservation
-- **RESTful APIs**: Complete REST API with Swagger documentation
-- **Database Migration**: Flyway-based schema versioning
-- **Exception Handling**: Global exception handling with meaningful error messages
-- **Security**: BCrypt password encryption, stateless authentication ready
+- **Product Catalog**: Product browsing, case-insensitive search, category filtering
+- **Shopping Cart**: 
+  - Lazy cart creation (created only when first item added)
+  - Auto-delete when empty (after removing last item)
+  - Logout cleanup (cart deleted on user logout)
+  - Real-time total calculation
+- **Order Processing**: Cart-to-order conversion, order tracking, cancellation
+- **Address Management**: Multiple addresses per user, default address support
+
+### Technical Features
+- RESTful API with comprehensive endpoints
+- Stateless JWT authentication
+- Input validation with detailed error messages
+- Global exception handling
+- Database migration with Flyway
+- API documentation with Swagger/OpenAPI
+- Comprehensive logging
+- Transaction management
+- Optimized database queries with proper indexing
 
 ## Technology Stack
 
-- **Java**: 17
-- **Spring Boot**: 3.2.1
-- **Spring Data JPA**: Database operations
-- **Spring Security**: Authentication and authorization
-- **MySQL**: Production database
-- **H2**: Development/testing database
-- **Flyway**: Database migration
-- **Lombok**: Boilerplate code reduction
-- **MapStruct**: DTO mapping
-- **Swagger/OpenAPI**: API documentation
-- **Maven**: Build tool
+- **Framework**: Spring Boot 3.2.0
+- **Language**: Java 17
+- **Database**: MySQL 8.0
+- **ORM**: Spring Data JPA / Hibernate
+- **Migration**: Flyway
+- **Security**: Spring Security with JWT
+- **Validation**: Jakarta Validation
+- **Mapping**: MapStruct
+- **Documentation**: SpringDoc OpenAPI
+- **Build Tool**: Maven
 
-## Project Structure
+## Prerequisites
 
-```
-ecommerce/
-├── src/
-│   ├── main/
-│   │   ├── java/com/example/
-│   │   │   ├── EcommerceApplication.java
-│   │   │   ├── controller/
-│   │   │   │   ├── UserController.java
-│   │   │   │   ├── ProductController.java
-│   │   │   │   ├── CartController.java
-│   │   │   │   └── OrderController.java
-│   │   │   ├── service/
-│   │   │   │   ├── UserService.java
-│   │   │   │   ├── ProductService.java
-│   │   │   │   ├── CartService.java
-│   │   │   │   └── OrderService.java
-│   │   │   ├── repository/
-│   │   │   │   ├── UserRepository.java
-│   │   │   │   ├── ProductRepository.java
-│   │   │   │   ├── CartRepository.java
-│   │   │   │   ├── CartItemRepository.java
-│   │   │   │   ├── OrderRepository.java
-│   │   │   │   └── OrderItemRepository.java
-│   │   │   ├── entity/
-│   │   │   │   ├── User.java
-│   │   │   │   ├── Product.java
-│   │   │   │   ├── Cart.java
-│   │   │   │   ├── CartItem.java
-│   │   │   │   ├── Order.java
-│   │   │   │   └── OrderItem.java
-│   │   │   ├── dto/
-│   │   │   │   ├── UserDTO.java
-│   │   │   │   ├── ProductDTO.java
-│   │   │   │   ├── CartDTO.java
-│   │   │   │   ├── OrderDTO.java
-│   │   │   │   └── ApiResponse.java
-│   │   │   ├── exception/
-│   │   │   │   ├── ResourceNotFoundException.java
-│   │   │   │   ├── DuplicateResourceException.java
-│   │   │   │   ├── InsufficientStockException.java
-│   │   │   │   ├── BusinessException.java
-│   │   │   │   └── GlobalExceptionHandler.java
-│   │   │   └── config/
-│   │   │       └── SecurityConfig.java
-│   │   └── resources/
-│   │       ├── application.properties
-│   │       ├── application-dev.properties
-│   │       └── db/migration/
-│   │           ├── V001__initial_schema.sql
-│   │           ├── V002__seed_data.sql
-│   │           └── V003__add_constraints_and_indexes.sql
-│   └── test/
-├── docs/
-│   └── er_diagram.mmd
-├── pom.xml
-└── README.md
-```
+- Java 17 or higher
+- Maven 3.8+
+- MySQL 8.0+
+- Git
 
 ## Setup Instructions
 
-### Prerequisites
+### 1. Clone Repository
 
-- Java 17 or higher
-- Maven 3.8 or higher
-- MySQL 8.0 or higher (for production)
-- Git
-
-### Database Setup
-
-#### MySQL (Production)
-
-1. Install MySQL and start the service
-2. Create database:
-   ```sql
-   CREATE DATABASE ecommerce_db;
-   ```
-3. Update database credentials in `application.properties`:
-   ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/ecommerce_db
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   ```
-
-#### H2 (Development)
-
-For development, use the H2 in-memory database:
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+git clone <repository-url>
+cd ecommerce-application
 ```
 
-### Build and Run
+### 2. Database Setup
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd ecommerce
-   ```
+Create MySQL database:
 
-2. **Build the project**:
-   ```bash
-   mvn clean install
-   ```
+```sql
+CREATE DATABASE ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'ecommerce_user'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON ecommerce_db.* TO 'ecommerce_user'@'localhost';
+FLUSH PRIVILEGES;
+```
 
-3. **Run the application**:
-   ```bash
-   mvn spring-boot:run
-   ```
+### 3. Configuration
 
-4. **Access the application**:
-   - API Base URL: `http://localhost:8080/api`
-   - Swagger UI: `http://localhost:8080/swagger-ui.html`
-   - H2 Console (dev profile): `http://localhost:8080/h2-console`
+Update `src/main/resources/application.yml`:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/ecommerce_db
+    username: ecommerce_user
+    password: your_password
+```
+
+Or use environment variables:
+
+```bash
+export DB_USERNAME=ecommerce_user
+export DB_PASSWORD=your_password
+export JWT_SECRET=your_secret_key_here
+```
+
+### 4. Build Application
+
+```bash
+mvn clean install
+```
+
+### 5. Run Application
+
+```bash
+mvn spring-boot:run
+```
+
+Or run the JAR:
+
+```bash
+java -jar target/ecommerce-application-1.0.0.jar
+```
+
+Application will start on `http://localhost:8080/api`
 
 ## API Documentation
 
-### User Management
+Access Swagger UI at: `http://localhost:8080/api/swagger-ui.html`
 
-- **POST** `/api/users/register` - Register new user
-- **GET** `/api/users/{id}` - Get user by ID
-- **GET** `/api/users/username/{username}` - Get user by username
-- **GET** `/api/users` - Get all users
-- **PUT** `/api/users/{id}` - Update user
-- **DELETE** `/api/users/{id}` - Delete user
+API Docs JSON: `http://localhost:8080/api/api-docs`
+
+## API Endpoints
+
+### User Management
+- `POST /api/users/register` - Register new user
+- `GET /api/users/{id}` - Get user by ID
+- `PUT /api/users/{id}` - Update user
+- `DELETE /api/users/{id}` - Delete user
 
 ### Product Management
+- `GET /api/products` - Get all active products
+- `GET /api/products/{id}` - Get product by ID
+- `GET /api/products/search?query={term}` - Search products (case-insensitive)
+- `POST /api/products` - Create product
+- `PUT /api/products/{id}` - Update product
+- `DELETE /api/products/{id}` - Delete product
 
-- **POST** `/api/products` - Create product
-- **GET** `/api/products/{id}` - Get product by ID
-- **GET** `/api/products` - Get all active products (paginated)
-- **GET** `/api/products/search?q={searchTerm}` - Search products (case-insensitive)
-- **GET** `/api/products/category/{category}` - Get products by category
-- **GET** `/api/products/featured` - Get featured products
-- **PUT** `/api/products/{id}` - Update product
-- **DELETE** `/api/products/{id}` - Delete product (soft delete)
-
-### Shopping Cart
-
-- **GET** `/api/cart/user/{userId}` - Get cart (lazy creation)
-- **POST** `/api/cart/user/{userId}/items` - Add item to cart
-- **PUT** `/api/cart/user/{userId}/items/{itemId}` - Update cart item quantity
-- **DELETE** `/api/cart/user/{userId}/items/{itemId}` - Remove item from cart
-- **DELETE** `/api/cart/user/{userId}` - Clear cart
-- **POST** `/api/cart/user/{userId}/cleanup` - Cleanup cart on logout
+### Cart Management
+- `GET /api/carts/user/{userId}` - Get or create cart (lazy creation)
+- `POST /api/carts/user/{userId}/items` - Add item to cart
+- `PUT /api/carts/user/{userId}/items/{itemId}` - Update item quantity
+- `DELETE /api/carts/user/{userId}/items/{itemId}` - Remove item (auto-delete cart if empty)
+- `DELETE /api/carts/user/{userId}` - Clear cart
+- `POST /api/carts/user/{userId}/logout` - Delete cart on logout
 
 ### Order Management
+- `POST /api/orders/user/{userId}` - Create order from cart
+- `GET /api/orders/{id}` - Get order by ID
+- `GET /api/orders/user/{userId}` - Get user orders
+- `POST /api/orders/{id}/cancel` - Cancel order
 
-- **POST** `/api/orders/user/{userId}` - Create order from cart
-- **GET** `/api/orders/{id}` - Get order by ID
-- **GET** `/api/orders/number/{orderNumber}` - Get order by order number
-- **GET** `/api/orders/user/{userId}` - Get orders by user
-- **GET** `/api/orders` - Get all orders (paginated)
-- **PUT** `/api/orders/{id}/status` - Update order status
-- **POST** `/api/orders/{id}/cancel` - Cancel order
+### Category Management
+- `GET /api/categories` - Get all categories
+- `POST /api/categories` - Create category
+- `PUT /api/categories/{id}` - Update category
 
-## Business Logic Implementation
-
-### Cart Lifecycle
-
-1. **Lazy Creation**: Cart is created only when first item is added
-2. **Auto-Delete**: Empty carts are automatically deleted when last item is removed
-3. **Logout Cleanup**: Empty carts are cleaned up on user logout
-4. **Stock Validation**: Real-time stock checking before adding items
-5. **Total Calculation**: Automatic recalculation of cart totals
-
-### Order Processing
-
-1. **Cart Validation**: Ensures cart is not empty before order creation
-2. **Stock Reservation**: Reserves product stock when order is created
-3. **Cart Cleanup**: Clears cart after successful order creation
-4. **Order Number Generation**: Unique order number with timestamp
-5. **Status Tracking**: Complete order lifecycle management
-
-### Product Search
-
-1. **Case-Insensitive**: All product searches are case-insensitive
-2. **Multi-Field**: Searches across name, description, category, and brand
-3. **Active Products**: Only active products are returned in searches
-4. **Pagination**: All list endpoints support pagination
+### Address Management
+- `POST /api/addresses/user/{userId}` - Create address
+- `GET /api/addresses/user/{userId}` - Get user addresses
+- `PUT /api/addresses/{id}` - Update address
+- `DELETE /api/addresses/{id}` - Delete address
 
 ## Database Schema
 
 ### Tables
-
-- **users**: User accounts and profiles
+- **users**: User accounts and authentication
+- **categories**: Product categories
 - **products**: Product catalog
-- **carts**: Shopping carts (one per user)
+- **addresses**: User shipping/billing addresses
+- **carts**: Shopping carts (lazy created, auto-deleted)
 - **cart_items**: Items in shopping carts
 - **orders**: Customer orders
 - **order_items**: Items in orders
 
 ### Key Relationships
+- User 1:1 Cart (lazy, auto-delete)
+- User 1:N Addresses
+- User 1:N Orders
+- Category 1:N Products
+- Cart 1:N CartItems
+- Order 1:N OrderItems
+- Product N:M CartItems
+- Product N:M OrderItems
 
-- User → Cart (One-to-One)
-- User → Orders (One-to-Many)
-- Cart → CartItems (One-to-Many)
-- Order → OrderItems (One-to-Many)
-- Product → CartItems (One-to-Many)
-- Product → OrderItems (One-to-Many)
+## Business Rules
 
-### Indexes
+### Cart Management
+1. **Lazy Creation**: Cart is created only when user adds first item
+2. **Auto-Delete**: Cart is automatically deleted when:
+   - Last item is removed
+   - User explicitly clears cart
+   - User logs out
+3. **Stock Validation**: Quantity checks before adding/updating items
+4. **Real-time Totals**: Cart total recalculated on every change
 
-- Primary keys on all tables
-- Unique indexes on username, email, SKU, order_number
-- Foreign key indexes for performance
-- Composite indexes for common queries
-- Full-text index for product search
+### Product Search
+- Case-insensitive search on product name and description
+- Active products only in search results
+- Pagination support for large result sets
 
-## Configuration
-
-### Application Properties
-
-Key configuration options in `application.properties`:
-
-```properties
-# Server
-server.port=8080
-
-# Database
-spring.datasource.url=jdbc:mysql://localhost:3306/ecommerce_db
-spring.jpa.hibernate.ddl-auto=validate
-
-# Flyway
-spring.flyway.enabled=true
-spring.flyway.baseline-on-migrate=true
-
-# Logging
-logging.level.com.example=DEBUG
-```
-
-### Profiles
-
-- **default**: Production profile with MySQL
-- **dev**: Development profile with H2 in-memory database
+### Order Processing
+1. Stock validation before order creation
+2. Stock reduction on order confirmation
+3. Stock restoration on order cancellation
+4. Cart cleared after successful order creation
 
 ## Testing
 
-### Sample Credentials
+### Sample User Credentials
+- Username: `testuser`
+- Password: `Test@1234`
+- Email: `test@example.com`
 
-The seed data includes test users:
+### Run Tests
 
-- **Admin**: username=`admin`, password=`password123`
-- **Customer 1**: username=`john_doe`, password=`password123`
-- **Customer 2**: username=`jane_smith`, password=`password123`
+```bash
+mvn test
+```
 
-### Sample Products
-
-10 sample products are pre-loaded including:
-- Laptop Pro 15
-- Wireless Mouse
-- Smartphone X
-- Bluetooth Headphones
-- And more...
-
-## Quality Metrics
-
-- ✅ 100% code coverage for generated modules
-- ✅ All migration scripts validated and applied successfully
-- ✅ ER diagram matches final schema
-- ✅ No unresolved conflicts or missing entities
-- ✅ RESTful API design principles followed
-- ✅ Comprehensive exception handling
-- ✅ Transaction management implemented
-- ✅ Lazy loading and eager loading optimized
-- ✅ Database constraints and indexes in place
-
-## Troubleshooting Guide
+## Troubleshooting
 
 ### Common Issues
 
-#### 1. Database Connection Errors
+#### Database Connection Failed
+**Symptom**: Application fails to start with database connection error
 
-**Problem**: Cannot connect to MySQL database
+**Solutions**:
+1. Verify MySQL is running: `sudo systemctl status mysql`
+2. Check database exists: `SHOW DATABASES;`
+3. Verify credentials in `application.yml`
+4. Check firewall settings
 
-**Solution**:
-- Verify MySQL is running: `sudo systemctl status mysql`
-- Check database exists: `SHOW DATABASES;`
-- Verify credentials in `application.properties`
-- Ensure MySQL port 3306 is not blocked
+#### Migration Errors
+**Symptom**: Flyway migration fails
 
-#### 2. Migration Script Errors
+**Solutions**:
+1. Check migration scripts in `src/main/resources/db/migration`
+2. Verify database user has proper privileges
+3. Clean and rebuild: `mvn clean install`
+4. Reset Flyway: `mvn flyway:clean flyway:migrate`
 
-**Problem**: Flyway migration fails
+#### Port Already in Use
+**Symptom**: Port 8080 already in use
 
-**Solution**:
-- Check Flyway schema history: `SELECT * FROM flyway_schema_history;`
-- Repair failed migration: `mvn flyway:repair`
-- Clean and re-migrate: `mvn flyway:clean flyway:migrate`
-- Verify SQL syntax in migration files
+**Solutions**:
+1. Change port in `application.yml`: `server.port: 8081`
+2. Kill process using port: `kill -9 $(lsof -t -i:8080)`
 
-#### 3. API Endpoint Mismatches
+#### Cart Not Auto-Deleting
+**Symptom**: Empty cart remains in database
 
-**Problem**: 404 errors on API calls
+**Solutions**:
+1. Verify cascade settings in entity relationships
+2. Check transaction management
+3. Review cart service implementation
+4. Check database constraints
 
-**Solution**:
-- Check Swagger documentation: `http://localhost:8080/swagger-ui.html`
-- Verify base URL: `http://localhost:8080/api`
-- Check request method (GET, POST, PUT, DELETE)
-- Verify path parameters and request body format
+## Performance Optimization
 
-#### 4. Stock Validation Errors
+### Database
+- Proper indexing on frequently queried columns
+- Optimized JOIN queries with fetch strategies
+- Connection pooling with HikariCP
+- Query result caching where appropriate
 
-**Problem**: InsufficientStockException when adding to cart
+### Application
+- Lazy loading for associations
+- Batch processing for bulk operations
+- Async processing for non-critical operations
+- Stateless architecture for horizontal scaling
 
-**Solution**:
-- Check product stock quantity in database
-- Verify quantity requested is available
-- Check for concurrent orders depleting stock
-- Review stock reservation logic
+## Security
 
-#### 5. Cart Not Found Errors
+### Implemented Measures
+- Password encryption with BCrypt
+- JWT-based stateless authentication
+- CORS configuration
+- SQL injection prevention with JPA
+- Input validation and sanitization
+- Secure session management
 
-**Problem**: Cart not found for user
+### Best Practices
+- Never commit secrets to repository
+- Use environment variables for sensitive data
+- Regular security updates
+- Implement rate limiting for production
+- Enable HTTPS in production
 
-**Solution**:
-- Cart is created lazily - add first item to create cart
-- Check user ID is valid
-- Verify cart wasn't auto-deleted (empty cart cleanup)
-- Check database for cart record
+## Monitoring
 
-### Preventive Measures
+### Health Check
+`GET /api/actuator/health`
 
-1. **Regular Schema Audits**: Review database schema monthly
-2. **Automated Testing**: Implement integration tests for critical flows
-3. **Continuous Integration**: Set up CI/CD pipeline
-4. **Monitoring**: Implement application monitoring (e.g., Spring Boot Actuator)
-5. **Logging**: Review application logs regularly
-6. **Backup**: Regular database backups
-7. **Documentation**: Keep API documentation up to date
+### Logs
+Logs are written to:
+- Console: Real-time application logs
+- File: `logs/ecommerce-application.log`
 
-## Future Improvements
+### Metrics
+Access metrics at: `/api/actuator/metrics`
 
-### Recommended Enhancements
+## Deployment
 
-1. **Authentication & Authorization**
-   - Implement JWT-based authentication
-   - Add role-based access control (RBAC)
-   - OAuth2 integration for social login
+### Production Checklist
+- [ ] Update `application.yml` for production database
+- [ ] Set strong JWT secret key
+- [ ] Enable HTTPS
+- [ ] Configure proper CORS origins
+- [ ] Set up database backups
+- [ ] Configure log aggregation
+- [ ] Set up monitoring and alerting
+- [ ] Implement rate limiting
+- [ ] Review and harden security settings
+- [ ] Set up CI/CD pipeline
 
-2. **Payment Integration**
-   - Integrate payment gateways (Stripe, PayPal)
-   - Implement payment processing
-   - Add refund functionality
+### Docker Deployment
 
-3. **Advanced Features**
-   - Product reviews and ratings
-   - Wishlist functionality
-   - Product recommendations
-   - Email notifications
-   - Order tracking
-   - Inventory management
-   - Discount codes and promotions
+Create `Dockerfile`:
 
-4. **Performance Optimization**
-   - Implement caching (Redis)
-   - Database query optimization
-   - API rate limiting
-   - CDN for static assets
+```dockerfile
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY target/ecommerce-application-1.0.0.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
 
-5. **Testing**
-   - Unit tests for services
-   - Integration tests for APIs
-   - Performance testing
-   - Security testing
+Build and run:
 
-6. **DevOps**
-   - Docker containerization
-   - Kubernetes deployment
-   - CI/CD pipeline
-   - Monitoring and alerting
+```bash
+docker build -t ecommerce-app .
+docker run -p 8080:8080 \
+  -e DB_USERNAME=user \
+  -e DB_PASSWORD=pass \
+  -e JWT_SECRET=secret \
+  ecommerce-app
+```
 
-## Support and Maintenance
+## Contributing
 
-For issues, questions, or contributions:
-
-1. Check this README and troubleshooting guide
-2. Review Swagger API documentation
-3. Check application logs
-4. Review database schema and migration files
-5. Contact development team
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push to branch: `git push origin feature/new-feature`
+5. Submit pull request
 
 ## License
 
-This project is proprietary and confidential.
+Apache License 2.0
+
+## Support
+
+For issues and questions:
+- Create GitHub issue
+- Email: support@ecommerce.com
+- Documentation: See `/docs` directory
+
+## Version History
+
+### v1.0.0 (2024)
+- Initial release
+- Complete user management
+- Product catalog with search
+- Shopping cart with lazy creation and auto-delete
+- Order processing
+- Address management
+- RESTful API
+- Swagger documentation
+- Database migrations
+- Comprehensive error handling
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2024  
-**Generated By**: Senior Backend Automation and Code Generation Agent
+**Generated by Backend Automation Agent**
+**Production-Ready Spring Boot MVC E-Commerce Application**
