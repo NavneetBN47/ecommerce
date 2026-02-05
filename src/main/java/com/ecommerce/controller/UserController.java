@@ -1,14 +1,14 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.ApiResponse;
-import com.ecommerce.dto.LoginRequest;
 import com.ecommerce.dto.UserDTO;
+import com.ecommerce.security.CurrentUser;
 import com.ecommerce.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,45 +20,34 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@Tag(name = "User Management", description = "APIs for user registration, login, and management")
+@Slf4j
+@Tag(name = "Users", description = "User management APIs")
 public class UserController {
     
     private final UserService userService;
     
-    @PostMapping("/register")
-    @Operation(summary = "Register a new user")
-    public ResponseEntity<ApiResponse<UserDTO>> registerUser(@Valid @RequestBody UserDTO userDTO) {
-        UserDTO createdUser = userService.registerUser(userDTO);
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("User registered successfully", createdUser));
-    }
-    
-    @PostMapping("/login")
-    @Operation(summary = "User login")
-    public ResponseEntity<ApiResponse<UserDTO>> login(@Valid @RequestBody LoginRequest loginRequest) {
-        UserDTO user = userService.login(loginRequest);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", user));
-    }
-    
-    @PostMapping("/logout/{userId}")
-    @Operation(summary = "User logout with cart cleanup")
-    public ResponseEntity<ApiResponse<Void>> logout(@PathVariable Long userId) {
-        userService.logout(userId);
-        return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
+    @GetMapping("/me")
+    @Operation(summary = "Get current user profile")
+    public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(@CurrentUser Long userId) {
+        log.info("GET /api/users/me - User: {}", userId);
+        UserDTO user = userService.getUserById(userId);
+        return ResponseEntity.ok(ApiResponse.success(user));
     }
     
     @GetMapping("/{id}")
     @Operation(summary = "Get user by ID")
     public ResponseEntity<ApiResponse<UserDTO>> getUserById(@PathVariable Long id) {
+        log.info("GET /api/users/{} - Get user by ID", id);
         UserDTO user = userService.getUserById(id);
-        return ResponseEntity.ok(ApiResponse.success("User retrieved successfully", user));
+        return ResponseEntity.ok(ApiResponse.success(user));
     }
     
     @GetMapping
     @Operation(summary = "Get all users")
     public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers() {
+        log.info("GET /api/users - Get all users");
         List<UserDTO> users = userService.getAllUsers();
-        return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully", users));
+        return ResponseEntity.ok(ApiResponse.success(users));
     }
     
     @PutMapping("/{id}")
@@ -66,6 +55,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserDTO>> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UserDTO userDTO) {
+        log.info("PUT /api/users/{} - Update user", id);
         UserDTO updatedUser = userService.updateUser(id, userDTO);
         return ResponseEntity.ok(ApiResponse.success("User updated successfully", updatedUser));
     }
@@ -73,6 +63,7 @@ public class UserController {
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete user")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
+        log.info("DELETE /api/users/{} - Delete user", id);
         userService.deleteUser(id);
         return ResponseEntity.ok(ApiResponse.success("User deleted successfully", null));
     }

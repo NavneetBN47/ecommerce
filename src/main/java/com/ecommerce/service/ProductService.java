@@ -2,12 +2,14 @@ package com.ecommerce.service;
 
 import com.ecommerce.dto.ProductDTO;
 import com.ecommerce.entity.Product;
+import com.ecommerce.exception.InsufficientStockException;
 import com.ecommerce.exception.ResourceAlreadyExistsException;
 import com.ecommerce.exception.ResourceNotFoundException;
 import com.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,35 +17,41 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Service layer for Product operations
+ * Service for Product operations
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class ProductService {
     
     private final ProductRepository productRepository;
-    private final ModelMapper modelMapper;
     
     /**
      * Create a new product
      */
-    @Transactional
     public ProductDTO createProduct(ProductDTO productDTO) {
         log.info("Creating new product: {}", productDTO.getName());
         
-        // Check if SKU already exists
         if (productRepository.existsBySku(productDTO.getSku())) {
             throw new ResourceAlreadyExistsException("Product with SKU already exists: " + productDTO.getSku());
         }
         
-        Product product = modelMapper.map(productDTO, Product.class);
-        product.setActive(true);
+        Product product = Product.builder()
+            .name(productDTO.getName())
+            .description(productDTO.getDescription())
+            .sku(productDTO.getSku())
+            .price(productDTO.getPrice())
+            .stockQuantity(productDTO.getStockQuantity())
+            .category(productDTO.getCategory())
+            .imageUrl(productDTO.getImageUrl())
+            .active(true)
+            .build();
         
         Product savedProduct = productRepository.save(product);
         log.info("Product created successfully: {}", savedProduct.getId());
         
-        return modelMapper.map(savedProduct, ProductDTO.class);
+        return convertToDTO(savedProduct);
     }
     
     /**
@@ -51,12 +59,10 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public ProductDTO getProductById(Long id) {
-        log.info("Fetching product by id: {}", id);
-        
+        log.debug("Fetching product by ID: {}", id);
         Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
-        
-        return modelMapper.map(product, ProductDTO.class);
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+        return convertToDTO(product);
     }
     
     /**
@@ -64,22 +70,9 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public List<ProductDTO> getAllActiveProducts() {
-        log.info("Fetching all active products");
-        
+        log.debug("Fetching all active products");
         return productRepository.findByActiveTrue().stream()
-            .map(product -> modelMapper.map(product, ProductDTO.class))
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * Get all products
-     */
-    @Transactional(readOnly = true)
-    public List<ProductDTO> getAllProducts() {
-        log.info("Fetching all products");
-        
-        return productRepository.findAll().stream()
-            .map(product -> modelMapper.map(product, ProductDTO.class))
+            .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
     
@@ -87,12 +80,10 @@ public class ProductService {
      * Search products by name (case-insensitive)
      */
     @Transactional(readOnly = true)
-    public List<ProductDTO> searchProducts(String searchTerm) {
-        log.info("Searching products with term: {}", searchTerm);
-        
-        return productRepository.searchByNameOrCategory(searchTerm).stream()
-            .map(product -> modelMapper.map(product, ProductDTO.class))
-            .collect(Collectors.toList());
+    public Page<ProductDTO> searchProducts(String searchTerm, Pageable pageable) {
+        log.debug("Searching products with term: {}", searchTerm);
+        return productRepository.searchByNameOrDescriptionIgnoreCase(searchTerm, pageable)
+            .map(this::convertToDTO);
     }
     
     /**
@@ -100,71 +91,115 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public List<ProductDTO> getProductsByCategory(String category) {
-        log.info("Fetching products by category: {}", category);
-        
+        log.debug("Fetching products by category: {}", category);
         return productRepository.findByCategoryAndActiveTrue(category).stream()
-            .map(product -> modelMapper.map(product, ProductDTO.class))
+            .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
     
     /**
      * Update product
      */
-    @Transactional
     public ProductDTO updateProduct(Long id, ProductDTO productDTO) {
         log.info("Updating product: {}", id);
         
         Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
         
-        // Check if new SKU already exists (if changed)
-        if (!product.getSku().equals(productDTO.getSku()) && 
-            productRepository.existsBySku(productDTO.getSku())) {
-            throw new ResourceAlreadyExistsException("Product with SKU already exists: " + productDTO.getSku());
+        if (productDTO.getName() != null) {
+            product.setName(productDTO.getName());
         }
-        
-        product.setSku(productDTO.getSku());
-        product.setName(productDTO.getName());
-        product.setDescription(productDTO.getDescription());
-        product.setPrice(productDTO.getPrice());
-        product.setStock(productDTO.getStock());
-        product.setCategory(productDTO.getCategory());
-        product.setImageUrl(productDTO.getImageUrl());
-        product.setActive(productDTO.getActive());
+        if (productDTO.getDescription() != null) {
+            product.setDescription(productDTO.getDescription());
+        }
+        if (productDTO.getPrice() != null) {
+            product.setPrice(productDTO.getPrice());
+        }
+        if (productDTO.getStockQuantity() != null) {
+            product.setStockQuantity(productDTO.getStockQuantity());
+        }
+        if (productDTO.getCategory() != null) {
+            product.setCategory(productDTO.getCategory());
+        }
+        if (productDTO.getImageUrl() != null) {
+            product.setImageUrl(productDTO.getImageUrl());
+        }
+        if (productDTO.getActive() != null) {
+            product.setActive(productDTO.getActive());
+        }
         
         Product updatedProduct = productRepository.save(product);
         log.info("Product updated successfully: {}", updatedProduct.getId());
         
-        return modelMapper.map(updatedProduct, ProductDTO.class);
+        return convertToDTO(updatedProduct);
     }
     
     /**
      * Delete product
      */
-    @Transactional
     public void deleteProduct(Long id) {
         log.info("Deleting product: {}", id);
         
-        Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        if (!productRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Product not found with ID: " + id);
+        }
         
-        productRepository.delete(product);
+        productRepository.deleteById(id);
         log.info("Product deleted successfully: {}", id);
     }
     
     /**
-     * Update product stock
+     * Check and reserve stock for a product
      */
-    @Transactional
-    public void updateStock(Long productId, Integer quantity) {
-        log.info("Updating stock for product: {}, quantity: {}", productId, quantity);
+    public void reserveStock(Long productId, Integer quantity) {
+        log.debug("Reserving stock for product: {}, quantity: {}", productId, quantity);
         
         Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
         
-        product.setStock(product.getStock() + quantity);
+        if (product.getStockQuantity() < quantity) {
+            throw new InsufficientStockException(
+                String.format("Insufficient stock for product %s. Available: %d, Requested: %d",
+                    product.getName(), product.getStockQuantity(), quantity));
+        }
+        
+        product.setStockQuantity(product.getStockQuantity() - quantity);
         productRepository.save(product);
         
-        log.info("Stock updated successfully for product: {}", productId);
+        log.info("Stock reserved successfully for product: {}", productId);
+    }
+    
+    /**
+     * Release reserved stock
+     */
+    public void releaseStock(Long productId, Integer quantity) {
+        log.debug("Releasing stock for product: {}, quantity: {}", productId, quantity);
+        
+        Product product = productRepository.findById(productId)
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+        
+        product.setStockQuantity(product.getStockQuantity() + quantity);
+        productRepository.save(product);
+        
+        log.info("Stock released successfully for product: {}", productId);
+    }
+    
+    /**
+     * Convert Product entity to DTO
+     */
+    private ProductDTO convertToDTO(Product product) {
+        return ProductDTO.builder()
+            .id(product.getId())
+            .name(product.getName())
+            .description(product.getDescription())
+            .sku(product.getSku())
+            .price(product.getPrice())
+            .stockQuantity(product.getStockQuantity())
+            .category(product.getCategory())
+            .imageUrl(product.getImageUrl())
+            .active(product.getActive())
+            .createdAt(product.getCreatedAt())
+            .updatedAt(product.getUpdatedAt())
+            .build();
     }
 }

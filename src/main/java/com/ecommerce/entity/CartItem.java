@@ -1,7 +1,10 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -25,6 +28,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class CartItem {
     
     @Id
@@ -39,11 +43,18 @@ public class CartItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
     
+    @NotNull(message = "Quantity is required")
+    @Min(value = 1, message = "Quantity must be at least 1")
     @Column(nullable = false)
-    private Integer quantity;
+    @Builder.Default
+    private Integer quantity = 1;
     
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    @NotNull(message = "Unit price is required")
+    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal unitPrice;
+    
+    @Column(name = "subtotal", precision = 10, scale = 2)
+    private BigDecimal subtotal;
     
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -54,9 +65,13 @@ public class CartItem {
     private LocalDateTime updatedAt;
     
     /**
-     * Calculate subtotal for this cart item
+     * Calculate subtotal based on quantity and unit price
      */
-    public BigDecimal getSubtotal() {
-        return price.multiply(BigDecimal.valueOf(quantity));
+    @PrePersist
+    @PreUpdate
+    public void calculateSubtotal() {
+        if (unitPrice != null && quantity != null) {
+            this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+        }
     }
 }

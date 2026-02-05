@@ -7,13 +7,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Request DTO for updating cart item quantity
+ * Update Cart Item Request DTO
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateCartItemRequest {
-
+    
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;

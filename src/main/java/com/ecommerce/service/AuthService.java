@@ -1,7 +1,8 @@
 package com.ecommerce.service;
 
-import com.ecommerce.dto.AuthRequest;
-import com.ecommerce.dto.AuthResponse;
+import com.ecommerce.dto.LoginRequest;
+import com.ecommerce.dto.LoginResponse;
+import com.ecommerce.dto.RegisterRequest;
 import com.ecommerce.dto.UserDTO;
 import com.ecommerce.entity.User;
 import com.ecommerce.exception.AuthenticationException;
@@ -14,49 +15,49 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service layer for Authentication operations
- * Implements stateless login with JWT
+ * Service for Authentication operations
+ * Implements stateless login with JWT tokens
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class AuthService {
-
+    
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
     private final CartService cartService;
-
+    
     /**
-     * Stateless login - returns JWT token
+     * Register a new user
      */
-    @Transactional
-    public AuthResponse login(AuthRequest authRequest) {
-        log.info("Login attempt for user: {}", authRequest.getUsernameOrEmail());
+    public UserDTO register(RegisterRequest request) {
+        log.info("Registering new user: {}", request.getUsername());
+        return userService.registerUser(request);
+    }
+    
+    /**
+     * Login user (stateless)
+     */
+    public LoginResponse login(LoginRequest request) {
+        log.info("User login attempt: {}", request.getIdentifier());
         
-        User user = userRepository.findByUsernameOrEmail(
-            authRequest.getUsernameOrEmail(), 
-            authRequest.getUsernameOrEmail())
+        User user = userRepository.findByUsernameOrEmail(request.getIdentifier())
             .orElseThrow(() -> new AuthenticationException("Invalid username/email or password"));
         
-        if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
-            log.warn("Failed login attempt for user: {}", authRequest.getUsernameOrEmail());
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.warn("Failed login attempt for user: {}", request.getIdentifier());
             throw new AuthenticationException("Invalid username/email or password");
         }
         
         if (!user.getActive()) {
-            log.warn("Login attempt for inactive user: {}", authRequest.getUsernameOrEmail());
+            log.warn("Login attempt for inactive user: {}", request.getIdentifier());
             throw new AuthenticationException("User account is inactive");
         }
         
-        // Update last login
-        userService.updateLastLogin(user.getId());
-        
-        // Generate JWT token
-        String token = jwtTokenProvider.generateToken(user);
-        
-        log.info("User logged in successfully: {}", user.getUsername());
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
         
         UserDTO userDTO = UserDTO.builder()
             .id(user.getId())
@@ -64,42 +65,28 @@ public class AuthService {
             .email(user.getEmail())
             .firstName(user.getFirstName())
             .lastName(user.getLastName())
+            .phone(user.getPhone())
+            .active(user.getActive())
             .build();
         
-        return AuthResponse.builder()
+        log.info("User logged in successfully: {}", user.getUsername());
+        
+        return LoginResponse.builder()
             .token(token)
             .tokenType("Bearer")
-            .expiresIn(jwtTokenProvider.getExpirationTime())
             .user(userDTO)
-            .message("Login successful")
             .build();
     }
-
+    
     /**
-     * Logout with cart cleanup
+     * Logout user and cleanup empty cart
      */
-    @Transactional
     public void logout(Long userId) {
-        log.info("Logout for user ID: {}", userId);
+        log.info("User logout: {}", userId);
         
-        // Cleanup cart if configured
+        // Cleanup empty cart on logout
         cartService.cleanupCartOnLogout(userId);
         
         log.info("User logged out successfully: {}", userId);
-    }
-
-    @Transactional
-    public AuthResponse register(UserDTO userDTO) {
-        log.info("Registration attempt for username: {}", userDTO.getUsername());
-        
-        // Create user
-        UserDTO createdUser = userService.createUser(userDTO);
-        
-        log.info("User registered successfully: {}", createdUser.getUsername());
-        
-        return AuthResponse.builder()
-            .user(createdUser)
-            .message("Registration successful. Please login.")
-            .build();
     }
 }

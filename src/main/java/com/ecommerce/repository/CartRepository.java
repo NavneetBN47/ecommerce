@@ -1,7 +1,9 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Cart;
+import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,10 +17,9 @@ import java.util.Optional;
 public interface CartRepository extends JpaRepository<Cart, Long> {
     
     /**
-     * Find cart by user ID with items eagerly loaded
+     * Find cart by user
      */
-    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
-    Optional<Cart> findByUserIdWithItems(@Param("userId") Long userId);
+    Optional<Cart> findByUser(User user);
     
     /**
      * Find cart by user ID
@@ -26,9 +27,21 @@ public interface CartRepository extends JpaRepository<Cart, Long> {
     Optional<Cart> findByUserId(Long userId);
     
     /**
+     * Delete cart by user
+     */
+    void deleteByUser(User user);
+    
+    /**
      * Delete cart by user ID
      */
     void deleteByUserId(Long userId);
+    
+    /**
+     * Delete empty carts (carts with no items)
+     */
+    @Modifying
+    @Query("DELETE FROM Cart c WHERE c.id NOT IN (SELECT DISTINCT ci.cart.id FROM CartItem ci)")
+    void deleteEmptyCarts();
     
     /**
      * Check if cart exists for user

@@ -1,75 +1,77 @@
 erDiagram
-    USERS ||--o| CARTS : has
     USERS ||--o{ ORDERS : places
+    USERS ||--o| CARTS : has
     CARTS ||--o{ CART_ITEMS : contains
     PRODUCTS ||--o{ CART_ITEMS : "included in"
-    ORDERS ||--o{ ORDER_ITEMS : contains
     PRODUCTS ||--o{ ORDER_ITEMS : "included in"
+    ORDERS ||--o{ ORDER_ITEMS : contains
 
     USERS {
-        BIGINT id PK
-        VARCHAR username UK
-        VARCHAR email UK
-        VARCHAR password
-        VARCHAR first_name
-        VARCHAR last_name
-        VARCHAR phone_number
-        BOOLEAN active
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        bigint id PK
+        varchar username UK
+        varchar email UK
+        varchar password
+        varchar first_name
+        varchar last_name
+        varchar phone
+        boolean active
+        timestamp created_at
+        timestamp updated_at
     }
 
     PRODUCTS {
-        BIGINT id PK
-        VARCHAR sku UK
-        VARCHAR name
-        TEXT description
-        DECIMAL price
-        INT stock
-        VARCHAR category
-        VARCHAR image_url
-        BOOLEAN active
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        bigint id PK
+        varchar name
+        text description
+        varchar sku UK
+        decimal price
+        int stock_quantity
+        varchar category
+        varchar image_url
+        boolean active
+        timestamp created_at
+        timestamp updated_at
     }
 
     CARTS {
-        BIGINT id PK
-        BIGINT user_id FK,UK
-        DECIMAL total_amount
-        INT total_items
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        bigint id PK
+        bigint user_id FK,UK
+        decimal total_amount
+        timestamp created_at
+        timestamp updated_at
     }
 
     CART_ITEMS {
-        BIGINT id PK
-        BIGINT cart_id FK
-        BIGINT product_id FK
-        INT quantity
-        DECIMAL price
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        bigint id PK
+        bigint cart_id FK
+        bigint product_id FK
+        int quantity
+        decimal unit_price
+        decimal subtotal
+        timestamp created_at
+        timestamp updated_at
     }
 
     ORDERS {
-        BIGINT id PK
-        VARCHAR order_number UK
-        BIGINT user_id FK
-        DECIMAL total_amount
-        VARCHAR status
-        TEXT shipping_address
-        VARCHAR payment_method
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        bigint id PK
+        varchar order_number UK
+        bigint user_id FK
+        varchar status
+        decimal total_amount
+        text shipping_address
+        text billing_address
+        varchar payment_method
+        text notes
+        timestamp created_at
+        timestamp updated_at
     }
 
     ORDER_ITEMS {
-        BIGINT id PK
-        BIGINT order_id FK
-        BIGINT product_id FK
-        INT quantity
-        DECIMAL price
-        DECIMAL subtotal
-        TIMESTAMP created_at
+        bigint id PK
+        bigint order_id FK
+        bigint product_id FK
+        int quantity
+        decimal unit_price
+        decimal subtotal
+        timestamp created_at
     }

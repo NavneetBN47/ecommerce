@@ -1,8 +1,9 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.ApiResponse;
-import com.ecommerce.dto.AuthRequest;
-import com.ecommerce.dto.AuthResponse;
+import com.ecommerce.dto.LoginRequest;
+import com.ecommerce.dto.LoginResponse;
+import com.ecommerce.dto.RegisterRequest;
 import com.ecommerce.dto.UserDTO;
 import com.ecommerce.security.CurrentUser;
 import com.ecommerce.service.AuthService;
@@ -19,35 +20,35 @@ import org.springframework.web.bind.annotation.*;
  * REST Controller for Authentication operations
  */
 @RestController
-@RequestMapping("/v1/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Authentication", description = "Authentication management APIs")
 public class AuthController {
-
+    
     private final AuthService authService;
-
-    @PostMapping("/login")
-    @Operation(summary = "User login", description = "Authenticate user and return JWT token")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest authRequest) {
-        log.info("Login request received for: {}", authRequest.getUsernameOrEmail());
-        AuthResponse authResponse = authService.login(authRequest);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
-    }
-
+    
     @PostMapping("/register")
-    @Operation(summary = "User registration", description = "Register a new user")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody UserDTO userDTO) {
-        log.info("Registration request received for: {}", userDTO.getUsername());
-        AuthResponse authResponse = authService.register(userDTO);
+    @Operation(summary = "Register a new user")
+    public ResponseEntity<ApiResponse<UserDTO>> register(@Valid @RequestBody RegisterRequest request) {
+        log.info("POST /api/auth/register - Register user: {}", request.getUsername());
+        UserDTO user = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Registration successful", authResponse));
+            .body(ApiResponse.success("User registered successfully", user));
     }
-
+    
+    @PostMapping("/login")
+    @Operation(summary = "Login user")
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+        log.info("POST /api/auth/login - Login attempt: {}", request.getIdentifier());
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+    }
+    
     @PostMapping("/logout")
-    @Operation(summary = "User logout", description = "Logout user and cleanup cart if configured")
+    @Operation(summary = "Logout user")
     public ResponseEntity<ApiResponse<Void>> logout(@CurrentUser Long userId) {
-        log.info("Logout request received for user ID: {}", userId);
+        log.info("POST /api/auth/logout - User: {}", userId);
         authService.logout(userId);
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }

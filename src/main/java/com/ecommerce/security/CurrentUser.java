@@ -1,15 +1,12 @@
 package com.ecommerce.security;
 
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-
 import java.lang.annotation.*;
 
 /**
- * Annotation to inject current authenticated user ID
+ * Annotation to inject current user ID into controller methods
  */
-@Target({ElementType.PARAMETER, ElementType.TYPE})
+@Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@AuthenticationPrincipal
 public @interface CurrentUser {
 }

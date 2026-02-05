@@ -1,11 +1,11 @@
 package com.ecommerce.security;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -13,67 +13,75 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 /**
- * JWT token provider for generating and validating JWT tokens
+ * JWT Token Provider for stateless authentication
  */
 @Component
+@Slf4j
 public class JwtTokenProvider {
-
-    private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
-
-    @Value("${spring.security.jwt.secret-key}")
+    
+    @Value("${jwt.secret:mySecretKeyForJWTTokenGenerationAndValidationPurpose12345}")
     private String jwtSecret;
-
-    @Value("${spring.security.jwt.expiration}")
-    private long jwtExpirationMs;
-
-    public String generateToken(Authentication authentication) {
-        String username = authentication.getName();
+    
+    @Value("${jwt.expiration:86400000}") // 24 hours in milliseconds
+    private long jwtExpiration;
+    
+    /**
+     * Generate JWT token
+     */
+    public String generateToken(Long userId, String username) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
-
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-
-        return Jwts.builder()
-            .subject(username)
-            .issuedAt(now)
-            .expiration(expiryDate)
-            .signWith(key)
-            .compact();
-    }
-
-    public String getUsernameFromToken(String token) {
+        Date expiryDate = new Date(now.getTime() + jwtExpiration);
+        
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         
-        Claims claims = Jwts.parser()
-            .verifyWith(key)
-            .build()
-            .parseSignedClaims(token)
-            .getPayload();
-
-        return claims.getSubject();
+        return Jwts.builder()
+            .setSubject(userId.toString())
+            .claim("username", username)
+            .setIssuedAt(now)
+            .setExpiration(expiryDate)
+            .signWith(key, SignatureAlgorithm.HS512)
+            .compact();
     }
-
+    
+    /**
+     * Get user ID from JWT token
+     */
+    public Long getUserIdFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return Long.parseLong(claims.getSubject());
+    }
+    
+    /**
+     * Get username from JWT token
+     */
+    public String getUsernameFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims.get("username", String.class);
+    }
+    
+    /**
+     * Validate JWT token
+     */
     public boolean validateToken(String token) {
         try {
-            SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-            Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token);
+            getClaimsFromToken(token);
             return true;
-        } catch (MalformedJwtException ex) {
-            logger.error("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            logger.error("Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            logger.error("Unsupported JWT token");
-        } catch (IllegalArgumentException ex) {
-            logger.error("JWT claims string is empty");
+        } catch (Exception ex) {
+            log.error("Invalid JWT token: {}", ex.getMessage());
+            return false;
         }
-        return false;
     }
-
-    public long getJwtExpirationMs() {
-        return jwtExpirationMs;
+    
+    /**
+     * Get claims from JWT token
+     */
+    private Claims getClaimsFromToken(String token) {
+        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        
+        return Jwts.parserBuilder()
+            .setSigningKey(key)
+            .build()
+            .parseClaimsJws(token)
+            .getBody();
     }
 }

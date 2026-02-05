@@ -7,7 +7,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
  * Main Spring Boot Application Entry Point
- * Enables JPA Auditing and Transaction Management
+ * 
+ * @author Backend Automation Agent
+ * @version 1.0.0
  */
 @SpringBootApplication
 @EnableJpaAuditing

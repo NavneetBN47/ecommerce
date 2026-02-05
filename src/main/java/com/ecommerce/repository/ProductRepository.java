@@ -1,6 +1,8 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,26 +23,37 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findBySku(String sku);
     
     /**
+     * Find active products
+     */
+    List<Product> findByActiveTrue();
+    
+    /**
+     * Find products by category
+     */
+    List<Product> findByCategory(String category);
+    
+    /**
      * Find active products by category
      */
     List<Product> findByCategoryAndActiveTrue(String category);
     
     /**
-     * Find all active products
-     */
-    List<Product> findByActiveTrue();
-    
-    /**
-     * Case-insensitive search by product name
+     * Case-insensitive product search by name
      */
     @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.active = true")
-    List<Product> searchByName(@Param("searchTerm") String searchTerm);
+    Page<Product> searchByNameIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
     
     /**
-     * Case-insensitive search by product name or category
+     * Case-insensitive product search by name or description
      */
-    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR LOWER(p.category) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.active = true")
-    List<Product> searchByNameOrCategory(@Param("searchTerm") String searchTerm);
+    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "OR LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.active = true")
+    Page<Product> searchByNameOrDescriptionIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
+    
+    /**
+     * Find products with stock quantity greater than specified amount
+     */
+    List<Product> findByStockQuantityGreaterThanAndActiveTrue(Integer quantity);
     
     /**
      * Check if SKU exists
