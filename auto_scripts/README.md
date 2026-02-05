@@ -1,238 +1,183 @@
-# E-Commerce Shopping Cart API
+# E-Commerce Shopping Cart System - Backend API
 
-A production-ready, stateless shopping cart system built with Spring Boot 3.2, implementing RESTful APIs for user authentication, product management, cart operations, and order processing.
+## Overview
 
-## Table of Contents
-
-- [Features](#features)
-- [Technology Stack](#technology-stack)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [API Documentation](#api-documentation)
-- [Database Schema](#database-schema)
-- [Security](#security)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Quality Metrics](#quality-metrics)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
+A production-ready RESTful API for an e-commerce shopping cart system built with Spring Boot 3.2, PostgreSQL, and JWT authentication. This system provides comprehensive user management, product catalog, and shopping cart functionality with enterprise-grade security and performance optimizations.
 
 ## Features
 
 ### Core Functionality
-
-- **User Management**
-  - User registration with validation
-  - Stateless JWT-based authentication
-  - Password encryption with BCrypt
-
-- **Product Management**
-  - Advanced product search with filters
-  - Category and brand filtering
-  - Price range filtering
-  - Pagination and sorting
-  - Stock management
-
-- **Shopping Cart**
-  - Add/update/remove items
-  - Real-time cart total calculation
-  - Stock validation
-  - Cart lifecycle management (ACTIVE, CHECKED_OUT, ABANDONED)
-
-- **Order Processing**
-  - Checkout with address and payment details
-  - Order history with pagination
-  - Order tracking by order number
-  - Automatic stock deduction
+- **User Management**: Registration, authentication, and profile management
+- **Product Catalog**: Browse, search (case-insensitive), and filter products by category
+- **Shopping Cart**: 
+  - Lazy cart creation (cart created only when first item is added)
+  - Add/update/remove items with real-time stock validation
+  - Automatic cart deletion when empty
+  - Cart cleanup on user logout
+  - Real-time total calculation
+- **Category Management**: Organize products into categories
+- **Stateless Authentication**: JWT-based authentication for scalability
 
 ### Technical Features
-
-- Stateless architecture with JWT tokens
-- RESTful API design
-- Comprehensive validation
-- Global exception handling
-- Database migration with Flyway
-- Transaction management
-- Optimized database queries with indexes
-- Cascading deletes and referential integrity
+- RESTful API design with proper HTTP methods and status codes
+- Comprehensive validation and error handling
+- Database migration management with Flyway
+- Optimized database queries with proper indexing
+- Transaction management for data consistency
+- Audit trails with automatic timestamp tracking
+- CORS configuration for frontend integration
 
 ## Technology Stack
 
 - **Framework**: Spring Boot 3.2.0
 - **Language**: Java 17
-- **Database**: MySQL 8.0
+- **Database**: PostgreSQL 15+
+- **Security**: Spring Security 6 with JWT
 - **ORM**: Spring Data JPA / Hibernate
-- **Security**: Spring Security + JWT
 - **Migration**: Flyway
 - **Build Tool**: Maven
 - **Additional Libraries**:
   - Lombok (boilerplate reduction)
-  - JJWT (JWT handling)
-  - Jackson (JSON processing)
+  - JJWT (JWT token handling)
+  - Jakarta Validation (input validation)
 
-## Architecture
-
-### Layered Architecture
-
-```
-┌─────────────────────────────────────┐
-│         Controllers                 │  REST API Layer
-├─────────────────────────────────────┤
-│         Services                    │  Business Logic Layer
-├─────────────────────────────────────┤
-│         Repositories                │  Data Access Layer
-├─────────────────────────────────────┤
-│         Entities                    │  Domain Model
-└─────────────────────────────────────┘
-```
-
-### Package Structure
-
-```
-com.ecommerce
-├── config              # Configuration classes
-├── controller          # REST controllers
-├── dto                 # Data Transfer Objects
-├── entity              # JPA entities
-├── exception           # Custom exceptions
-├── repository          # Data repositories
-├── security            # Security components
-└── service             # Business logic
-```
-
-## Getting Started
-
-### Prerequisites
+## Prerequisites
 
 - Java 17 or higher
-- Maven 3.6+
-- MySQL 8.0+
+- Maven 3.8+
+- PostgreSQL 15+
 - Git
 
-### Installation
+## Installation & Setup
 
-1. **Clone the repository**
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/NavneetBN47/ecommerce.git
-cd ecommerce
+cd ecommerce/api-springboot
 ```
 
-2. **Configure Database**
+### 2. Database Setup
 
-Create a MySQL database:
-
-```sql
+```bash
+# Create PostgreSQL database
+psql -U postgres
 CREATE DATABASE ecommerce_db;
+\q
 ```
 
-Update `src/main/resources/application.properties`:
+### 3. Configure Application
 
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/ecommerce_db
-spring.datasource.username=your_username
-spring.datasource.password=your_password
+Update `src/main/resources/application.yml` with your database credentials:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecommerce_db
+    username: your_username
+    password: your_password
 ```
 
-3. **Build the project**
+### 4. Build the Application
 
 ```bash
 mvn clean install
 ```
 
-4. **Run the application**
+### 5. Run Database Migrations
+
+Migrations run automatically on application startup via Flyway.
+
+### 6. Start the Application
 
 ```bash
 mvn spring-boot:run
 ```
 
-The application will start on `http://localhost:8080`
-
-### Quick Start with Docker (Optional)
-
-```bash
-docker-compose up -d
-```
+The API will be available at `http://localhost:8080`
 
 ## API Documentation
 
 ### Authentication Endpoints
 
 #### Register User
-
 ```http
 POST /api/auth/register
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "SecurePass123!",
-  "firstName": "John",
-  "lastName": "Doe",
-  "phone": "1234567890"
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "SecurePass@123",
+  "fullName": "John Doe",
+  "phone": "+1234567890",
+  "address": "123 Main St, City, State"
 }
 ```
 
 #### Login
-
 ```http
 POST /api/auth/login
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "SecurePass123!"
+  "usernameOrEmail": "john_doe",
+  "password": "SecurePass@123"
 }
-```
 
-**Response:**
-```json
+Response:
 {
   "success": true,
+  "message": "Login successful",
   "data": {
-    "token": "eyJhbGciOiJIUzUxMiJ9...",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "tokenType": "Bearer",
-    "userId": 1,
-    "email": "user@example.com",
-    "firstName": "John",
-    "lastName": "Doe"
+    "expiresIn": 86400000,
+    "user": { ... }
   }
 }
 ```
 
+#### Logout
+```http
+POST /api/auth/logout
+Authorization: Bearer <token>
+```
+
 ### Product Endpoints
 
-#### Search Products
-
+#### Get All Products (Paginated)
 ```http
-POST /api/products/search
-Content-Type: application/json
+GET /api/products?page=0&size=10&sortBy=productName&sortDir=ASC
+```
 
-{
-  "keyword": "laptop",
-  "category": "Electronics",
-  "minPrice": 100,
-  "maxPrice": 2000,
-  "page": 0,
-  "size": 20,
-  "sortBy": "price",
-  "sortDirection": "ASC"
-}
+#### Search Products (Case-Insensitive)
+```http
+GET /api/products/search?query=laptop&page=0&size=10
+```
+
+#### Get Products by Category
+```http
+GET /api/products/category/{categoryId}?page=0&size=10
 ```
 
 #### Get Product by ID
-
 ```http
 GET /api/products/{id}
 ```
 
 ### Cart Endpoints
 
-#### Add to Cart
-
+#### Get Cart (Lazy Creation)
 ```http
-POST /api/cart/add
-Authorization: Bearer {token}
+GET /api/cart
+Authorization: Bearer <token>
+```
+
+#### Add Item to Cart
+```http
+POST /api/cart/items
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -241,18 +186,10 @@ Content-Type: application/json
 }
 ```
 
-#### Get Cart
-
-```http
-GET /api/cart
-Authorization: Bearer {token}
-```
-
 #### Update Cart Item
-
 ```http
-PUT /api/cart/items/{itemId}
-Authorization: Bearer {token}
+PUT /api/cart/items/{cartItemId}
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -260,206 +197,195 @@ Content-Type: application/json
 }
 ```
 
-#### Remove Cart Item
-
+#### Remove Item from Cart
 ```http
-DELETE /api/cart/items/{itemId}
-Authorization: Bearer {token}
+DELETE /api/cart/items/{cartItemId}
+Authorization: Bearer <token>
 ```
 
-### Order Endpoints
-
-#### Checkout
-
+#### Clear Cart
 ```http
-POST /api/orders/checkout
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "shippingAddress": "123 Main St, City, State 12345",
-  "billingAddress": "123 Main St, City, State 12345",
-  "paymentMethod": "CREDIT_CARD"
-}
+DELETE /api/cart
+Authorization: Bearer <token>
 ```
 
-#### Get User Orders
+### Category Endpoints
 
+#### Get All Categories
 ```http
-GET /api/orders?page=0&size=10
-Authorization: Bearer {token}
+GET /api/categories
 ```
+
+#### Get Category by ID
+```http
+GET /api/categories/{id}
+```
+
+## Business Logic Implementation
+
+### Cart Management
+
+1. **Lazy Cart Creation**: Cart is created only when the first item is added
+2. **Stock Validation**: Real-time validation of product availability before adding to cart
+3. **Automatic Deletion**: Empty carts are automatically deleted when:
+   - Last item is removed
+   - User logs out with an empty cart
+4. **Total Calculation**: Cart totals (amount and item count) are recalculated automatically on any cart modification
+5. **Duplicate Prevention**: Unique constraint on (cart_id, product_id) prevents duplicate items
+
+### Product Search
+
+- Case-insensitive search using SQL LOWER() function
+- Indexed product_name column for performance
+- Pagination support for large result sets
+
+### Security
+
+- Stateless JWT authentication (no server-side sessions)
+- BCrypt password hashing
+- Token expiration (24 hours default)
+- CORS configuration for frontend integration
+- Method-level security with @PreAuthorize
 
 ## Database Schema
 
-See [db/diagrams/er_diagram.md](db/diagrams/er_diagram.md) for the complete ER diagram.
+### Tables
 
-### Key Tables
+1. **users**: User accounts and profiles
+2. **categories**: Product categories
+3. **products**: Product catalog
+4. **carts**: Shopping carts (one per user)
+5. **cart_items**: Items in shopping carts
 
-- **users**: User account information
-- **products**: Product catalog
-- **carts**: Shopping cart instances
-- **cart_items**: Items in shopping carts
-- **orders**: Completed orders
-- **order_items**: Items in orders
+### Key Relationships
 
-### Migration Scripts
+- Users (1) ←→ (0..1) Carts
+- Carts (1) ←→ (0..*) Cart Items
+- Products (1) ←→ (0..*) Cart Items
+- Categories (1) ←→ (0..*) Products
 
-Database migrations are managed by Flyway:
+### Constraints
 
-- `V1__Initial_Schema.sql`: Creates all tables with constraints
-- `V2__Sample_Data.sql`: Inserts sample data for testing
-
-## Security
-
-### Authentication Flow
-
-1. User registers or logs in
-2. Server generates JWT token
-3. Client includes token in Authorization header
-4. Server validates token on each request
-
-### Password Security
-
-- Passwords are hashed using BCrypt with strength 10
-- Never stored in plain text
-- Validation enforces strong password requirements
-
-### JWT Configuration
-
-- Token expiration: 24 hours (configurable)
-- Secret key: Configured in application.properties
-- Stateless authentication (no session storage)
+- Unique: username, email, SKU, (cart_id, product_id)
+- Foreign Keys: All relationships with appropriate CASCADE rules
+- Check Constraints: price >= 0, stock_quantity >= 0, quantity > 0
+- Indexes: All foreign keys and frequently queried columns
 
 ## Testing
 
-### Run Tests
+### Test User Credentials
 
-```bash
-mvn test
+```
+Username: testuser
+Email: test@example.com
+Password: Test@123
 ```
 
-### Test Coverage
+### Sample Products
 
+The database is pre-populated with sample products across multiple categories for testing.
+
+## Configuration
+
+### Environment Profiles
+
+- **dev**: Development environment (application-dev.yml)
+- **prod**: Production environment (application-prod.yml)
+
+Switch profiles:
 ```bash
-mvn jacoco:report
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
 ```
 
-View coverage report at `target/site/jacoco/index.html`
+### Key Configuration Properties
 
-## Deployment
+```yaml
+app:
+  jwt:
+    secret: <your-secret-key>
+    expiration-ms: 86400000  # 24 hours
 
-### Production Checklist
-
-- [ ] Update database credentials
-- [ ] Set strong JWT secret
-- [ ] Configure production profile
-- [ ] Enable HTTPS
-- [ ] Set up monitoring
-- [ ] Configure logging
-- [ ] Set up backup strategy
-
-### Environment Variables
-
-```bash
-export DATABASE_URL=jdbc:mysql://prod-db:3306/ecommerce_db
-export DATABASE_USERNAME=prod_user
-export DATABASE_PASSWORD=secure_password
-export JWT_SECRET=your_production_secret_key
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
 ```
 
-### Build for Production
+## Maintenance
 
-```bash
-mvn clean package -DskipTests
-java -jar target/ecommerce-api-1.0.0.jar --spring.profiles.active=prod
+### Database Migrations
+
+Migrations are located in `src/main/resources/db/migration/`:
+
+- V001: Initial schema
+- V002: Sample data
+- V003: Triggers for automatic timestamps
+
+To create a new migration:
+```
+V004__description.sql
 ```
 
-## Quality Metrics
+### Backup & Restore
 
-### Code Quality
+```bash
+# Backup
+pg_dump -U postgres ecommerce_db > backup.sql
 
-- **Lines of Code**: ~3,500
-- **Test Coverage**: Target 80%+
-- **Cyclomatic Complexity**: < 10 per method
-- **Code Duplication**: < 5%
-
-### Performance Metrics
-
-- **API Response Time**: < 200ms (p95)
-- **Database Query Time**: < 50ms (p95)
-- **Concurrent Users**: 1000+
-- **Throughput**: 500 req/sec
-
-### Database Optimization
-
-- Indexed columns for frequent queries
-- Optimized JOIN operations
-- Connection pooling configured
-- Query result caching
+# Restore
+psql -U postgres ecommerce_db < backup.sql
+```
 
 ## Troubleshooting
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed troubleshooting guide.
+See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and solutions.
 
-### Common Issues
+## Performance Optimization
 
-#### Database Connection Failed
+1. **Database Indexing**: All foreign keys and frequently queried columns are indexed
+2. **Connection Pooling**: HikariCP with optimized settings
+3. **Query Optimization**: 
+   - Lazy loading for relationships
+   - Fetch joins where appropriate
+   - Pagination for large result sets
+4. **Caching**: Consider adding Redis for session management in production
 
-**Problem**: Application fails to connect to MySQL
+## Security Best Practices
 
-**Solution**:
-1. Verify MySQL is running: `sudo systemctl status mysql`
-2. Check credentials in application.properties
-3. Ensure database exists: `SHOW DATABASES;`
-4. Check firewall rules
+1. Change default JWT secret in production
+2. Use environment variables for sensitive configuration
+3. Enable HTTPS in production
+4. Implement rate limiting for API endpoints
+5. Regular security audits and dependency updates
 
-#### JWT Token Invalid
+## Future Enhancements
 
-**Problem**: 401 Unauthorized error
-
-**Solution**:
-1. Verify token is included in Authorization header
-2. Check token format: `Bearer {token}`
-3. Ensure token hasn't expired
-4. Verify JWT secret matches
-
-#### Insufficient Stock Error
-
-**Problem**: Cannot add item to cart
-
-**Solution**:
-1. Check product stock quantity
-2. Verify product is active
-3. Review cart item quantity
+1. Order management and checkout process
+2. Payment gateway integration
+3. Email notifications
+4. Product reviews and ratings
+5. Wishlist functionality
+6. Admin dashboard
+7. Analytics and reporting
+8. Redis caching layer
+9. Elasticsearch for advanced product search
+10. Microservices architecture
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Code Style
-
-- Follow Java naming conventions
-- Use Lombok annotations
-- Write meaningful commit messages
-- Add JavaDoc for public methods
-- Include unit tests for new features
+Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Contact
+## Support
 
-- **Project Repository**: https://github.com/NavneetBN47/ecommerce
-- **Issue Tracker**: https://github.com/NavneetBN47/ecommerce/issues
+For support, email support@example.com or create an issue in the GitHub repository.
 
-## Acknowledgments
+## Authors
 
-- Spring Boot team for the excellent framework
-- MySQL team for the robust database
-- Open source community for various libraries
+- Shopping Cart Team
+- Version: 1.0.0
+- Last Updated: 2025-02-05

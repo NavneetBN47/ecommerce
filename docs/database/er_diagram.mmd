@@ -1,0 +1,61 @@
+erDiagram
+    USERS ||--o| CARTS : "has"
+    CARTS ||--o{ CART_ITEMS : "contains"
+    PRODUCTS ||--o{ CART_ITEMS : "included_in"
+    CATEGORIES ||--o{ PRODUCTS : "categorizes"
+
+    USERS {
+        bigserial user_id PK
+        varchar username UK
+        varchar email UK
+        varchar password_hash
+        varchar full_name
+        varchar phone
+        text address
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CATEGORIES {
+        bigserial category_id PK
+        varchar category_name UK
+        text description
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PRODUCTS {
+        bigserial product_id PK
+        varchar product_name
+        text description
+        varchar sku UK
+        decimal price
+        integer stock_quantity
+        bigint category_id FK
+        varchar image_url
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CARTS {
+        bigserial cart_id PK
+        bigint user_id FK,UK
+        varchar status
+        decimal total_amount
+        integer total_items
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CART_ITEMS {
+        bigserial cart_item_id PK
+        bigint cart_id FK
+        bigint product_id FK
+        integer quantity
+        decimal price
+        timestamp added_at
+        timestamp updated_at
+    }

@@ -1,536 +1,422 @@
 # Troubleshooting Guide
 
-## Table of Contents
+## Common Issues and Solutions
 
-1. [Database Issues](#database-issues)
-2. [Authentication Issues](#authentication-issues)
-3. [API Issues](#api-issues)
-4. [Performance Issues](#performance-issues)
-5. [Deployment Issues](#deployment-issues)
-6. [Common Error Messages](#common-error-messages)
+### 1. Database Connection Issues
 
-## Database Issues
-
-### Issue: Database Connection Failed
+#### Problem: "Connection refused" or "Connection timeout"
 
 **Symptoms:**
-- Application fails to start
-- Error: "Unable to connect to database"
-- Connection timeout errors
-
-**Diagnosis:**
-```bash
-# Check MySQL status
-sudo systemctl status mysql
-
-# Test connection
-mysql -u root -p -h localhost
-
-# Check port
-netstat -an | grep 3306
+```
+java.sql.SQLException: Connection refused
 ```
 
 **Solutions:**
 
-1. **Verify MySQL is running:**
-```bash
-sudo systemctl start mysql
-sudo systemctl enable mysql
-```
-
-2. **Check credentials:**
-```properties
-# application.properties
-spring.datasource.url=jdbc:mysql://localhost:3306/ecommerce_db
-spring.datasource.username=correct_username
-spring.datasource.password=correct_password
-```
-
-3. **Create database if missing:**
-```sql
-CREATE DATABASE IF NOT EXISTS ecommerce_db;
-GRANT ALL PRIVILEGES ON ecommerce_db.* TO 'your_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-4. **Check firewall:**
-```bash
-sudo ufw allow 3306/tcp
-```
-
-### Issue: Flyway Migration Failed
-
-**Symptoms:**
-- Application fails to start
-- Error: "Migration failed"
-- Schema version mismatch
-
-**Solutions:**
-
-1. **Check migration history:**
-```sql
-SELECT * FROM flyway_schema_history;
-```
-
-2. **Repair failed migration:**
-```bash
-mvn flyway:repair
-```
-
-3. **Clean and rebuild (CAUTION: Deletes all data):**
-```bash
-mvn flyway:clean flyway:migrate
-```
-
-4. **Manual fix:**
-```sql
--- Remove failed migration entry
-DELETE FROM flyway_schema_history WHERE success = 0;
-```
-
-### Issue: Slow Database Queries
-
-**Symptoms:**
-- API responses are slow
-- High database CPU usage
-- Timeout errors
-
-**Diagnosis:**
-```sql
--- Enable slow query log
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 1;
-
--- Check slow queries
-SHOW FULL PROCESSLIST;
-
--- Analyze query performance
-EXPLAIN SELECT * FROM products WHERE category = 'Electronics';
-```
-
-**Solutions:**
-
-1. **Add missing indexes:**
-```sql
-CREATE INDEX idx_product_category ON products(category);
-CREATE INDEX idx_cart_user_status ON carts(user_id, status);
-```
-
-2. **Optimize queries:**
-```java
-// Use pagination
-Pageable pageable = PageRequest.of(page, size);
-
-// Use fetch joins for related entities
-@Query("SELECT c FROM Cart c JOIN FETCH c.items WHERE c.id = :id")
-```
-
-3. **Configure connection pool:**
-```properties
-spring.datasource.hikari.maximum-pool-size=20
-spring.datasource.hikari.minimum-idle=5
-spring.datasource.hikari.connection-timeout=30000
-```
-
-## Authentication Issues
-
-### Issue: JWT Token Invalid
-
-**Symptoms:**
-- 401 Unauthorized error
-- "Invalid token" message
-- Authentication fails
-
-**Diagnosis:**
-```bash
-# Decode JWT token (without verification)
-echo "YOUR_TOKEN" | cut -d'.' -f2 | base64 -d | jq
-```
-
-**Solutions:**
-
-1. **Verify token format:**
-```http
-Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
-```
-
-2. **Check token expiration:**
-```properties
-# Increase expiration time
-jwt.expiration=86400000
-```
-
-3. **Verify JWT secret:**
-```properties
-# Ensure secret is consistent
-jwt.secret=YourSecretKeyMustBeTheSameEverywhereAndLongEnough
-```
-
-4. **Clear and regenerate token:**
-```bash
-# Login again to get new token
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password"}'
-```
-
-### Issue: Password Validation Fails
-
-**Symptoms:**
-- Registration fails
-- "Password does not meet requirements" error
-
-**Solutions:**
-
-1. **Check password requirements:**
-- Minimum 8 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one digit
-- At least one special character (@$!%*?&)
-
-2. **Valid password examples:**
-```
-SecurePass123!
-MyP@ssw0rd
-Test1234!
-```
-
-### Issue: User Already Exists
-
-**Symptoms:**
-- 409 Conflict error
-- "Email already registered" message
-
-**Solutions:**
-
-1. **Use different email:**
-```json
-{
-  "email": "newuser@example.com",
-  "password": "SecurePass123!"
-}
-```
-
-2. **Reset existing user (if needed):**
-```sql
-DELETE FROM users WHERE email = 'user@example.com';
-```
-
-## API Issues
-
-### Issue: 404 Not Found
-
-**Symptoms:**
-- Endpoint not found
-- Wrong URL
-
-**Solutions:**
-
-1. **Verify endpoint URL:**
-```
-Correct: http://localhost:8080/api/products/search
-Wrong:   http://localhost:8080/products/search
-```
-
-2. **Check application is running:**
-```bash
-curl http://localhost:8080/actuator/health
-```
-
-3. **Review controller mappings:**
-```bash
-# Check application logs for registered endpoints
-grep "Mapped" application.log
-```
-
-### Issue: 400 Bad Request - Validation Error
-
-**Symptoms:**
-- Request rejected
-- Validation error messages
-
-**Solutions:**
-
-1. **Check request body format:**
-```json
-{
-  "productId": 1,
-  "quantity": 2
-}
-```
-
-2. **Verify required fields:**
-- All @NotNull fields must be present
-- All @NotBlank fields must have values
-- Email must be valid format
-- Numbers must be in valid range
-
-3. **Review validation constraints:**
-```java
-@Min(value = 1, message = "Quantity must be at least 1")
-private Integer quantity;
-```
-
-### Issue: 500 Internal Server Error
-
-**Symptoms:**
-- Unexpected server error
-- Application crash
-
-**Diagnosis:**
-```bash
-# Check application logs
-tail -f logs/application.log
-
-# Check stack trace
-grep -A 20 "Exception" logs/application.log
-```
-
-**Solutions:**
-
-1. **Review error logs:**
-```bash
-# Enable debug logging
-logging.level.com.ecommerce=DEBUG
-```
-
-2. **Check for null pointer exceptions:**
-```java
-// Add null checks
-if (product != null && product.getActive()) {
-    // process
-}
-```
-
-3. **Verify database constraints:**
-```sql
--- Check for constraint violations
-SHOW ENGINE INNODB STATUS;
-```
-
-## Performance Issues
-
-### Issue: Slow API Response
-
-**Symptoms:**
-- High latency
-- Timeout errors
-- Poor user experience
-
-**Diagnosis:**
-```bash
-# Measure response time
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost:8080/api/products
-
-# Check application metrics
-curl http://localhost:8080/actuator/metrics
-```
-
-**Solutions:**
-
-1. **Enable caching:**
-```java
-@Cacheable("products")
-public ProductResponse getProductById(Long id) {
-    // ...
-}
-```
-
-2. **Optimize queries:**
-```java
-// Use projections
-@Query("SELECT new com.ecommerce.dto.ProductResponse(p.id, p.name, p.price) FROM Product p")
-```
-
-3. **Add pagination:**
-```java
-Pageable pageable = PageRequest.of(page, size);
-Page<Product> products = productRepository.findAll(pageable);
-```
-
-4. **Configure thread pool:**
-```properties
-server.tomcat.threads.max=200
-server.tomcat.threads.min-spare=10
-```
-
-### Issue: High Memory Usage
-
-**Symptoms:**
-- OutOfMemoryError
-- Application crashes
-- Slow performance
-
-**Diagnosis:**
-```bash
-# Check memory usage
-jps -l
-jmap -heap <PID>
-
-# Generate heap dump
-jmap -dump:live,format=b,file=heap.bin <PID>
-```
-
-**Solutions:**
-
-1. **Increase heap size:**
-```bash
-java -Xms512m -Xmx2048m -jar ecommerce-api.jar
-```
-
-2. **Fix memory leaks:**
-```java
-// Close resources properly
-try (Connection conn = dataSource.getConnection()) {
-    // use connection
-}
-```
-
-3. **Use pagination:**
-```java
-// Don't load all records at once
-Page<Product> products = productRepository.findAll(pageable);
-```
-
-## Deployment Issues
-
-### Issue: Application Won't Start
-
-**Symptoms:**
-- Application fails to start
-- Port already in use
-- Configuration errors
-
-**Solutions:**
-
-1. **Check port availability:**
-```bash
-# Check if port 8080 is in use
-lsof -i :8080
-
-# Kill process using port
-kill -9 <PID>
-
-# Or change port
-server.port=8081
-```
-
-2. **Verify Java version:**
-```bash
-java -version
-# Should be Java 17 or higher
-```
-
-3. **Check dependencies:**
-```bash
-mvn dependency:tree
-mvn clean install
-```
-
-### Issue: Environment Variables Not Set
-
-**Symptoms:**
-- Configuration not loaded
-- Default values used
-- Connection failures
-
-**Solutions:**
-
-1. **Set environment variables:**
-```bash
-export DATABASE_URL=jdbc:mysql://localhost:3306/ecommerce_db
-export DATABASE_USERNAME=root
-export DATABASE_PASSWORD=password
-export JWT_SECRET=your_secret_key
-```
-
-2. **Use .env file:**
-```bash
-# .env
-DATABASE_URL=jdbc:mysql://localhost:3306/ecommerce_db
-DATABASE_USERNAME=root
-DATABASE_PASSWORD=password
-```
-
-3. **Verify variables are loaded:**
-```bash
-echo $DATABASE_URL
-```
-
-## Common Error Messages
-
-### "Resource not found"
-
-**Cause:** Requested entity doesn't exist in database
+1. **Verify PostgreSQL is running:**
+   ```bash
+   # Linux/Mac
+   sudo systemctl status postgresql
+   # or
+   pg_ctl status
+   
+   # Windows
+   net start postgresql-x64-15
+   ```
+
+2. **Check connection parameters:**
+   - Verify database name, username, and password in `application.yml`
+   - Ensure PostgreSQL is listening on the correct port (default: 5432)
+   
+3. **Test connection manually:**
+   ```bash
+   psql -h localhost -U postgres -d ecommerce_db
+   ```
+
+4. **Check pg_hba.conf:**
+   - Ensure local connections are allowed
+   - Add line: `host all all 127.0.0.1/32 md5`
+
+#### Problem: "Database does not exist"
 
 **Solution:**
-- Verify ID is correct
-- Check if resource was deleted
-- Ensure user has access to resource
+```bash
+psql -U postgres
+CREATE DATABASE ecommerce_db;
+\q
+```
 
-### "Insufficient stock"
+### 2. Migration Issues
 
-**Cause:** Product stock is less than requested quantity
+#### Problem: Flyway migration fails
 
-**Solution:**
-- Check product stock: `SELECT stock_quantity FROM products WHERE id = ?`
-- Reduce quantity in request
-- Wait for stock replenishment
+**Symptoms:**
+```
+FlywayException: Validate failed: Migration checksum mismatch
+```
 
-### "Cart is empty"
+**Solutions:**
 
-**Cause:** Attempting to checkout with no items in cart
+1. **Clean and re-run migrations (DEVELOPMENT ONLY):**
+   ```bash
+   mvn flyway:clean flyway:migrate
+   ```
 
-**Solution:**
-- Add items to cart before checkout
-- Verify cart status is ACTIVE
-- Check cart items: `SELECT * FROM cart_items WHERE cart_id = ?`
+2. **Repair migration history:**
+   ```bash
+   mvn flyway:repair
+   ```
 
-### "Invalid credentials"
+3. **Manual fix:**
+   ```sql
+   DELETE FROM flyway_schema_history WHERE success = false;
+   ```
 
-**Cause:** Wrong email or password
-
-**Solution:**
-- Verify email is correct
-- Check password (case-sensitive)
-- Reset password if forgotten
-- Ensure user exists: `SELECT * FROM users WHERE email = ?`
-
-### "Validation failed"
-
-**Cause:** Request data doesn't meet validation requirements
+#### Problem: "Table already exists"
 
 **Solution:**
-- Review validation error messages
-- Check required fields
-- Verify data formats (email, phone, etc.)
-- Ensure values are in valid ranges
+Either drop existing tables or use baseline:
+```bash
+mvn flyway:baseline
+```
+
+### 3. Authentication Issues
+
+#### Problem: "Invalid JWT token" or "Token expired"
+
+**Solutions:**
+
+1. **Generate new token:**
+   - Login again to get a fresh token
+   - Check token expiration time in configuration
+
+2. **Verify JWT secret:**
+   - Ensure `app.jwt.secret` is properly configured
+   - Secret must be at least 256 bits (32 characters)
+
+3. **Check token format:**
+   ```
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   ```
+
+#### Problem: "Bad credentials" on login
+
+**Solutions:**
+
+1. **Verify password:**
+   - Ensure password meets requirements (8+ chars, uppercase, lowercase, digit, special char)
+   - Check for typos
+
+2. **Reset test user password:**
+   ```sql
+   UPDATE users 
+   SET password_hash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'
+   WHERE username = 'testuser';
+   -- Password: Test@123
+   ```
+
+### 4. Cart Issues
+
+#### Problem: "Insufficient stock" error
+
+**Solutions:**
+
+1. **Check product stock:**
+   ```sql
+   SELECT product_id, product_name, stock_quantity 
+   FROM products 
+   WHERE product_id = ?;
+   ```
+
+2. **Update stock if needed:**
+   ```sql
+   UPDATE products 
+   SET stock_quantity = 100 
+   WHERE product_id = ?;
+   ```
+
+#### Problem: Cart not created or items not added
+
+**Solutions:**
+
+1. **Verify authentication:**
+   - Ensure valid JWT token is provided
+   - Check token hasn't expired
+
+2. **Check product exists and is active:**
+   ```sql
+   SELECT * FROM products WHERE product_id = ? AND is_active = true;
+   ```
+
+3. **Review application logs:**
+   ```bash
+   tail -f logs/spring-boot-application.log
+   ```
+
+### 5. Build Issues
+
+#### Problem: Maven build fails
+
+**Solutions:**
+
+1. **Clean and rebuild:**
+   ```bash
+   mvn clean install -U
+   ```
+
+2. **Delete .m2 cache:**
+   ```bash
+   rm -rf ~/.m2/repository
+   mvn clean install
+   ```
+
+3. **Check Java version:**
+   ```bash
+   java -version  # Should be 17+
+   mvn -version
+   ```
+
+#### Problem: Lombok not working
+
+**Solutions:**
+
+1. **Enable annotation processing in IDE:**
+   - IntelliJ: Settings → Build → Compiler → Annotation Processors → Enable
+   - Eclipse: Install Lombok plugin
+
+2. **Rebuild project:**
+   ```bash
+   mvn clean compile
+   ```
+
+### 6. Performance Issues
+
+#### Problem: Slow query performance
+
+**Solutions:**
+
+1. **Check missing indexes:**
+   ```sql
+   SELECT schemaname, tablename, indexname 
+   FROM pg_indexes 
+   WHERE schemaname = 'public';
+   ```
+
+2. **Analyze query plans:**
+   ```sql
+   EXPLAIN ANALYZE SELECT * FROM products WHERE product_name ILIKE '%laptop%';
+   ```
+
+3. **Optimize connection pool:**
+   ```yaml
+   spring:
+     datasource:
+       hikari:
+         maximum-pool-size: 20
+         minimum-idle: 10
+   ```
+
+#### Problem: High memory usage
+
+**Solutions:**
+
+1. **Adjust JVM settings:**
+   ```bash
+   java -Xms512m -Xmx2048m -jar application.jar
+   ```
+
+2. **Enable pagination:**
+   - Always use pagination for large result sets
+   - Default page size: 10-50 items
+
+### 7. CORS Issues
+
+#### Problem: "CORS policy blocked" error in browser
+
+**Solutions:**
+
+1. **Update allowed origins in WebConfig:**
+   ```java
+   .allowedOrigins("http://localhost:3000", "http://your-frontend-url")
+   ```
+
+2. **Check request headers:**
+   - Ensure proper Content-Type header
+   - Include Authorization header for protected endpoints
+
+### 8. Validation Errors
+
+#### Problem: "Validation failed" with unclear errors
+
+**Solutions:**
+
+1. **Check request payload:**
+   - Ensure all required fields are present
+   - Verify data types match DTO definitions
+   - Check field length constraints
+
+2. **Review validation annotations:**
+   ```java
+   @NotBlank(message = "Username is required")
+   @Size(min = 3, max = 50)
+   private String username;
+   ```
+
+### 9. Transaction Issues
+
+#### Problem: "Transaction rolled back" or "Deadlock detected"
+
+**Solutions:**
+
+1. **Check transaction boundaries:**
+   - Ensure @Transactional is properly placed
+   - Avoid long-running transactions
+
+2. **Review locking strategy:**
+   ```java
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   ```
+
+3. **Increase transaction timeout:**
+   ```yaml
+   spring:
+     transaction:
+       default-timeout: 30
+   ```
+
+## Preventive Measures
+
+### 1. Regular Maintenance
+
+```sql
+-- Vacuum database
+VACUUM ANALYZE;
+
+-- Reindex tables
+REINDEX DATABASE ecommerce_db;
+
+-- Check table sizes
+SELECT 
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+```
+
+### 2. Monitoring
+
+1. **Enable actuator endpoints:**
+   ```yaml
+   management:
+     endpoints:
+       web:
+         exposure:
+           include: health,info,metrics
+   ```
+
+2. **Check application health:**
+   ```bash
+   curl http://localhost:8080/actuator/health
+   ```
+
+3. **Monitor database connections:**
+   ```sql
+   SELECT * FROM pg_stat_activity WHERE datname = 'ecommerce_db';
+   ```
+
+### 3. Logging
+
+1. **Enable debug logging:**
+   ```yaml
+   logging:
+     level:
+       com.ecommerce: DEBUG
+       org.springframework.security: DEBUG
+   ```
+
+2. **Review logs regularly:**
+   ```bash
+   tail -f logs/spring-boot-application.log | grep ERROR
+   ```
+
+### 4. Backup Strategy
+
+```bash
+# Daily backup
+pg_dump -U postgres ecommerce_db > backup_$(date +%Y%m%d).sql
+
+# Automated backup script
+#!/bin/bash
+BACKUP_DIR="/path/to/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+pg_dump -U postgres ecommerce_db | gzip > $BACKUP_DIR/backup_$DATE.sql.gz
+find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +7 -delete
+```
 
 ## Getting Help
 
-If you're still experiencing issues:
+### 1. Check Logs
 
-1. **Check logs:**
 ```bash
-tail -f logs/application.log
+# Application logs
+tail -f logs/spring-boot-application.log
+
+# PostgreSQL logs
+tail -f /var/log/postgresql/postgresql-15-main.log
 ```
 
-2. **Enable debug mode:**
-```properties
-logging.level.root=DEBUG
+### 2. Enable Verbose Logging
+
+```yaml
+logging:
+  level:
+    root: INFO
+    com.ecommerce: DEBUG
+    org.springframework: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 ```
 
-3. **Search GitHub issues:**
-https://github.com/NavneetBN47/ecommerce/issues
+### 3. Contact Support
 
-4. **Create new issue:**
-Include:
-- Error message
-- Stack trace
-- Steps to reproduce
-- Environment details
-- Relevant logs
+- Create an issue on GitHub
+- Email: support@example.com
+- Include:
+  - Error message
+  - Stack trace
+  - Steps to reproduce
+  - Environment details (OS, Java version, PostgreSQL version)
 
-5. **Contact support:**
-navneet.bhargavan@ascendion.com
+## Additional Resources
+
+- [Spring Boot Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [JWT.io](https://jwt.io/) - JWT debugger
+- [Flyway Documentation](https://flywaydb.org/documentation/)
+
+## Emergency Procedures
+
+### Database Corruption
+
+1. Stop application
+2. Restore from latest backup
+3. Verify data integrity
+4. Restart application
+
+### Security Breach
+
+1. Immediately change JWT secret
+2. Force logout all users (invalidate all tokens)
+3. Review access logs
+4. Update passwords
+5. Audit code for vulnerabilities
+
+### Data Loss
+
+1. Stop all write operations
+2. Restore from backup
+3. Apply transaction logs if available
+4. Verify data consistency
+5. Resume operations
