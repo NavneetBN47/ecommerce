@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI/Swagger configuration
+ * OpenAPI (Swagger) Configuration
  */
 @Configuration
 public class OpenApiConfig {
@@ -22,20 +22,20 @@ public class OpenApiConfig {
             .info(new Info()
                 .title("E-Commerce Backend API")
                 .version("1.0.0")
-                .description("RESTful API for E-Commerce platform with Spring Boot MVC")
+                .description("Production-ready Spring Boot MVC E-Commerce Application with JWT Authentication")
                 .contact(new Contact()
                     .name("Backend Team")
                     .email("backend@ecommerce.com"))
                 .license(new License()
                     .name("Apache 2.0")
                     .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
-            .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
             .components(new Components()
-                .addSecuritySchemes("Bearer Authentication",
-                    new SecurityScheme()
-                        .type(SecurityScheme.Type.HTTP)
-                        .scheme("bearer")
-                        .bearerFormat("JWT")
-                        .description("JWT token authentication")));
+                .addSecuritySchemes("bearer-jwt", new SecurityScheme()
+                    .type(SecurityScheme.Type.HTTP)
+                    .scheme("bearer")
+                    .bearerFormat("JWT")
+                    .in(SecurityScheme.In.HEADER)
+                    .name("Authorization")))
+            .addSecurityItem(new SecurityRequirement().addList("bearer-jwt"));
     }
 }
