@@ -1,0 +1,57 @@
+erDiagram
+    USERS ||--o{ CARTS : "owns"
+    CARTS ||--|{ CART_ITEMS : "contains"
+    PRODUCTS ||--o{ CART_ITEMS : "referenced_by"
+    
+    USERS {
+        uuid user_id PK
+        varchar username UK "unique, immutable"
+        varchar email UK
+        varchar password_hash
+        varchar first_name
+        varchar last_name
+        varchar phone
+        date date_of_birth
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+        timestamp last_login
+    }
+    
+    PRODUCTS {
+        uuid product_id PK
+        varchar name
+        text description
+        decimal price "must be > 0"
+        varchar category
+        varchar brand
+        varchar sku UK
+        integer stock_quantity "must be >= 0"
+        decimal weight
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    CARTS {
+        uuid cart_id PK
+        uuid user_id FK "unique per active cart"
+        varchar session_id
+        varchar status "active, abandoned, converted, expired"
+        decimal total_amount "auto-calculated"
+        integer item_count "auto-calculated"
+        timestamp created_at
+        timestamp updated_at
+        timestamp expires_at
+    }
+    
+    CART_ITEMS {
+        uuid cart_item_id PK
+        uuid cart_id FK
+        uuid product_id FK
+        integer quantity "must be > 0"
+        decimal unit_price "snapshot from product"
+        decimal total_price "quantity * unit_price"
+        timestamp added_at
+        timestamp updated_at
+    }
