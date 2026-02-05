@@ -1,8 +1,8 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -15,56 +15,54 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Product Entity representing products table
+ * Product Entity representing products available in the e-commerce system
  */
 @Entity
 @Table(name = "products", indexes = {
-    @Index(name = "idx_sku", columnList = "sku"),
-    @Index(name = "idx_category", columnList = "category_id"),
-    @Index(name = "idx_status", columnList = "status"),
-    @Index(name = "idx_name", columnList = "name")
+    @Index(name = "idx_product_name", columnList = "name"),
+    @Index(name = "idx_product_category", columnList = "category"),
+    @Index(name = "idx_product_sku", columnList = "sku", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "sku", nullable = false, unique = true, length = 50)
-    private String sku;
-
-    @Column(name = "name", nullable = false, length = 255)
+    @NotBlank(message = "Product name is required")
+    @Size(max = 200, message = "Product name must not exceed 200 characters")
+    @Column(nullable = false, length = 200)
     private String name;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(length = 2000)
     private String description;
 
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
+    @NotBlank(message = "SKU is required")
+    @Column(nullable = false, unique = true, length = 50)
+    private String sku;
+
+    @NotNull(message = "Price is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
+    @NotNull(message = "Stock quantity is required")
+    @Min(value = 0, message = "Stock quantity cannot be negative")
     @Column(name = "stock_quantity", nullable = false)
-    @Builder.Default
-    private Integer stockQuantity = 0;
+    private Integer stockQuantity;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")
-    private Category category;
-
-    @Column(name = "brand", length = 100)
-    private String brand;
+    @Column(length = 100)
+    private String category;
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
-    @Builder.Default
-    private ProductStatus status = ProductStatus.ACTIVE;
+    @Column(nullable = false)
+    private Boolean active = true;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -74,23 +72,44 @@ public class Product {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<CartItem> cartItems = new ArrayList<>();
 
-    @OneToMany(mappedBy = "product")
-    @Builder.Default
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    public enum ProductStatus {
-        ACTIVE, INACTIVE, OUT_OF_STOCK, DISCONTINUED
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
-    public boolean isInStock() {
-        return stockQuantity != null && stockQuantity > 0;
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
-    public boolean hasStock(int quantity) {
-        return stockQuantity != null && stockQuantity >= quantity;
+    /**
+     * Check if product has sufficient stock
+     */
+    public boolean hasStock(Integer quantity) {
+        return this.stockQuantity >= quantity;
+    }
+
+    /**
+     * Reduce stock quantity
+     */
+    public void reduceStock(Integer quantity) {
+        if (!hasStock(quantity)) {
+            throw new IllegalStateException("Insufficient stock for product: " + this.name);
+        }
+        this.stockQuantity -= quantity;
+    }
+
+    /**
+     * Increase stock quantity
+     */
+    public void increaseStock(Integer quantity) {
+        this.stockQuantity += quantity;
     }
 }

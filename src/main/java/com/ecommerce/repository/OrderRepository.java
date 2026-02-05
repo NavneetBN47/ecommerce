@@ -1,6 +1,7 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Order;
+import com.ecommerce.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,20 +19,55 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    /**
+     * Find order by order number
+     */
     Optional<Order> findByOrderNumber(String orderNumber);
 
-    @Query("SELECT o FROM Order o WHERE o.user.id = :userId ORDER BY o.createdAt DESC")
-    Page<Order> findByUserId(@Param("userId") Long userId, Pageable pageable);
+    /**
+     * Find all orders for a user
+     */
+    List<Order> findByUser(User user);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.id = :orderId")
-    Optional<Order> findByIdWithItems(@Param("orderId") Long orderId);
+    /**
+     * Find orders for a user with pagination
+     */
+    Page<Order> findByUser(User user, Pageable pageable);
 
-    @Query("SELECT o FROM Order o WHERE o.user.id = :userId AND o.status = :status")
-    List<Order> findByUserIdAndStatus(@Param("userId") Long userId, 
-                                       @Param("status") Order.OrderStatus status);
+    /**
+     * Find orders by user ID
+     */
+    @Query("SELECT o FROM Order o WHERE o.user.id = :userId ORDER BY o.orderDate DESC")
+    List<Order> findByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT o FROM Order o WHERE o.status = :status")
-    Page<Order> findByStatus(@Param("status") Order.OrderStatus status, Pageable pageable);
+    /**
+     * Find orders by status
+     */
+    List<Order> findByStatus(Order.OrderStatus status);
 
+    /**
+     * Find orders by status with pagination
+     */
+    Page<Order> findByStatus(Order.OrderStatus status, Pageable pageable);
+
+    /**
+     * Find orders by user and status
+     */
+    List<Order> findByUserAndStatus(User user, Order.OrderStatus status);
+
+    /**
+     * Find orders within date range
+     */
+    @Query("SELECT o FROM Order o WHERE o.orderDate BETWEEN :startDate AND :endDate ORDER BY o.orderDate DESC")
+    List<Order> findOrdersBetweenDates(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    /**
+     * Count orders by user
+     */
+    long countByUser(User user);
+
+    /**
+     * Check if order number exists
+     */
     boolean existsByOrderNumber(String orderNumber);
 }

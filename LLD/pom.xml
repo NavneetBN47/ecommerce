@@ -13,10 +13,10 @@
     </parent>
     
     <groupId>com.ecommerce</groupId>
-    <artifactId>shopping-cart-service</artifactId>
+    <artifactId>ecommerce-backend</artifactId>
     <version>1.0.0</version>
-    <name>E-Commerce Shopping Cart Service</name>
-    <description>Spring Boot MVC application for e-commerce shopping cart management</description>
+    <name>E-Commerce Backend</name>
+    <description>Spring Boot MVC E-Commerce Application</description>
     
     <properties>
         <java.version>17</java.version>
@@ -68,42 +68,28 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
         
-        <!-- JWT Dependencies -->
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.12.3</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.12.3</version>
-            <scope>runtime</scope>
-        </dependency>
-        
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.12.3</version>
-            <scope>runtime</scope>
-        </dependency>
-        
-        <!-- Lombok for reducing boilerplate code -->
+        <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
         
-        <!-- MapStruct for DTO mapping -->
+        <!-- MapStruct for DTO Mapping -->
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>1.5.5.Final</version>
         </dependency>
         
-        <!-- SpringDoc OpenAPI for API Documentation -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct-processor</artifactId>
+            <version>1.5.5.Final</version>
+            <scope>provided</scope>
+        </dependency>
+        
+        <!-- Springdoc OpenAPI for API Documentation -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -167,12 +153,6 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
-            </plugin>
-            
-            <plugin>
-                <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-maven-plugin</artifactId>
-                <version>9.22.3</version>
             </plugin>
         </plugins>
     </build>

@@ -1,6 +1,8 @@
 package com.ecommerce.repository;
 
+import com.ecommerce.entity.Cart;
 import com.ecommerce.entity.CartItem;
+import com.ecommerce.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,21 +18,35 @@ import java.util.Optional;
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId")
-    Optional<CartItem> findByCartIdAndProductId(@Param("cartId") Long cartId, 
-                                                 @Param("productId") Long productId);
+    /**
+     * Find cart item by cart and product
+     */
+    Optional<CartItem> findByCartAndProduct(Cart cart, Product product);
 
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.id = :cartId")
-    List<CartItem> findByCartId(@Param("cartId") Long cartId);
+    /**
+     * Find all items in a cart
+     */
+    List<CartItem> findByCart(Cart cart);
 
+    /**
+     * Find all items for a specific product
+     */
+    List<CartItem> findByProduct(Product product);
+
+    /**
+     * Delete all items in a cart
+     */
     @Modifying
-    @Query("DELETE FROM CartItem ci WHERE ci.cart.id = :cartId")
-    void deleteByCartId(@Param("cartId") Long cartId);
+    @Query("DELETE FROM CartItem ci WHERE ci.cart = :cart")
+    void deleteByCart(@Param("cart") Cart cart);
 
-    @Modifying
-    @Query("DELETE FROM CartItem ci WHERE ci.cart.user.id = :userId")
-    void deleteByUserId(@Param("userId") Long userId);
+    /**
+     * Count items in a cart
+     */
+    long countByCart(Cart cart);
 
-    @Query("SELECT COUNT(ci) FROM CartItem ci WHERE ci.cart.id = :cartId")
-    int countByCartId(@Param("cartId") Long cartId);
+    /**
+     * Check if product exists in cart
+     */
+    boolean existsByCartAndProduct(Cart cart, Product product);
 }

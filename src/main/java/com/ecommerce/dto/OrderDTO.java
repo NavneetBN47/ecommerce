@@ -1,9 +1,8 @@
 package com.ecommerce.dto;
 
-import com.ecommerce.entity.Order;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -13,12 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Order Data Transfer Object
+ * Data Transfer Object for Order
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class OrderDTO {
 
@@ -28,18 +26,22 @@ public class OrderDTO {
 
     private Long userId;
 
-    private String username;
+    private LocalDateTime orderDate;
 
-    @Builder.Default
-    private List<OrderItemDTO> items = new ArrayList<>();
-
-    private Order.OrderStatus status;
+    private String status;
 
     private BigDecimal totalAmount;
 
+    @NotBlank(message = "Shipping address is required")
     private String shippingAddress;
 
     private String billingAddress;
+
+    private String paymentMethod;
+
+    private String notes;
+
+    private List<OrderItemDTO> items = new ArrayList<>();
 
     private LocalDateTime createdAt;
 

@@ -1,12 +1,8 @@
 package com.ecommerce.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -14,18 +10,18 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Product Data Transfer Object
+ * Data Transfer Object for Product
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProductDTO {
 
     private Long id;
 
     @NotBlank(message = "Product name is required")
+    @Size(max = 200, message = "Product name must not exceed 200 characters")
     private String name;
 
     private String description;

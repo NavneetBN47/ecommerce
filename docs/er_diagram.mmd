@@ -1,92 +1,74 @@
-```mermaid
 erDiagram
-    USERS ||--o{ SHOPPING_CARTS : "has"
+    USERS ||--o{ CARTS : "has"
     USERS ||--o{ ORDERS : "places"
-    USERS ||--o{ ADDRESSES : "has"
-    
-    CATEGORIES ||--o{ CATEGORIES : "contains"
-    CATEGORIES ||--o{ PRODUCTS : "categorizes"
-    
+    CARTS ||--o{ CART_ITEMS : "contains"
     PRODUCTS ||--o{ CART_ITEMS : "included_in"
-    PRODUCTS ||--o{ ORDER_ITEMS : "ordered_as"
-    
-    SHOPPING_CARTS ||--o{ CART_ITEMS : "contains"
-    
+    PRODUCTS ||--o{ ORDER_ITEMS : "included_in"
     ORDERS ||--o{ ORDER_ITEMS : "contains"
-    
+
     USERS {
         BIGINT id PK
         VARCHAR username UK
         VARCHAR email UK
-        VARCHAR password_hash
+        VARCHAR password
         VARCHAR first_name
         VARCHAR last_name
-        VARCHAR phone
-        VARCHAR status
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-        TIMESTAMP last_login_at
-    }
-    
-    CATEGORIES {
-        BIGINT id PK
-        VARCHAR name UK
-        TEXT description
-        BIGINT parent_category_id FK
-        VARCHAR status
+        VARCHAR phone_number
+        BOOLEAN active
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
-    
+
     PRODUCTS {
         BIGINT id PK
-        VARCHAR sku UK
         VARCHAR name
-        TEXT description
+        VARCHAR description
+        VARCHAR sku UK
         DECIMAL price
         INT stock_quantity
-        BIGINT category_id FK
-        VARCHAR brand
+        VARCHAR category
         VARCHAR image_url
-        VARCHAR status
+        BOOLEAN active
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
-    
-    SHOPPING_CARTS {
+
+    CARTS {
         BIGINT id PK
         BIGINT user_id FK
         VARCHAR status
+        DECIMAL total_amount
+        INT total_items
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
-    
+
     CART_ITEMS {
         BIGINT id PK
         BIGINT cart_id FK
         BIGINT product_id FK
         INT quantity
         DECIMAL price
+        DECIMAL subtotal
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
-    
+
     ORDERS {
         BIGINT id PK
-        BIGINT user_id FK
         VARCHAR order_number UK
+        BIGINT user_id FK
+        TIMESTAMP order_date
         VARCHAR status
-        DECIMAL subtotal
-        DECIMAL tax
-        DECIMAL shipping_cost
-        DECIMAL total
-        TEXT shipping_address
+        DECIMAL total_amount
+        VARCHAR shipping_address
+        VARCHAR billing_address
         VARCHAR payment_method
-        VARCHAR payment_status
+        VARCHAR notes
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
-    
+
     ORDER_ITEMS {
         BIGINT id PK
         BIGINT order_id FK
@@ -96,18 +78,3 @@ erDiagram
         DECIMAL subtotal
         TIMESTAMP created_at
     }
-    
-    ADDRESSES {
-        BIGINT id PK
-        BIGINT user_id FK
-        VARCHAR address_type
-        VARCHAR street_address
-        VARCHAR city
-        VARCHAR state
-        VARCHAR postal_code
-        VARCHAR country
-        BOOLEAN is_default
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-```

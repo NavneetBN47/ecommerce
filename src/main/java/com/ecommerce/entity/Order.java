@@ -1,8 +1,8 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -15,62 +15,54 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Order Entity representing orders table
+ * Order Entity representing customer orders
  */
 @Entity
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_user", columnList = "user_id"),
-    @Index(name = "idx_order_number", columnList = "order_number"),
-    @Index(name = "idx_status", columnList = "status"),
-    @Index(name = "idx_created", columnList = "created_at")
+    @Index(name = "idx_order_user", columnList = "user_id"),
+    @Index(name = "idx_order_status", columnList = "status"),
+    @Index(name = "idx_order_number", columnList = "order_number", unique = true),
+    @Index(name = "idx_order_date", columnList = "order_date")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
     @Column(name = "order_number", nullable = false, unique = true, length = 50)
     private String orderNumber;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_order_user"))
+    private User user;
+
+    @NotNull
+    @Column(name = "order_date", nullable = false)
+    private LocalDateTime orderDate;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
-    @Builder.Default
+    @Column(nullable = false, length = 20)
     private OrderStatus status = OrderStatus.PENDING;
 
-    @Column(name = "subtotal", nullable = false, precision = 10, scale = 2)
-    private BigDecimal subtotal;
+    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal totalAmount = BigDecimal.ZERO;
 
-    @Column(name = "tax", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal tax = BigDecimal.ZERO;
-
-    @Column(name = "shipping_cost", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal shippingCost = BigDecimal.ZERO;
-
-    @Column(name = "total", nullable = false, precision = 10, scale = 2)
-    private BigDecimal total;
-
-    @Column(name = "shipping_address", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "shipping_address", length = 500)
     private String shippingAddress;
+
+    @Column(name = "billing_address", length = 500)
+    private String billingAddress;
 
     @Column(name = "payment_method", length = 50)
     private String paymentMethod;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status", length = 20)
-    @Builder.Default
-    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+    @Column(length = 1000)
+    private String notes;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -81,26 +73,45 @@ public class Order {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 
-    public enum OrderStatus {
-        PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        orderDate = LocalDateTime.now();
     }
 
-    public enum PaymentStatus {
-        PENDING, COMPLETED, FAILED, REFUNDED
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
-    public boolean canBeCancelled() {
-        return status == OrderStatus.PENDING || status == OrderStatus.CONFIRMED;
+    /**
+     * Calculate total amount from order items
+     */
+    public void calculateTotalAmount() {
+        this.totalAmount = items.stream()
+            .map(OrderItem::getSubtotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    /**
+     * Add item to order
+     */
     public void addItem(OrderItem item) {
-        if (items == null) {
-            items = new ArrayList<>();
-        }
         items.add(item);
         item.setOrder(this);
+        calculateTotalAmount();
+    }
+
+    public enum OrderStatus {
+        PENDING,
+        CONFIRMED,
+        PROCESSING,
+        SHIPPED,
+        DELIVERED,
+        CANCELLED,
+        REFUNDED
     }
 }

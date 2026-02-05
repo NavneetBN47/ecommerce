@@ -1,12 +1,14 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Cart;
+import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,24 +18,43 @@ import java.util.Optional;
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
 
-    Optional<Cart> findByUserIdAndStatus(Long userId, Cart.CartStatus status);
+    /**
+     * Find active cart for user
+     */
+    Optional<Cart> findByUserAndStatus(User user, Cart.CartStatus status);
 
-    List<Cart> findByUserId(Long userId);
+    /**
+     * Find active cart by user ID
+     */
+    @Query("SELECT c FROM Cart c WHERE c.user.id = :userId AND c.status = :status")
+    Optional<Cart> findActiveCartByUserId(@Param("userId") Long userId, @Param("status") Cart.CartStatus status);
 
-    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId AND c.status = :status")
-    Optional<Cart> findActiveCartByUserIdWithItems(@Param("userId") Long userId, @Param("status") Cart.CartStatus status);
+    /**
+     * Find all carts for a user
+     */
+    List<Cart> findByUser(User user);
 
-    @Query("SELECT c FROM Cart c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
-    Optional<Cart> findActiveCartByUserId(@Param("userId") Long userId);
-
+    /**
+     * Delete empty carts (auto-cleanup)
+     */
     @Modifying
-    @Query("DELETE FROM Cart c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
-    void deleteActiveCartsByUserId(@Param("userId") Long userId);
+    @Query("DELETE FROM Cart c WHERE c.totalItems = 0 OR c.totalItems IS NULL")
+    void deleteEmptyCarts();
 
+    /**
+     * Delete abandoned carts older than specified date
+     */
     @Modifying
-    @Query("DELETE FROM Cart c WHERE c.id IN (SELECT cart.id FROM Cart cart WHERE cart.user.id = :userId AND SIZE(cart.items) = 0)")
-    void deleteEmptyCartsByUserId(@Param("userId") Long userId);
+    @Query("DELETE FROM Cart c WHERE c.status = 'ABANDONED' AND c.updatedAt < :cutoffDate")
+    void deleteAbandonedCartsOlderThan(@Param("cutoffDate") LocalDateTime cutoffDate);
 
-    @Query("SELECT COUNT(c) FROM Cart c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
-    long countActiveCartsByUserId(@Param("userId") Long userId);
+    /**
+     * Find carts by status
+     */
+    List<Cart> findByStatus(Cart.CartStatus status);
+
+    /**
+     * Count active carts for user
+     */
+    long countByUserAndStatus(User user, Cart.CartStatus status);
 }
