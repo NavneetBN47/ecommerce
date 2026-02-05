@@ -1,12 +1,7 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -15,15 +10,18 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * CartItem Entity representing individual items in a cart
+ * CartItem entity representing individual items in a shopping cart
  */
 @Entity
 @Table(name = "cart_items", indexes = {
     @Index(name = "idx_cart_item_cart", columnList = "cart_id"),
     @Index(name = "idx_cart_item_product", columnList = "product_id")
+}, uniqueConstraints = {
+    @UniqueConstraint(name = "uk_cart_product", columnNames = {"cart_id", "product_id"})
 })
 @EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -41,16 +39,13 @@ public class CartItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @NotNull(message = "Quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
     @Column(nullable = false)
     private Integer quantity;
 
-    @NotNull(message = "Price is required")
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal unitPrice;
 
-    @Column(precision = 10, scale = 2)
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
     @CreatedDate
@@ -61,24 +56,23 @@ public class CartItem {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /**
-     * Calculate subtotal before persist/update
-     */
-    @PrePersist
-    @PreUpdate
-    public void calculateSubtotal() {
-        if (price != null && quantity != null) {
-            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
-        }
+    // Business logic methods
+    public void updateSubtotal() {
+        this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
     }
 
-    /**
-     * Get subtotal
-     */
-    public BigDecimal getSubtotal() {
-        if (subtotal == null) {
-            calculateSubtotal();
-        }
-        return subtotal;
+    public void increaseQuantity(int amount) {
+        this.quantity += amount;
+        updateSubtotal();
+    }
+
+    public void decreaseQuantity(int amount) {
+        this.quantity = Math.max(0, this.quantity - amount);
+        updateSubtotal();
+    }
+
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
+        updateSubtotal();
     }
 }

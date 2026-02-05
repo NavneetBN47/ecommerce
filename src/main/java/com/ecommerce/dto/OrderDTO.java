@@ -10,34 +10,59 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Order Data Transfer Object
+ * DTO for Order entity
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class OrderDTO {
 
     private Long id;
+
     private String orderNumber;
+
     private Long userId;
-    private List<OrderItemDTO> items = new ArrayList<>();
-    private Long shippingAddressId;
-    private AddressDTO shippingAddress;
+
+    private String username;
+
+    private List<OrderItemDTO> items;
+
     private Order.OrderStatus status;
 
     @NotNull(message = "Total amount is required")
     private BigDecimal totalAmount;
 
-    private Integer totalItems;
-    private String paymentMethod;
-    private String paymentStatus;
+    private BigDecimal shippingAmount;
+
+    private BigDecimal taxAmount;
+
+    private BigDecimal discountAmount;
+
+    private BigDecimal grandTotal;
+
+    @NotNull(message = "Shipping address is required")
+    private Long shippingAddressId;
+
+    private Long billingAddressId;
+
+    private Order.PaymentMethod paymentMethod;
+
+    private Order.PaymentStatus paymentStatus;
+
+    private LocalDateTime orderDate;
+
+    private LocalDateTime shippedDate;
+
+    private LocalDateTime deliveredDate;
+
     private String notes;
+
     private LocalDateTime createdAt;
+
     private LocalDateTime updatedAt;
 }

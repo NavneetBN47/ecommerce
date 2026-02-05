@@ -4,42 +4,50 @@ import com.ecommerce.dto.ApiResponse;
 import com.ecommerce.dto.AuthRequest;
 import com.ecommerce.dto.AuthResponse;
 import com.ecommerce.dto.UserDTO;
+import com.ecommerce.security.CurrentUser;
 import com.ecommerce.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Authentication REST Controller with stateless login
+ * REST Controller for Authentication operations
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/v1/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "APIs for user authentication")
+@Slf4j
+@Tag(name = "Authentication", description = "Authentication management APIs")
 public class AuthController {
 
     private final AuthService authService;
 
     @PostMapping("/login")
-    @Operation(summary = "Login (stateless - returns JWT token)")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest request) {
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+    @Operation(summary = "User login", description = "Authenticate user and return JWT token")
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest authRequest) {
+        log.info("Login request received for: {}", authRequest.getUsernameOrEmail());
+        AuthResponse authResponse = authService.login(authRequest);
+        return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Register new user")
+    @Operation(summary = "User registration", description = "Register a new user")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody UserDTO userDTO) {
-        AuthResponse response = authService.register(userDTO);
-        return ResponseEntity.ok(ApiResponse.success("Registration successful", response));
+        log.info("Registration request received for: {}", userDTO.getUsername());
+        AuthResponse authResponse = authService.register(userDTO);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success("Registration successful", authResponse));
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout with cart cleanup")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestParam Long userId) {
+    @Operation(summary = "User logout", description = "Logout user and cleanup cart if configured")
+    public ResponseEntity<ApiResponse<Void>> logout(@CurrentUser Long userId) {
+        log.info("Logout request received for user ID: {}", userId);
         authService.logout(userId);
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }

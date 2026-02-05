@@ -1,31 +1,29 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * Order Entity representing customer orders
+ * Order entity representing customer orders
  */
 @Entity
 @Table(name = "orders", indexes = {
+    @Index(name = "idx_order_number", columnList = "order_number", unique = true),
     @Index(name = "idx_order_user", columnList = "user_id"),
     @Index(name = "idx_order_status", columnList = "status"),
-    @Index(name = "idx_order_number", columnList = "order_number", unique = true)
+    @Index(name = "idx_order_date", columnList = "order_date")
 })
 @EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -44,30 +42,53 @@ public class Order {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<OrderItem> items = new ArrayList<>();
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "shipping_address_id")
-    private Address shippingAddress;
+    private Set<OrderItem> items = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
-    @NotNull(message = "Total amount is required")
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
-    @Column(name = "total_items")
-    private Integer totalItems;
+    @Column(name = "shipping_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingAmount = BigDecimal.ZERO;
 
-    @Column(name = "payment_method", length = 50)
-    private String paymentMethod;
+    @Column(name = "tax_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal taxAmount = BigDecimal.ZERO;
 
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipping_address_id")
+    private Address shippingAddress;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "billing_address_id")
+    private Address billingAddress;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 20)
+    private PaymentMethod paymentMethod;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", length = 20)
     @Builder.Default
-    private String paymentStatus = "PENDING";
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @Column(name = "order_date", nullable = false)
+    private LocalDateTime orderDate;
+
+    @Column(name = "shipped_date")
+    private LocalDateTime shippedDate;
+
+    @Column(name = "delivered_date")
+    private LocalDateTime deliveredDate;
 
     @Column(columnDefinition = "TEXT")
     private String notes;
@@ -84,23 +105,26 @@ public class Order {
         PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED
     }
 
-    /**
-     * Add item to order
-     */
+    public enum PaymentMethod {
+        CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER, CASH_ON_DELIVERY
+    }
+
+    public enum PaymentStatus {
+        PENDING, COMPLETED, FAILED, REFUNDED
+    }
+
+    // Business logic methods
     public void addItem(OrderItem item) {
         items.add(item);
         item.setOrder(this);
     }
 
-    /**
-     * Calculate order totals
-     */
-    public void calculateTotals() {
-        this.totalAmount = items.stream()
-            .map(OrderItem::getSubtotal)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        this.totalItems = items.stream()
-            .mapToInt(OrderItem::getQuantity)
-            .sum();
+    public void removeItem(OrderItem item) {
+        items.remove(item);
+        item.setOrder(null);
+    }
+
+    public BigDecimal calculateGrandTotal() {
+        return totalAmount.add(shippingAmount).add(taxAmount).subtract(discountAmount);
     }
 }

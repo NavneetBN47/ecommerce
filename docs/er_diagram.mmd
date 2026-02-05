@@ -1,0 +1,130 @@
+erDiagram
+    USERS ||--o{ ADDRESSES : has
+    USERS ||--o| CARTS : has
+    USERS ||--o{ ORDERS : places
+    
+    CATEGORIES ||--o{ CATEGORIES : "parent-child"
+    CATEGORIES ||--o{ PRODUCTS : contains
+    
+    PRODUCTS ||--o{ CART_ITEMS : "added to"
+    PRODUCTS ||--o{ ORDER_ITEMS : "ordered in"
+    
+    CARTS ||--o{ CART_ITEMS : contains
+    
+    ORDERS ||--o{ ORDER_ITEMS : contains
+    ORDERS }o--|| ADDRESSES : "shipping address"
+    ORDERS }o--|| ADDRESSES : "billing address"
+    
+    USERS {
+        BIGINT id PK
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR password
+        VARCHAR first_name
+        VARCHAR last_name
+        VARCHAR phone_number
+        BOOLEAN active
+        BOOLEAN email_verified
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        TIMESTAMP last_login
+    }
+    
+    ADDRESSES {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR address_line1
+        VARCHAR address_line2
+        VARCHAR city
+        VARCHAR state
+        VARCHAR postal_code
+        VARCHAR country
+        BOOLEAN is_default
+        VARCHAR address_type
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    CATEGORIES {
+        BIGINT id PK
+        VARCHAR name UK
+        VARCHAR slug UK
+        TEXT description
+        BIGINT parent_id FK
+        BOOLEAN active
+        INTEGER display_order
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    PRODUCTS {
+        BIGINT id PK
+        VARCHAR sku UK
+        VARCHAR name
+        TEXT description
+        DECIMAL price
+        DECIMAL discount_price
+        INTEGER stock_quantity
+        BIGINT category_id FK
+        VARCHAR image_url
+        BOOLEAN active
+        BOOLEAN featured
+        VARCHAR brand
+        DECIMAL rating
+        INTEGER review_count
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    CARTS {
+        BIGINT id PK
+        BIGINT user_id FK,UK
+        INTEGER total_items
+        DECIMAL total_price
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    CART_ITEMS {
+        BIGINT id PK
+        BIGINT cart_id FK
+        BIGINT product_id FK
+        INTEGER quantity
+        DECIMAL unit_price
+        DECIMAL subtotal
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    ORDERS {
+        BIGINT id PK
+        VARCHAR order_number UK
+        BIGINT user_id FK
+        VARCHAR status
+        DECIMAL total_amount
+        DECIMAL shipping_amount
+        DECIMAL tax_amount
+        DECIMAL discount_amount
+        BIGINT shipping_address_id FK
+        BIGINT billing_address_id FK
+        VARCHAR payment_method
+        VARCHAR payment_status
+        TIMESTAMP order_date
+        TIMESTAMP shipped_date
+        TIMESTAMP delivered_date
+        TEXT notes
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    ORDER_ITEMS {
+        BIGINT id PK
+        BIGINT order_id FK
+        BIGINT product_id FK
+        INTEGER quantity
+        DECIMAL unit_price
+        DECIMAL subtotal
+        VARCHAR product_name
+        VARCHAR product_sku
+        TIMESTAMP created_at
+    }

@@ -1,11 +1,7 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -13,14 +9,13 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 /**
- * Address Entity for user shipping/billing addresses
+ * Address entity for user shipping and billing addresses
  */
 @Entity
-@Table(name = "addresses", indexes = {
-    @Index(name = "idx_address_user", columnList = "user_id")
-})
+@Table(name = "addresses")
 @EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -34,20 +29,22 @@ public class Address {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @NotBlank(message = "Street address is required")
-    @Column(name = "street_address", nullable = false)
-    private String streetAddress;
+    @Column(name = "address_line1", nullable = false, length = 255)
+    private String addressLine1;
 
-    @Column(length = 100)
+    @Column(name = "address_line2", length = 255)
+    private String addressLine2;
+
+    @Column(nullable = false, length = 100)
     private String city;
 
-    @Column(length = 100)
+    @Column(nullable = false, length = 100)
     private String state;
 
-    @Column(name = "postal_code", length = 20)
+    @Column(name = "postal_code", nullable = false, length = 20)
     private String postalCode;
 
-    @Column(length = 100)
+    @Column(nullable = false, length = 100)
     private String country;
 
     @Column(name = "is_default")
@@ -55,9 +52,8 @@ public class Address {
     private Boolean isDefault = false;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "address_type", length = 20)
-    @Builder.Default
-    private AddressType addressType = AddressType.SHIPPING;
+    @Column(name = "address_type", nullable = false)
+    private AddressType addressType;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

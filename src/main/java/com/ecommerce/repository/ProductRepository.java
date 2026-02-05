@@ -1,6 +1,8 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,35 +12,34 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Product Repository with case-insensitive search
+ * Repository interface for Product entity
+ * Implements case-insensitive search as per business requirements
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findBySku(String sku);
 
-    List<Product> findByActiveTrue();
+    // Case-insensitive search for product name
+    @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.active = true")
+    Page<Product> searchByNameIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-    List<Product> findByCategory(String category);
+    // Case-insensitive search across multiple fields
+    @Query("SELECT p FROM Product p WHERE " +
+           "(LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(p.sku) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
+           "p.active = true")
+    Page<Product> searchProductsIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-    List<Product> findByBrand(String brand);
+    Page<Product> findByActiveTrue(Pageable pageable);
 
-    /**
-     * Case-insensitive product search by name, description, category, or brand
-     */
-    @Query("SELECT p FROM Product p WHERE p.active = true AND " +
-           "(LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(p.category) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :search, '%')))")
-    List<Product> searchProducts(@Param("search") String search);
+    Page<Product> findByCategoryIdAndActiveTrue(Long categoryId, Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE p.active = true AND p.stockQuantity > 0")
-    List<Product> findAvailableProducts();
+    Page<Product> findByFeaturedTrueAndActiveTrue(Pageable pageable);
 
-    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.active = true ORDER BY p.category")
-    List<String> findAllCategories();
+    @Query("SELECT p FROM Product p WHERE p.stockQuantity > 0 AND p.active = true")
+    Page<Product> findInStockProducts(Pageable pageable);
 
-    @Query("SELECT DISTINCT p.brand FROM Product p WHERE p.active = true ORDER BY p.brand")
-    List<String> findAllBrands();
+    List<Product> findByIdIn(List<Long> ids);
 }

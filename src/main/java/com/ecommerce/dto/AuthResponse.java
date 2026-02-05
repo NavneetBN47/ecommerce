@@ -1,24 +1,28 @@
 package com.ecommerce.dto;
 
-import com.ecommerce.entity.User;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Authentication Response DTO
+ * DTO for authentication responses
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AuthResponse {
 
     private String token;
-    private String type = "Bearer";
-    private Long userId;
-    private String username;
-    private String email;
-    private User.UserRole role;
+
+    private String tokenType;
+
+    private Long expiresIn;
+
+    private UserDTO user;
+
+    private String message;
 }

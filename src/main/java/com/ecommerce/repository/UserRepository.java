@@ -3,14 +3,12 @@ package com.ecommerce.repository;
 import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
- * User Repository for database operations
+ * Repository interface for User entity
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -21,15 +19,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsernameOrEmail(String username, String email);
 
-    Boolean existsByUsername(String username);
+    boolean existsByUsername(String username);
 
-    Boolean existsByEmail(String email);
+    boolean existsByEmail(String email);
 
-    List<User> findByActiveTrue();
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.cart WHERE u.id = :id")
+    Optional<User> findByIdWithCart(Long id);
 
-    List<User> findByRole(User.UserRole role);
-
-    @Query("SELECT u FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
-    List<User> searchUsers(@Param("search") String search);
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.addresses WHERE u.id = :id")
+    Optional<User> findByIdWithAddresses(Long id);
 }

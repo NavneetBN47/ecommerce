@@ -3,71 +3,74 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.ApiResponse;
 import com.ecommerce.dto.CartDTO;
 import com.ecommerce.dto.CartItemDTO;
+import com.ecommerce.security.CurrentUser;
 import com.ecommerce.service.CartService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Cart REST Controller with lazy creation and auto-cleanup
+ * REST Controller for Cart operations
  */
 @RestController
-@RequestMapping("/api/carts")
+@RequestMapping("/v1/cart")
 @RequiredArgsConstructor
-@Tag(name = "Cart Management", description = "APIs for managing shopping carts")
+@Slf4j
+@Tag(name = "Cart", description = "Shopping cart management APIs")
 public class CartController {
 
     private final CartService cartService;
 
-    @GetMapping("/user/{userId}")
-    @Operation(summary = "Get or create cart for user (lazy creation)")
-    public ResponseEntity<ApiResponse<CartDTO>> getOrCreateCart(@PathVariable Long userId) {
+    @GetMapping
+    @Operation(summary = "Get user cart", description = "Get or create cart for current user (lazy creation)")
+    public ResponseEntity<ApiResponse<CartDTO>> getCart(@CurrentUser Long userId) {
+        log.info("Get cart request for user ID: {}", userId);
         CartDTO cart = cartService.getOrCreateCart(userId);
         return ResponseEntity.ok(ApiResponse.success(cart));
     }
 
-    @GetMapping("/{cartId}")
-    @Operation(summary = "Get cart by ID")
-    public ResponseEntity<ApiResponse<CartDTO>> getCartById(@PathVariable Long cartId) {
-        CartDTO cart = cartService.getCartById(cartId);
-        return ResponseEntity.ok(ApiResponse.success(cart));
-    }
-
-    @PostMapping("/user/{userId}/items")
-    @Operation(summary = "Add item to cart with stock check")
+    @PostMapping("/items")
+    @Operation(summary = "Add item to cart", description = "Add product to cart with quantity validation")
     public ResponseEntity<ApiResponse<CartDTO>> addItemToCart(
-            @PathVariable Long userId,
-            @Valid @RequestBody CartItemDTO itemDTO) {
-        CartDTO cart = cartService.addItemToCart(userId, itemDTO);
+            @CurrentUser Long userId,
+            @Valid @RequestBody CartItemDTO cartItemDTO) {
+        log.info("Add item to cart request for user ID: {}, product ID: {}", 
+            userId, cartItemDTO.getProductId());
+        CartDTO cart = cartService.addItemToCart(userId, cartItemDTO.getProductId(), cartItemDTO.getQuantity());
         return ResponseEntity.ok(ApiResponse.success("Item added to cart", cart));
     }
 
-    @PutMapping("/{cartId}/items/{itemId}")
-    @Operation(summary = "Update cart item quantity")
-    public ResponseEntity<ApiResponse<CartDTO>> updateCartItem(
-            @PathVariable Long cartId,
-            @PathVariable Long itemId,
+    @PutMapping("/items/{productId}")
+    @Operation(summary = "Update cart item quantity", description = "Update quantity of item in cart")
+    public ResponseEntity<ApiResponse<CartDTO>> updateCartItemQuantity(
+            @CurrentUser Long userId,
+            @PathVariable Long productId,
             @RequestParam Integer quantity) {
-        CartDTO cart = cartService.updateCartItem(cartId, itemId, quantity);
+        log.info("Update cart item quantity request for user ID: {}, product ID: {}, quantity: {}", 
+            userId, productId, quantity);
+        CartDTO cart = cartService.updateCartItemQuantity(userId, productId, quantity);
         return ResponseEntity.ok(ApiResponse.success("Cart item updated", cart));
     }
 
-    @DeleteMapping("/{cartId}/items/{itemId}")
-    @Operation(summary = "Remove item from cart (auto-delete if empty)")
+    @DeleteMapping("/items/{productId}")
+    @Operation(summary = "Remove item from cart", description = "Remove product from cart")
     public ResponseEntity<ApiResponse<CartDTO>> removeItemFromCart(
-            @PathVariable Long cartId,
-            @PathVariable Long itemId) {
-        CartDTO cart = cartService.removeItemFromCart(cartId, itemId);
+            @CurrentUser Long userId,
+            @PathVariable Long productId) {
+        log.info("Remove item from cart request for user ID: {}, product ID: {}", userId, productId);
+        CartDTO cart = cartService.removeItemFromCart(userId, productId);
         return ResponseEntity.ok(ApiResponse.success("Item removed from cart", cart));
     }
 
-    @DeleteMapping("/{cartId}")
-    @Operation(summary = "Clear cart")
-    public ResponseEntity<ApiResponse<Void>> clearCart(@PathVariable Long cartId) {
-        cartService.clearCart(cartId);
+    @DeleteMapping
+    @Operation(summary = "Clear cart", description = "Remove all items from cart")
+    public ResponseEntity<ApiResponse<Void>> clearCart(@CurrentUser Long userId) {
+        log.info("Clear cart request for user ID: {}", userId);
+        cartService.clearCart(userId);
         return ResponseEntity.ok(ApiResponse.success("Cart cleared", null));
     }
 }

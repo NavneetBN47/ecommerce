@@ -1,23 +1,17 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * User Entity representing system users
+ * User entity representing registered users in the e-commerce system
  */
 @Entity
 @Table(name = "users", indexes = {
@@ -25,7 +19,8 @@ import java.util.List;
     @Index(name = "idx_user_username", columnList = "username", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -35,17 +30,12 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email should be valid")
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    @NotBlank(message = "Password is required")
     @Column(nullable = false)
     private String password;
 
@@ -62,22 +52,20 @@ public class User {
     @Builder.Default
     private Boolean active = true;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "email_verified")
     @Builder.Default
-    private UserRole role = UserRole.CUSTOMER;
+    private Boolean emailVerified = false;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<Cart> carts = new ArrayList<>();
+    private Set<Address> addresses = new HashSet<>();
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Cart cart;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @Builder.Default
-    private List<Order> orders = new ArrayList<>();
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Address> addresses = new ArrayList<>();
+    private Set<Order> orders = new HashSet<>();
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -87,7 +75,17 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public enum UserRole {
-        CUSTOMER, ADMIN, SELLER
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
+
+    // Helper methods
+    public void addAddress(Address address) {
+        addresses.add(address);
+        address.setUser(this);
+    }
+
+    public void removeAddress(Address address) {
+        addresses.remove(address);
+        address.setUser(null);
     }
 }

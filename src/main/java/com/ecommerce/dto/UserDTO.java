@@ -1,6 +1,5 @@
 package com.ecommerce.dto;
 
-import com.ecommerce.entity.User;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -13,34 +12,41 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * User Data Transfer Object
+ * DTO for User entity
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserDTO {
 
     private Long id;
 
     @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 50)
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
 
     @NotBlank(message = "Email is required")
-    @Email(message = "Email should be valid")
+    @Email(message = "Email must be valid")
     private String email;
 
-    @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
     private String firstName;
+
     private String lastName;
+
     private String phoneNumber;
+
     private Boolean active;
-    private User.UserRole role;
+
+    private Boolean emailVerified;
+
     private LocalDateTime createdAt;
+
     private LocalDateTime updatedAt;
+
+    private LocalDateTime lastLogin;
 }

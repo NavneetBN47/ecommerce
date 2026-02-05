@@ -11,11 +11,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * User Service with business logic
+ * Service layer for User operations
  */
 @Service
 @RequiredArgsConstructor
@@ -26,39 +27,49 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
-    public List<UserDTO> getAllUsers() {
-        log.info("Fetching all users");
-        return userRepository.findAll().stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
     public UserDTO getUserById(Long id) {
-        log.info("Fetching user by id: {}", id);
+        log.debug("Fetching user with ID: {}", id);
         User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        return convertToDTO(user);
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        return mapToDTO(user);
     }
 
     @Transactional(readOnly = true)
     public UserDTO getUserByUsername(String username) {
-        log.info("Fetching user by username: {}", username);
+        log.debug("Fetching user with username: {}", username);
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
-        return convertToDTO(user);
+            .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
+        return mapToDTO(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserDTO getUserByEmail(String email) {
+        log.debug("Fetching user with email: {}", email);
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        return mapToDTO(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserDTO> getAllUsers() {
+        log.debug("Fetching all users");
+        return userRepository.findAll().stream()
+            .map(this::mapToDTO)
+            .collect(Collectors.toList());
     }
 
     @Transactional
     public UserDTO createUser(UserDTO userDTO) {
-        log.info("Creating new user: {}", userDTO.getUsername());
+        log.info("Creating new user with username: {}", userDTO.getUsername());
         
+        // Check for duplicate username
         if (userRepository.existsByUsername(userDTO.getUsername())) {
-            throw new DuplicateResourceException("Username already exists: " + userDTO.getUsername());
+            throw new DuplicateResourceException("User", "username", userDTO.getUsername());
         }
         
+        // Check for duplicate email
         if (userRepository.existsByEmail(userDTO.getEmail())) {
-            throw new DuplicateResourceException("Email already exists: " + userDTO.getEmail());
+            throw new DuplicateResourceException("User", "email", userDTO.getEmail());
         }
 
         User user = User.builder()
@@ -69,72 +80,84 @@ public class UserService {
             .lastName(userDTO.getLastName())
             .phoneNumber(userDTO.getPhoneNumber())
             .active(true)
-            .role(userDTO.getRole() != null ? userDTO.getRole() : User.UserRole.CUSTOMER)
+            .emailVerified(false)
             .build();
 
         User savedUser = userRepository.save(user);
-        log.info("User created successfully with id: {}", savedUser.getId());
-        return convertToDTO(savedUser);
+        log.info("User created successfully with ID: {}", savedUser.getId());
+        
+        return mapToDTO(savedUser);
     }
 
     @Transactional
     public UserDTO updateUser(Long id, UserDTO userDTO) {
-        log.info("Updating user with id: {}", id);
+        log.info("Updating user with ID: {}", id);
         
         User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
-        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
-            if (userRepository.existsByEmail(userDTO.getEmail())) {
-                throw new DuplicateResourceException("Email already exists: " + userDTO.getEmail());
-            }
-            user.setEmail(userDTO.getEmail());
+        // Check for duplicate username if changed
+        if (!user.getUsername().equals(userDTO.getUsername()) && 
+            userRepository.existsByUsername(userDTO.getUsername())) {
+            throw new DuplicateResourceException("User", "username", userDTO.getUsername());
         }
 
-        if (userDTO.getFirstName() != null) user.setFirstName(userDTO.getFirstName());
-        if (userDTO.getLastName() != null) user.setLastName(userDTO.getLastName());
-        if (userDTO.getPhoneNumber() != null) user.setPhoneNumber(userDTO.getPhoneNumber());
-        if (userDTO.getPassword() != null) {
+        // Check for duplicate email if changed
+        if (!user.getEmail().equals(userDTO.getEmail()) && 
+            userRepository.existsByEmail(userDTO.getEmail())) {
+            throw new DuplicateResourceException("User", "email", userDTO.getEmail());
+        }
+
+        user.setUsername(userDTO.getUsername());
+        user.setEmail(userDTO.getEmail());
+        user.setFirstName(userDTO.getFirstName());
+        user.setLastName(userDTO.getLastName());
+        user.setPhoneNumber(userDTO.getPhoneNumber());
+        
+        if (userDTO.getPassword() != null && !userDTO.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         }
 
         User updatedUser = userRepository.save(user);
-        log.info("User updated successfully: {}", id);
-        return convertToDTO(updatedUser);
+        log.info("User updated successfully with ID: {}", updatedUser.getId());
+        
+        return mapToDTO(updatedUser);
     }
 
     @Transactional
     public void deleteUser(Long id) {
-        log.info("Deleting user with id: {}", id);
+        log.info("Deleting user with ID: {}", id);
         
         if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found with id: " + id);
+            throw new ResourceNotFoundException("User", "id", id);
         }
         
         userRepository.deleteById(id);
-        log.info("User deleted successfully: {}", id);
+        log.info("User deleted successfully with ID: {}", id);
     }
 
-    @Transactional(readOnly = true)
-    public List<UserDTO> searchUsers(String search) {
-        log.info("Searching users with term: {}", search);
-        return userRepository.searchUsers(search).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
+    @Transactional
+    public void updateLastLogin(Long userId) {
+        log.debug("Updating last login for user ID: {}", userId);
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
     }
 
-    private UserDTO convertToDTO(User user) {
-        UserDTO dto = new UserDTO();
-        dto.setId(user.getId());
-        dto.setUsername(user.getUsername());
-        dto.setEmail(user.getEmail());
-        dto.setFirstName(user.getFirstName());
-        dto.setLastName(user.getLastName());
-        dto.setPhoneNumber(user.getPhoneNumber());
-        dto.setActive(user.getActive());
-        dto.setRole(user.getRole());
-        dto.setCreatedAt(user.getCreatedAt());
-        dto.setUpdatedAt(user.getUpdatedAt());
-        return dto;
+    private UserDTO mapToDTO(User user) {
+        return UserDTO.builder()
+            .id(user.getId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
+            .phoneNumber(user.getPhoneNumber())
+            .active(user.getActive())
+            .emailVerified(user.getEmailVerified())
+            .createdAt(user.getCreatedAt())
+            .updatedAt(user.getUpdatedAt())
+            .lastLogin(user.getLastLogin())
+            .build();
     }
 }

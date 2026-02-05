@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Authentication Service with stateless login
+ * Service layer for Authentication operations
+ * Implements stateless login with JWT
  */
 @Service
 @RequiredArgsConstructor
@@ -24,78 +25,53 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserService userService;
     private final CartService cartService;
 
     /**
      * Stateless login - returns JWT token
      */
     @Transactional
-    public AuthResponse login(AuthRequest request) {
-        log.info("Login attempt for username: {}", request.getUsername());
+    public AuthResponse login(AuthRequest authRequest) {
+        log.info("Login attempt for user: {}", authRequest.getUsernameOrEmail());
         
-        User user = userRepository.findByUsername(request.getUsername())
-            .orElseThrow(() -> new AuthenticationException("Invalid username or password"));
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new AuthenticationException("Invalid username or password");
+        User user = userRepository.findByUsernameOrEmail(
+            authRequest.getUsernameOrEmail(), 
+            authRequest.getUsernameOrEmail())
+            .orElseThrow(() -> new AuthenticationException("Invalid username/email or password"));
+        
+        if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
+            log.warn("Failed login attempt for user: {}", authRequest.getUsernameOrEmail());
+            throw new AuthenticationException("Invalid username/email or password");
         }
-
+        
         if (!user.getActive()) {
+            log.warn("Login attempt for inactive user: {}", authRequest.getUsernameOrEmail());
             throw new AuthenticationException("User account is inactive");
         }
-
+        
+        // Update last login
+        userService.updateLastLogin(user.getId());
+        
+        // Generate JWT token
         String token = jwtTokenProvider.generateToken(user);
         
         log.info("User logged in successfully: {}", user.getUsername());
         
-        return AuthResponse.builder()
-            .token(token)
-            .type("Bearer")
-            .userId(user.getId())
+        UserDTO userDTO = UserDTO.builder()
+            .id(user.getId())
             .username(user.getUsername())
             .email(user.getEmail())
-            .role(user.getRole())
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
             .build();
-    }
-
-    /**
-     * Register new user
-     */
-    @Transactional
-    public AuthResponse register(UserDTO userDTO) {
-        log.info("Registering new user: {}", userDTO.getUsername());
-        
-        if (userRepository.existsByUsername(userDTO.getUsername())) {
-            throw new AuthenticationException("Username already exists");
-        }
-        
-        if (userRepository.existsByEmail(userDTO.getEmail())) {
-            throw new AuthenticationException("Email already exists");
-        }
-
-        User user = User.builder()
-            .username(userDTO.getUsername())
-            .email(userDTO.getEmail())
-            .password(passwordEncoder.encode(userDTO.getPassword()))
-            .firstName(userDTO.getFirstName())
-            .lastName(userDTO.getLastName())
-            .phoneNumber(userDTO.getPhoneNumber())
-            .active(true)
-            .role(User.UserRole.CUSTOMER)
-            .build();
-
-        User savedUser = userRepository.save(user);
-        String token = jwtTokenProvider.generateToken(savedUser);
-        
-        log.info("User registered successfully: {}", savedUser.getUsername());
         
         return AuthResponse.builder()
             .token(token)
-            .type("Bearer")
-            .userId(savedUser.getId())
-            .username(savedUser.getUsername())
-            .email(savedUser.getEmail())
-            .role(savedUser.getRole())
+            .tokenType("Bearer")
+            .expiresIn(jwtTokenProvider.getExpirationTime())
+            .user(userDTO)
+            .message("Login successful")
             .build();
     }
 
@@ -104,11 +80,26 @@ public class AuthService {
      */
     @Transactional
     public void logout(Long userId) {
-        log.info("Logout for user: {}", userId);
+        log.info("Logout for user ID: {}", userId);
         
-        // Cleanup empty carts on logout
-        cartService.cleanupEmptyCartsOnLogout(userId);
+        // Cleanup cart if configured
+        cartService.cleanupCartOnLogout(userId);
         
         log.info("User logged out successfully: {}", userId);
+    }
+
+    @Transactional
+    public AuthResponse register(UserDTO userDTO) {
+        log.info("Registration attempt for username: {}", userDTO.getUsername());
+        
+        // Create user
+        UserDTO createdUser = userService.createUser(userDTO);
+        
+        log.info("User registered successfully: {}", createdUser.getUsername());
+        
+        return AuthResponse.builder()
+            .user(createdUser)
+            .message("Registration successful. Please login.")
+            .build();
     }
 }

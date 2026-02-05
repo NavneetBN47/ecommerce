@@ -9,19 +9,23 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * Generic API Response wrapper
+ * Generic API response wrapper
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
 
     private Boolean success;
+
     private String message;
+
     private T data;
+
     private String error;
+
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
 
@@ -29,6 +33,7 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder()
             .success(true)
             .data(data)
+            .timestamp(LocalDateTime.now())
             .build();
     }
 
@@ -37,6 +42,7 @@ public class ApiResponse<T> {
             .success(true)
             .message(message)
             .data(data)
+            .timestamp(LocalDateTime.now())
             .build();
     }
 
@@ -44,6 +50,7 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder()
             .success(false)
             .error(error)
+            .timestamp(LocalDateTime.now())
             .build();
     }
 
@@ -52,6 +59,7 @@ public class ApiResponse<T> {
             .success(false)
             .message(message)
             .error(error)
+            .timestamp(LocalDateTime.now())
             .build();
     }
 }

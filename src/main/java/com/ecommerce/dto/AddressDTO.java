@@ -11,27 +11,41 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * Address Data Transfer Object
+ * DTO for Address entity
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class AddressDTO {
 
     private Long id;
+
     private Long userId;
 
-    @NotBlank(message = "Street address is required")
-    private String streetAddress;
+    @NotBlank(message = "Address line 1 is required")
+    private String addressLine1;
 
+    private String addressLine2;
+
+    @NotBlank(message = "City is required")
     private String city;
+
+    @NotBlank(message = "State is required")
     private String state;
+
+    @NotBlank(message = "Postal code is required")
     private String postalCode;
+
+    @NotBlank(message = "Country is required")
     private String country;
+
     private Boolean isDefault;
+
     private Address.AddressType addressType;
+
     private LocalDateTime createdAt;
+
     private LocalDateTime updatedAt;
 }

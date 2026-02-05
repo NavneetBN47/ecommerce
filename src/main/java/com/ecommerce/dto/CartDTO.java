@@ -1,6 +1,5 @@
 package com.ecommerce.dto;
 
-import com.ecommerce.entity.Cart;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,25 +8,31 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Cart Data Transfer Object
+ * DTO for Cart entity
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CartDTO {
 
     private Long id;
+
     private Long userId;
-    private List<CartItemDTO> items = new ArrayList<>();
-    private Cart.CartStatus status;
-    private BigDecimal totalAmount;
+
+    private List<CartItemDTO> items;
+
     private Integer totalItems;
+
+    private BigDecimal totalPrice;
+
+    private Boolean isEmpty;
+
     private LocalDateTime createdAt;
+
     private LocalDateTime updatedAt;
 }

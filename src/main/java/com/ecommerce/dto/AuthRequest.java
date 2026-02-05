@@ -7,16 +7,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Authentication Request DTO
+ * DTO for authentication requests
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class AuthRequest {
 
-    @NotBlank(message = "Username is required")
-    private String username;
+    @NotBlank(message = "Username or email is required")
+    private String usernameOrEmail;
 
     @NotBlank(message = "Password is required")
     private String password;
