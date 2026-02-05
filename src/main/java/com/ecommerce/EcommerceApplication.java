@@ -3,25 +3,17 @@ package com.ecommerce;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
- * Main Spring Boot Application Class for E-Commerce Backend
+ * Main Spring Boot Application Entry Point
  * 
- * Features:
- * - RESTful API for e-commerce operations
- * - JWT-based authentication and authorization
- * - Shopping cart management with lifecycle handling
- * - Order processing with stock management
- * - Product catalog with search capabilities
- * - User management with role-based access control
- * 
- * @author E-Commerce Development Team
+ * @author Backend Automation Agent
  * @version 1.0.0
  */
 @SpringBootApplication
 @EnableJpaAuditing
-@EnableScheduling
+@EnableTransactionManagement
 public class EcommerceApplication {
 
     public static void main(String[] args) {

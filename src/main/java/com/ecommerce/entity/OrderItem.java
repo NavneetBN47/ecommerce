@@ -1,27 +1,27 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * OrderItem Entity representing individual items in an order
- * 
- * Business Rules:
- * - Denormalized product name and price for historical accuracy
- * - Subtotal = price * quantity
- * - Cascade delete with order
- * - Cannot delete product if in order (RESTRICT)
  */
 @Entity
 @Table(name = "order_items", indexes = {
-    @Index(name = "idx_order", columnList = "order_id"),
-    @Index(name = "idx_product", columnList = "product_id")
+    @Index(name = "idx_order_item_order", columnList = "order_id"),
+    @Index(name = "idx_order_item_product", columnList = "product_id")
 })
+@EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,53 +30,50 @@ public class OrderItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "order_item_id")
-    private Long orderItemId;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @Column(name = "order_id", insertable = false, updatable = false)
-    private Long orderId;
-
-    @Column(name = "product_id", nullable = false)
-    private Long productId;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", insertable = false, updatable = false)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(name = "product_name", nullable = false, length = 200)
-    private String productName;
-
-    @Column(name = "price", nullable = false, precision = 12, scale = 2)
-    private BigDecimal price;
-
-    @Column(name = "quantity", nullable = false)
+    @NotNull(message = "Quantity is required")
+    @Min(value = 1, message = "Quantity must be at least 1")
+    @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "subtotal", nullable = false, precision = 12, scale = 2)
+    @NotNull(message = "Price is required")
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
+
+    @Column(precision = 10, scale = 2)
     private BigDecimal subtotal;
 
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     /**
-     * Calculate and set subtotal
+     * Calculate subtotal before persist/update
      */
+    @PrePersist
+    @PreUpdate
     public void calculateSubtotal() {
-        this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
+        if (price != null && quantity != null) {
+            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
+        }
     }
 
     /**
-     * Create OrderItem from CartItem
+     * Get subtotal
      */
-    public static OrderItem fromCartItem(CartItem cartItem, Product product) {
-        OrderItem orderItem = OrderItem.builder()
-            .productId(cartItem.getProductId())
-            .productName(product.getName())
-            .price(product.getPrice())
-            .quantity(cartItem.getQuantity())
-            .build();
-        orderItem.calculateSubtotal();
-        return orderItem;
+    public BigDecimal getSubtotal() {
+        if (subtotal == null) {
+            calculateSubtotal();
+        }
+        return subtotal;
     }
 }

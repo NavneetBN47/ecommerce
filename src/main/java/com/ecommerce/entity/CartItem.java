@@ -1,6 +1,8 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,23 +15,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * CartItem Entity representing individual items in a shopping cart
- * 
- * Business Rules:
- * - One product per cart (enforced by unique constraint)
- * - Quantity range: 1-99
- * - Price captured at time of addition (historical)
- * - Cascade delete with cart
- * - Cannot delete product if in cart (RESTRICT)
+ * CartItem Entity representing individual items in a cart
  */
 @Entity
-@Table(name = "cart_items",
-    uniqueConstraints = @UniqueConstraint(name = "uk_cart_product", columnNames = {"cart_id", "product_id"}),
-    indexes = {
-        @Index(name = "idx_cart", columnList = "cart_id"),
-        @Index(name = "idx_product", columnList = "product_id")
-    }
-)
+@Table(name = "cart_items", indexes = {
+    @Index(name = "idx_cart_item_cart", columnList = "cart_id"),
+    @Index(name = "idx_cart_item_product", columnList = "product_id")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
@@ -39,28 +31,27 @@ public class CartItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "cart_item_id")
-    private Long cartItemId;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
-    @Column(name = "cart_id", insertable = false, updatable = false)
-    private Long cartId;
-
-    @Column(name = "product_id", nullable = false)
-    private Long productId;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", insertable = false, updatable = false)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(name = "quantity", nullable = false)
+    @NotNull(message = "Quantity is required")
+    @Min(value = 1, message = "Quantity must be at least 1")
+    @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "price_at_addition", nullable = false, precision = 12, scale = 2)
-    private BigDecimal priceAtAddition;
+    @NotNull(message = "Price is required")
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal subtotal;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -71,32 +62,23 @@ public class CartItem {
     private LocalDateTime updatedAt;
 
     /**
-     * Calculate subtotal (price * quantity)
+     * Calculate subtotal before persist/update
+     */
+    @PrePersist
+    @PreUpdate
+    public void calculateSubtotal() {
+        if (price != null && quantity != null) {
+            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
+        }
+    }
+
+    /**
+     * Get subtotal
      */
     public BigDecimal getSubtotal() {
-        return priceAtAddition.multiply(BigDecimal.valueOf(quantity));
-    }
-
-    /**
-     * Validate quantity is within allowed range (1-99)
-     */
-    public void validateQuantity() {
-        if (quantity < 1 || quantity > 99) {
-            throw new IllegalArgumentException(
-                String.format("Quantity must be between 1 and 99. Provided: %d", quantity)
-            );
+        if (subtotal == null) {
+            calculateSubtotal();
         }
-    }
-
-    /**
-     * Update quantity with validation
-     */
-    public void updateQuantity(Integer newQuantity) {
-        if (newQuantity < 1 || newQuantity > 99) {
-            throw new IllegalArgumentException(
-                String.format("Quantity must be between 1 and 99. Provided: %d", newQuantity)
-            );
-        }
-        this.quantity = newQuantity;
+        return subtotal;
     }
 }

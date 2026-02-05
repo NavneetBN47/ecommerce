@@ -15,19 +15,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Cart Entity representing user shopping carts
- * 
- * Business Rules:
- * - One ACTIVE cart per user at any time
- * - Cart status: ACTIVE or CHECKED_OUT
- * - CHECKED_OUT carts are historical records
- * - Abandoned carts (30+ days inactive) are auto-cleared
- * - Cart persists across sessions until checkout
+ * Cart Entity representing user shopping cart
+ * Implements lazy creation and auto-delete when empty
  */
 @Entity
 @Table(name = "carts", indexes = {
-    @Index(name = "idx_user_status", columnList = "user_id, status"),
-    @Index(name = "idx_updated", columnList = "updated_at")
+    @Index(name = "idx_cart_user", columnList = "user_id"),
+    @Index(name = "idx_cart_status", columnList = "status")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -38,24 +32,28 @@ public class Cart {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "cart_id")
-    private Long cartId;
-
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
-    @Builder.Default
-    private CartStatus status = CartStatus.ACTIVE;
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<CartItem> items = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private CartStatus status = CartStatus.ACTIVE;
+
+    @Column(name = "total_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    @Column(name = "total_items")
+    @Builder.Default
+    private Integer totalItems = 0;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -65,39 +63,17 @@ public class Cart {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /**
-     * Calculate total amount of all items in cart
-     */
-    public BigDecimal getTotalAmount() {
-        return items.stream()
-            .map(CartItem::getSubtotal)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public enum CartStatus {
+        ACTIVE, CHECKED_OUT, ABANDONED
     }
 
     /**
-     * Get total number of items in cart
-     */
-    public Integer getItemCount() {
-        return items.stream()
-            .mapToInt(CartItem::getQuantity)
-            .sum();
-    }
-
-    /**
-     * Add item to cart or update quantity if already exists
+     * Add item to cart
      */
     public void addItem(CartItem item) {
-        CartItem existingItem = items.stream()
-            .filter(i -> i.getProductId().equals(item.getProductId()))
-            .findFirst()
-            .orElse(null);
-
-        if (existingItem != null) {
-            existingItem.setQuantity(existingItem.getQuantity() + item.getQuantity());
-        } else {
-            item.setCart(this);
-            items.add(item);
-        }
+        items.add(item);
+        item.setCart(this);
+        recalculateTotals();
     }
 
     /**
@@ -106,6 +82,7 @@ public class Cart {
     public void removeItem(CartItem item) {
         items.remove(item);
         item.setCart(null);
+        recalculateTotals();
     }
 
     /**
@@ -113,37 +90,30 @@ public class Cart {
      */
     public void clearItems() {
         items.clear();
-    }
-
-    /**
-     * Mark cart as checked out
-     */
-    public void checkout() {
-        this.status = CartStatus.CHECKED_OUT;
-    }
-
-    /**
-     * Check if cart is active
-     */
-    public boolean isActive() {
-        return status == CartStatus.ACTIVE;
+        recalculateTotals();
     }
 
     /**
      * Check if cart is empty
      */
     public boolean isEmpty() {
-        return items.isEmpty();
+        return items == null || items.isEmpty();
     }
 
     /**
-     * Check if cart is abandoned (inactive for 30+ days)
+     * Recalculate cart totals
      */
-    public boolean isAbandoned(int abandonedDays) {
-        return updatedAt.isBefore(LocalDateTime.now().minusDays(abandonedDays));
-    }
-
-    public enum CartStatus {
-        ACTIVE, CHECKED_OUT
+    public void recalculateTotals() {
+        if (items == null || items.isEmpty()) {
+            this.totalAmount = BigDecimal.ZERO;
+            this.totalItems = 0;
+        } else {
+            this.totalAmount = items.stream()
+                .map(CartItem::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            this.totalItems = items.stream()
+                .mapToInt(CartItem::getQuantity)
+                .sum();
+        }
     }
 }

@@ -1,6 +1,9 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,24 +13,16 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * User Entity representing system users (customers and admins)
- * 
- * Business Rules:
- * - Username must be unique (3-50 chars, alphanumeric + underscore)
- * - Email must be unique and valid
- * - Password is stored as BCrypt hash
- * - Failed login attempts tracked, account locked after 5 failures
- * - Supports USER and ADMIN roles
- * - Status can be ACTIVE, INACTIVE, or LOCKED
+ * User Entity representing system users
  */
 @Entity
 @Table(name = "users", indexes = {
-    @Index(name = "idx_username", columnList = "username"),
-    @Index(name = "idx_email", columnList = "email"),
-    @Index(name = "idx_status", columnList = "status"),
-    @Index(name = "idx_role", columnList = "role")
+    @Index(name = "idx_user_email", columnList = "email", unique = true),
+    @Index(name = "idx_user_username", columnList = "username", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -38,43 +33,51 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
-    private Long userId;
+    private Long id;
 
-    @Column(name = "username", nullable = false, unique = true, length = 50)
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(name = "email", nullable = false, unique = true, length = 100)
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email should be valid")
+    @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
+    @NotBlank(message = "Password is required")
+    @Column(nullable = false)
+    private String password;
 
-    @Column(name = "first_name", nullable = false, length = 50)
+    @Column(name = "first_name", length = 50)
     private String firstName;
 
-    @Column(name = "last_name", nullable = false, length = 50)
+    @Column(name = "last_name", length = 50)
     private String lastName;
 
-    @Column(name = "phone_number", length = 15)
+    @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 20)
+    @Column(nullable = false)
     @Builder.Default
-    private UserRole role = UserRole.USER;
+    private Boolean active = true;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(nullable = false, length = 20)
     @Builder.Default
-    private UserStatus status = UserStatus.ACTIVE;
+    private UserRole role = UserRole.CUSTOMER;
 
-    @Column(name = "failed_login_attempts")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private Integer failedLoginAttempts = 0;
+    private List<Cart> carts = new ArrayList<>();
 
-    @Column(name = "account_locked_until")
-    private LocalDateTime accountLockedUntil;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<Order> orders = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Address> addresses = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -84,47 +87,7 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "last_login_at")
-    private LocalDateTime lastLoginAt;
-
-    /**
-     * Check if account is currently locked
-     */
-    public boolean isAccountLocked() {
-        return accountLockedUntil != null && accountLockedUntil.isAfter(LocalDateTime.now());
-    }
-
-    /**
-     * Check if account is active and not locked
-     */
-    public boolean isAccountActive() {
-        return status == UserStatus.ACTIVE && !isAccountLocked();
-    }
-
-    /**
-     * Increment failed login attempts and lock account if threshold reached
-     */
-    public void incrementFailedLoginAttempts() {
-        this.failedLoginAttempts++;
-        if (this.failedLoginAttempts >= 5) {
-            this.accountLockedUntil = LocalDateTime.now().plusMinutes(30);
-        }
-    }
-
-    /**
-     * Reset failed login attempts on successful login
-     */
-    public void resetFailedLoginAttempts() {
-        this.failedLoginAttempts = 0;
-        this.accountLockedUntil = null;
-        this.lastLoginAt = LocalDateTime.now();
-    }
-
     public enum UserRole {
-        USER, ADMIN
-    }
-
-    public enum UserStatus {
-        ACTIVE, INACTIVE, LOCKED
+        CUSTOMER, ADMIN, SELLER
     }
 }
