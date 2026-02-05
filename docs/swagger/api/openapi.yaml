@@ -1,0 +1,1243 @@
+openapi: 3.0.3
+info:
+  title: Ecommerce API
+  description: Comprehensive API for ecommerce platform with user management, authentication, cart operations, and product search
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@ecommerce.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.ecommerce.com/v1
+    description: Production server
+  - url: https://staging-api.ecommerce.com/v1
+    description: Staging server
+  - url: http://localhost:8080/v1
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email and password
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Bad request - Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: User registration
+      description: Register a new user account
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Bad request - Invalid input or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict - User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Logout current user and invalidate token
+      operationId: logout
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Refresh the access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Bad request - Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Expired or invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /cart:
+    get:
+      tags:
+        - Cart
+      summary: Get user cart
+      description: Retrieve current user's cart items
+      operationId: getCart
+      responses:
+        '200':
+          description: Cart retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /cart/items:
+    post:
+      tags:
+        - Cart
+      summary: Add item to cart
+      description: Add a product item to the user's cart
+      operationId: addItemToCart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '201':
+          description: Item added to cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Bad request - Invalid input or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /cart/items/{itemId}:
+    put:
+      tags:
+        - Cart
+      summary: Update cart item
+      description: Update quantity of a specific cart item
+      operationId: updateCartItem
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          description: Cart item ID
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Bad request - Invalid input or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Cart
+      summary: Remove item from cart
+      description: Remove a specific item from the user's cart
+      operationId: removeCartItem
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          description: Cart item ID
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Item removed from cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /cart/clear:
+    delete:
+      tags:
+        - Cart
+      summary: Clear cart
+      description: Remove all items from the user's cart
+      operationId: clearCart
+      responses:
+        '200':
+          description: Cart cleared successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Search products
+      description: Search and filter products with pagination
+      operationId: searchProducts
+      security: []
+      parameters:
+        - name: query
+          in: query
+          description: Search query string
+          schema:
+            type: string
+            maxLength: 100
+        - name: category
+          in: query
+          description: Product category filter
+          schema:
+            type: string
+            maxLength: 50
+        - name: minPrice
+          in: query
+          description: Minimum price filter
+          schema:
+            type: number
+            format: double
+            minimum: 0
+        - name: maxPrice
+          in: query
+          description: Maximum price filter
+          schema:
+            type: number
+            format: double
+            minimum: 0
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [name, price, rating, createdDate]
+            default: name
+        - name: sortDirection
+          in: query
+          description: Sort direction
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: page
+          in: query
+          description: Page number (0-based)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          description: Page size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPageResponse'
+        '400':
+          description: Bad request - Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /products/{productId}:
+    get:
+      tags:
+        - Products
+      summary: Get product by ID
+      description: Retrieve detailed information about a specific product
+      operationId: getProductById
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Product retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /products/categories:
+    get:
+      tags:
+        - Products
+      summary: Get product categories
+      description: Retrieve all available product categories
+      operationId: getProductCategories
+      security: []
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriesResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /products/featured:
+    get:
+      tags:
+        - Products
+      summary: Get featured products
+      description: Retrieve featured products for homepage display
+      operationId: getFeaturedProducts
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of featured products to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Featured products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+        '400':
+          description: Bad request - Invalid limit parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Retrieve current user's profile information
+      operationId: getUserProfile
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Update current user's profile information
+      operationId: updateUserProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '400':
+          description: Bad request - Invalid input or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/change-password:
+    put:
+      tags:
+        - Users
+      summary: Change password
+      description: Change current user's password
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Bad request - Invalid input or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieve user information by user ID (admin only)
+      operationId: getUserById
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          minLength: 6
+          maxLength: 100
+          description: User password
+          example: password123
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          minLength: 6
+          maxLength: 100
+          description: User password
+          example: password123
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: User first name
+          example: John
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: User last name
+          example: Doe
+        phoneNumber:
+          type: string
+          maxLength: 20
+          description: User phone number
+          example: +1234567890
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          description: JWT refresh token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          description: Token type
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Token expiration time in seconds
+          example: 3600
+        user:
+          $ref: '#/components/schemas/UserResponse'
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: JWT refresh token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    CartResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Cart ID
+          example: 1
+        userId:
+          type: integer
+          format: int64
+          description: User ID
+          example: 123
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemResponse'
+        totalAmount:
+          type: number
+          format: double
+          description: Total cart amount
+          example: 299.99
+        totalItems:
+          type: integer
+          description: Total number of items in cart
+          example: 3
+        createdAt:
+          type: string
+          format: date-time
+          description: Cart creation timestamp
+          example: 2023-12-01T10:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Cart last update timestamp
+          example: 2023-12-01T15:30:00Z
+    CartItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Cart item ID
+          example: 1
+        productId:
+          type: integer
+          format: int64
+          description: Product ID
+          example: 456
+        product:
+          $ref: '#/components/schemas/ProductResponse'
+        quantity:
+          type: integer
+          minimum: 1
+          description: Item quantity
+          example: 2
+        unitPrice:
+          type: number
+          format: double
+          description: Unit price at time of adding to cart
+          example: 99.99
+        totalPrice:
+          type: number
+          format: double
+          description: Total price for this item (quantity * unitPrice)
+          example: 199.98
+        addedAt:
+          type: string
+          format: date-time
+          description: Item added timestamp
+          example: 2023-12-01T12:00:00Z
+    AddCartItemRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Product ID to add
+          example: 456
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Quantity to add
+          example: 2
+    UpdateCartItemRequest:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: New quantity
+          example: 3
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Product ID
+          example: 456
+        name:
+          type: string
+          description: Product name
+          example: Wireless Headphones
+        description:
+          type: string
+          description: Product description
+          example: High-quality wireless headphones with noise cancellation
+        price:
+          type: number
+          format: double
+          description: Product price
+          example: 99.99
+        category:
+          type: string
+          description: Product category
+          example: Electronics
+        brand:
+          type: string
+          description: Product brand
+          example: TechBrand
+        sku:
+          type: string
+          description: Stock keeping unit
+          example: WH-001
+        stockQuantity:
+          type: integer
+          description: Available stock quantity
+          example: 50
+        imageUrl:
+          type: string
+          format: uri
+          description: Product image URL
+          example: https://example.com/images/wh-001.jpg
+        rating:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 5
+          description: Average product rating
+          example: 4.5
+        reviewCount:
+          type: integer
+          description: Number of reviews
+          example: 128
+        featured:
+          type: boolean
+          description: Whether product is featured
+          example: true
+        active:
+          type: boolean
+          description: Whether product is active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Product creation timestamp
+          example: 2023-11-01T10:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Product last update timestamp
+          example: 2023-11-15T14:30:00Z
+    ProductPageResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductResponse'
+        pageable:
+          $ref: '#/components/schemas/Pageable'
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of elements
+          example: 150
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 8
+        last:
+          type: boolean
+          description: Whether this is the last page
+          example: false
+        first:
+          type: boolean
+          description: Whether this is the first page
+          example: true
+        numberOfElements:
+          type: integer
+          description: Number of elements in current page
+          example: 20
+        size:
+          type: integer
+          description: Page size
+          example: 20
+        number:
+          type: integer
+          description: Current page number
+          example: 0
+        sort:
+          $ref: '#/components/schemas/Sort'
+        empty:
+          type: boolean
+          description: Whether the page is empty
+          example: false
+    ProductListResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductResponse'
+        totalCount:
+          type: integer
+          description: Total number of products
+          example: 10
+    CategoriesResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            type: string
+          description: List of product categories
+          example: [Electronics, Clothing, Books, Home & Garden]
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: User ID
+          example: 123
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: user@example.com
+        firstName:
+          type: string
+          description: User first name
+          example: John
+        lastName:
+          type: string
+          description: User last name
+          example: Doe
+        phoneNumber:
+          type: string
+          description: User phone number
+          example: +1234567890
+        role:
+          type: string
+          enum: [USER, ADMIN]
+          description: User role
+          example: USER
+        active:
+          type: boolean
+          description: Whether user account is active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: User registration timestamp
+          example: 2023-10-01T09:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: User last update timestamp
+          example: 2023-11-01T16:45:00Z
+    UserProfileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: User ID
+          example: 123
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: user@example.com
+        firstName:
+          type: string
+          description: User first name
+          example: John
+        lastName:
+          type: string
+          description: User last name
+          example: Doe
+        phoneNumber:
+          type: string
+          description: User phone number
+          example: +1234567890
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressResponse'
+        createdAt:
+          type: string
+          format: date-time
+          description: User registration timestamp
+          example: 2023-10-01T09:00:00Z
+    UpdateUserProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: User first name
+          example: John
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: User last name
+          example: Doe
+        phoneNumber:
+          type: string
+          maxLength: 20
+          description: User phone number
+          example: +1234567890
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          minLength: 6
+          maxLength: 100
+          description: Current password
+          example: oldpassword123
+        newPassword:
+          type: string
+          minLength: 6
+          maxLength: 100
+          description: New password
+          example: newpassword456
+    AddressResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Address ID
+          example: 1
+        street:
+          type: string
+          description: Street address
+          example: 123 Main St
+        city:
+          type: string
+          description: City
+          example: New York
+        state:
+          type: string
+          description: State/Province
+          example: NY
+        zipCode:
+          type: string
+          description: ZIP/Postal code
+          example: 10001
+        country:
+          type: string
+          description: Country
+          example: USA
+        type:
+          type: string
+          enum: [SHIPPING, BILLING]
+          description: Address type
+          example: SHIPPING
+        default:
+          type: boolean
+          description: Whether this is the default address
+          example: true
+    Pageable:
+      type: object
+      properties:
+        sort:
+          $ref: '#/components/schemas/Sort'
+        pageNumber:
+          type: integer
+          description: Current page number
+          example: 0
+        pageSize:
+          type: integer
+          description: Page size
+          example: 20
+        offset:
+          type: integer
+          format: int64
+          description: Offset from the start
+          example: 0
+        paged:
+          type: boolean
+          description: Whether pagination is enabled
+          example: true
+        unpaged:
+          type: boolean
+          description: Whether pagination is disabled
+          example: false
+    Sort:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+          description: Whether sorting is applied
+          example: true
+        unsorted:
+          type: boolean
+          description: Whether no sorting is applied
+          example: false
+        empty:
+          type: boolean
+          description: Whether sort is empty
+          example: false
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: Operation completed successfully
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+          example: 2023-12-01T15:30:00Z
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Error message
+          example: Invalid input data
+        details:
+          type: array
+          items:
+            type: string
+          description: Detailed error messages
+          example: ["Email is required", "Password must be at least 6 characters"]
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+          example: 2023-12-01T15:30:00Z
+        path:
+          type: string
+          description: Request path that caused the error
+          example: /api/v1/auth/login
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
