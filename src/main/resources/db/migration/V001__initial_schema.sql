@@ -1,118 +1,118 @@
--- Initial Database Schema for E-Commerce Application
+-- V001__initial_schema.sql
+-- Initial database schema for E-Commerce Platform
 
--- Users Table
+-- Create users table
 CREATE TABLE users (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
     phone_number VARCHAR(20),
-    address VARCHAR(255),
-    city VARCHAR(100),
-    state VARCHAR(100),
-    zip_code VARCHAR(20),
-    country VARCHAR(100),
-    role VARCHAR(20) NOT NULL DEFAULT 'CUSTOMER',
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    last_login DATETIME,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_user_email (email),
-    INDEX idx_user_username (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Products Table
+-- Create indexes for users
+CREATE INDEX idx_user_email ON users(email);
+CREATE INDEX idx_user_username ON users(username);
+
+-- Create products table
 CREATE TABLE products (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     description TEXT,
-    sku VARCHAR(100) NOT NULL UNIQUE,
-    price DECIMAL(10, 2) NOT NULL,
-    discount_price DECIMAL(10, 2),
-    stock_quantity INT NOT NULL DEFAULT 0,
+    sku VARCHAR(50) NOT NULL UNIQUE,
+    price DECIMAL(10, 2) NOT NULL CHECK (price > 0),
+    stock_quantity INTEGER NOT NULL CHECK (stock_quantity >= 0),
     category VARCHAR(100),
-    brand VARCHAR(100),
     image_url VARCHAR(500),
     active BOOLEAN NOT NULL DEFAULT TRUE,
-    featured BOOLEAN NOT NULL DEFAULT FALSE,
-    rating DECIMAL(3, 2) DEFAULT 0.00,
-    review_count INT DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_product_name (name),
-    INDEX idx_product_category (category),
-    INDEX idx_product_sku (sku)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Carts Table
+-- Create indexes for products
+CREATE INDEX idx_product_name ON products(name);
+CREATE INDEX idx_product_category ON products(category);
+CREATE INDEX idx_product_sku ON products(sku);
+CREATE INDEX idx_product_active ON products(active);
+
+-- Create carts table
 CREATE TABLE carts (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL UNIQUE,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     total_amount DECIMAL(10, 2) DEFAULT 0.00,
-    total_items INT DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_cart_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    total_items INTEGER DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cart_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
--- Cart Items Table
+-- Create indexes for carts
+CREATE INDEX idx_cart_user ON carts(user_id);
+CREATE INDEX idx_cart_status ON carts(status);
+
+-- Create cart_items table
 CREATE TABLE cart_items (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     cart_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
-    quantity INT NOT NULL,
-    unit_price DECIMAL(10, 2) NOT NULL,
-    subtotal DECIMAL(10, 2) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    UNIQUE KEY uk_cart_product (cart_id, product_id),
-    INDEX idx_cart_item_cart (cart_id),
-    INDEX idx_cart_item_product (product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    quantity INTEGER NOT NULL CHECK (quantity >= 1),
+    price DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cart_item_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_cart_item_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CONSTRAINT uk_cart_product UNIQUE (cart_id, product_id)
+);
 
--- Orders Table
+-- Create indexes for cart_items
+CREATE INDEX idx_cart_item_cart ON cart_items(cart_id);
+CREATE INDEX idx_cart_item_product ON cart_items(product_id);
+
+-- Create orders table
 CREATE TABLE orders (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE,
     user_id BIGINT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     total_amount DECIMAL(10, 2) NOT NULL,
-    total_items INT NOT NULL,
     shipping_address TEXT,
     billing_address TEXT,
-    payment_method VARCHAR(20),
-    payment_status VARCHAR(20) DEFAULT 'PENDING',
-    order_date DATETIME NOT NULL,
-    shipped_date DATETIME,
-    delivered_date DATETIME,
-    notes TEXT,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_order_user (user_id),
-    INDEX idx_order_number (order_number),
-    INDEX idx_order_status (status),
-    INDEX idx_order_date (order_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
--- Order Items Table
+-- Create indexes for orders
+CREATE INDEX idx_order_user ON orders(user_id);
+CREATE INDEX idx_order_status ON orders(status);
+CREATE INDEX idx_order_number ON orders(order_number);
+
+-- Create order_items table
 CREATE TABLE order_items (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     order_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
-    product_name VARCHAR(200) NOT NULL,
-    product_sku VARCHAR(100),
-    quantity INT NOT NULL,
-    unit_price DECIMAL(10, 2) NOT NULL,
-    subtotal DECIMAL(10, 2) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    INDEX idx_order_item_order (order_id),
-    INDEX idx_order_item_product (product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    quantity INTEGER NOT NULL CHECK (quantity >= 1),
+    price DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_item_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    CONSTRAINT fk_order_item_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- Create indexes for order_items
+CREATE INDEX idx_order_item_order ON order_items(order_id);
+CREATE INDEX idx_order_item_product ON order_items(product_id);
+
+-- Add comments for documentation
+COMMENT ON TABLE users IS 'Registered users in the system';
+COMMENT ON TABLE products IS 'Product catalog';
+COMMENT ON TABLE carts IS 'Shopping carts for users';
+COMMENT ON TABLE cart_items IS 'Items in shopping carts';
+COMMENT ON TABLE orders IS 'Completed orders';
+COMMENT ON TABLE order_items IS 'Items in orders';

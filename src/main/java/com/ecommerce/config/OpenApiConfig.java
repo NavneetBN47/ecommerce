@@ -4,11 +4,8 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
-import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
 
 /**
  * OpenAPI/Swagger configuration
@@ -17,21 +14,17 @@ import java.util.List;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI customOpenAPI() {
+    public OpenAPI ecommerceOpenAPI() {
         return new OpenAPI()
             .info(new Info()
-                .title("E-Commerce Application API")
+                .title("E-Commerce Platform API")
+                .description("Production-ready E-Commerce Platform with Cart Management")
                 .version("1.0.0")
-                .description("Production-ready Spring Boot MVC E-Commerce Application API Documentation")
                 .contact(new Contact()
-                    .name("Backend Automation Agent")
-                    .email("support@ecommerce.com"))
+                    .name("Development Team")
+                    .email("dev@ecommerce.com"))
                 .license(new License()
                     .name("Apache 2.0")
-                    .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
-            .servers(List.of(
-                new Server().url("http://localhost:8080/api").description("Local Development Server"),
-                new Server().url("https://api.ecommerce.com/api").description("Production Server")
-            ));
+                    .url("https://www.apache.org/licenses/LICENSE-2.0.html")));
     }
 }

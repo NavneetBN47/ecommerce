@@ -1,45 +1,44 @@
--- V003: Add additional constraints and indexes for cart management
--- Author: Backend Automation Agent
--- Date: 2024
--- Purpose: Enhance cart functionality with proper constraints for lazy creation and auto-delete
+-- V003__add_cart_constraints.sql
+-- Additional constraints and optimizations for cart management
 
--- Add check constraint for cart item quantity
-ALTER TABLE cart_items
-ADD CONSTRAINT chk_cart_item_quantity CHECK (quantity > 0);
+-- Add constraint to ensure cart status is valid
+ALTER TABLE carts ADD CONSTRAINT chk_cart_status 
+    CHECK (status IN ('ACTIVE', 'CHECKED_OUT', 'ABANDONED'));
 
--- Add check constraint for cart item price
-ALTER TABLE cart_items
-ADD CONSTRAINT chk_cart_item_price CHECK (price >= 0);
+-- Add constraint to ensure order status is valid
+ALTER TABLE orders ADD CONSTRAINT chk_order_status 
+    CHECK (status IN ('PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'));
 
--- Add check constraint for cart item subtotal
-ALTER TABLE cart_items
-ADD CONSTRAINT chk_cart_item_subtotal CHECK (subtotal >= 0);
+-- Add trigger to update updated_at timestamp for users
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
 
--- Add check constraint for cart total amount
-ALTER TABLE carts
-ADD CONSTRAINT chk_cart_total_amount CHECK (total_amount >= 0);
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Add check constraint for product stock quantity
-ALTER TABLE products
-ADD CONSTRAINT chk_product_stock_quantity CHECK (stock_quantity >= 0);
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Add check constraint for product price
-ALTER TABLE products
-ADD CONSTRAINT chk_product_price CHECK (price >= 0);
+CREATE TRIGGER update_carts_updated_at BEFORE UPDATE ON carts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Add check constraint for order item quantity
-ALTER TABLE order_items
-ADD CONSTRAINT chk_order_item_quantity CHECK (quantity > 0);
+CREATE TRIGGER update_cart_items_updated_at BEFORE UPDATE ON cart_items
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Add check constraint for order total amount
-ALTER TABLE orders
-ADD CONSTRAINT chk_order_total_amount CHECK (total_amount >= 0);
+CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Add composite index for better cart item lookup performance
-CREATE INDEX idx_cart_items_cart_product ON cart_items(cart_id, product_id);
+-- Add index for better query performance on cart status and user
+CREATE INDEX idx_cart_user_status ON carts(user_id, status);
 
--- Add index for order date range queries
-CREATE INDEX idx_orders_date ON orders(order_date);
+-- Add index for order queries
+CREATE INDEX idx_order_created_at ON orders(created_at DESC);
 
--- Add index for user orders lookup
-CREATE INDEX idx_orders_user_date ON orders(user_id, order_date DESC);
+-- Add comment for cart auto-delete feature
+COMMENT ON TABLE carts IS 'Shopping carts for users. Empty carts are automatically deleted.';
+COMMENT ON COLUMN carts.status IS 'Cart status: ACTIVE (in use), CHECKED_OUT (converted to order), ABANDONED (inactive)';
