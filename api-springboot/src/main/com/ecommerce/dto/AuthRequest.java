@@ -1,23 +1,23 @@
 package com.ecommerce.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Authentication Response DTO
+ * Authentication Request DTO
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AuthResponse {
+public class AuthRequest {
 
-    private String token;
-    private String type = "Bearer";
-    private Long userId;
+    @NotBlank(message = "Username is required")
     private String username;
-    private String email;
-    private String message;
+
+    @NotBlank(message = "Password is required")
+    private String password;
 }

@@ -1,163 +1,82 @@
-```mermaid
 erDiagram
-    users ||--o| shopping_carts : "has one"
-    users ||--o{ user_addresses : "has many"
-    shopping_carts ||--|{ cart_items : "contains"
-    products ||--o{ cart_items : "in"
-    products ||--|| product_inventory : "has"
-    products }o--|| categories : "belongs to"
-    products ||--o{ product_images : "has"
-    users ||--o{ orders : "places"
-    orders ||--|{ order_items : "contains"
-    products ||--o{ order_items : "in"
-    orders ||--o{ payment_transactions : "has"
-    user_addresses ||--o{ orders : "billing address"
-    user_addresses ||--o{ orders : "shipping address"
+    USERS ||--o{ CARTS : has
+    USERS ||--o{ ORDERS : places
+    CARTS ||--o{ CART_ITEMS : contains
+    PRODUCTS ||--o{ CART_ITEMS : "included in"
+    PRODUCTS ||--o{ ORDER_ITEMS : "included in"
+    ORDERS ||--o{ ORDER_ITEMS : contains
 
-    users {
-        UUID user_id PK
-        VARCHAR username UK "Unique, immutable"
+    USERS {
+        BIGINT id PK
+        VARCHAR username UK
         VARCHAR email UK
-        VARCHAR password_hash
+        VARCHAR password
         VARCHAR first_name
         VARCHAR last_name
-        VARCHAR phone
-        DATE date_of_birth
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        VARCHAR phone_number
         BOOLEAN is_active
-        BOOLEAN email_verified
-        TIMESTAMP last_login
-    }
-
-    user_addresses {
-        UUID address_id PK
-        UUID user_id FK
-        VARCHAR address_type
-        VARCHAR street_address
-        VARCHAR city
-        VARCHAR state
-        VARCHAR postal_code
-        VARCHAR country
-        BOOLEAN is_default
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
 
-    categories {
-        UUID category_id PK
-        VARCHAR name UK
-        TEXT description
-        UUID parent_category_id FK
-        VARCHAR image_url
-        BOOLEAN is_active
-        INTEGER sort_order
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    products {
-        UUID product_id PK
+    PRODUCTS {
+        BIGINT id PK
         VARCHAR name
         TEXT description
         VARCHAR sku UK
-        UUID category_id FK
         DECIMAL price
-        DECIMAL cost_price
-        DECIMAL weight
-        DECIMAL dimensions_length
-        DECIMAL dimensions_width
-        DECIMAL dimensions_height
-        BOOLEAN is_active
-        BOOLEAN is_featured
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    product_inventory {
-        UUID inventory_id PK
-        UUID product_id FK "One-to-One"
-        INTEGER quantity_available
-        INTEGER quantity_reserved
-        INTEGER reorder_level
-        INTEGER max_stock_level
-        TIMESTAMP last_restocked
-        TIMESTAMP updated_at
-    }
-
-    product_images {
-        UUID image_id PK
-        UUID product_id FK
+        INT stock_quantity
+        VARCHAR category
         VARCHAR image_url
-        VARCHAR alt_text
-        BOOLEAN is_primary
-        INTEGER sort_order
-        TIMESTAMP created_at
-    }
-
-    shopping_carts {
-        UUID cart_id PK
-        UUID user_id FK "Unique - One cart per user"
-        VARCHAR session_id
+        BOOLEAN is_active
         TIMESTAMP created_at
         TIMESTAMP updated_at
-        TIMESTAMP expires_at
     }
 
-    cart_items {
-        UUID cart_item_id PK
-        UUID cart_id FK "Cascade on delete"
-        UUID product_id FK
-        INTEGER quantity "Must be > 0"
-        DECIMAL unit_price
-        TIMESTAMP added_at
-        TIMESTAMP updated_at
-    }
-
-    orders {
-        UUID order_id PK
-        UUID user_id FK
-        VARCHAR order_number UK
-        VARCHAR status
-        DECIMAL subtotal
-        DECIMAL tax_amount
-        DECIMAL shipping_amount
-        DECIMAL discount_amount
+    CARTS {
+        BIGINT id PK
+        BIGINT user_id FK
         DECIMAL total_amount
-        VARCHAR currency
-        UUID billing_address_id FK
-        UUID shipping_address_id FK
+        INT total_items
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    CART_ITEMS {
+        BIGINT id PK
+        BIGINT cart_id FK
+        BIGINT product_id FK
+        INT quantity
+        DECIMAL price
+        DECIMAL subtotal
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    ORDERS {
+        BIGINT id PK
+        VARCHAR order_number UK
+        BIGINT user_id FK
+        DECIMAL total_amount
+        INT total_items
+        VARCHAR status
+        TEXT shipping_address
+        TEXT billing_address
         VARCHAR payment_method
         VARCHAR payment_status
         TEXT notes
         TIMESTAMP created_at
         TIMESTAMP updated_at
-        TIMESTAMP shipped_at
-        TIMESTAMP delivered_at
     }
 
-    order_items {
-        UUID order_item_id PK
-        UUID order_id FK
-        UUID product_id FK
-        INTEGER quantity
-        DECIMAL unit_price
-        DECIMAL total_price
+    ORDER_ITEMS {
+        BIGINT id PK
+        BIGINT order_id FK
+        BIGINT product_id FK
+        INT quantity
+        DECIMAL price
+        DECIMAL subtotal
+        VARCHAR product_name
+        VARCHAR product_sku
         TIMESTAMP created_at
     }
-
-    payment_transactions {
-        UUID transaction_id PK
-        UUID order_id FK
-        VARCHAR transaction_type
-        DECIMAL amount
-        VARCHAR currency
-        VARCHAR payment_method
-        VARCHAR payment_gateway
-        VARCHAR gateway_transaction_id
-        VARCHAR status
-        TEXT gateway_response
-        TIMESTAMP created_at
-        TIMESTAMP processed_at
-    }
-```

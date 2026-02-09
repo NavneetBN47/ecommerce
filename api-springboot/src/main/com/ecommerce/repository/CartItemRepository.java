@@ -10,23 +10,38 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * CartItem Repository
+ */
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.cartId = :cartId")
-    List<CartItem> findByCartId(@Param("cartId") Long cartId);
+    /**
+     * Find cart items by cart ID
+     */
+    List<CartItem> findByCartId(Long cartId);
 
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cart.cartId = :cartId AND ci.product.productId = :productId")
-    Optional<CartItem> findByCartIdAndProductId(@Param("cartId") Long cartId, @Param("productId") Long productId);
+    /**
+     * Find cart item by cart ID and product ID
+     */
+    Optional<CartItem> findByCartIdAndProductId(Long cartId, Long productId);
 
+    /**
+     * Delete cart items by cart ID
+     */
     @Modifying
-    @Query("DELETE FROM CartItem ci WHERE ci.cart.cartId = :cartId")
-    void deleteAllByCartId(@Param("cartId") Long cartId);
+    @Query("DELETE FROM CartItem ci WHERE ci.cart.id = :cartId")
+    void deleteByCartId(@Param("cartId") Long cartId);
 
+    /**
+     * Delete cart item by cart ID and product ID
+     */
     @Modifying
-    @Query("DELETE FROM CartItem ci WHERE ci.cart.user.userId = :userId")
-    void deleteAllByUserId(@Param("userId") Long userId);
+    @Query("DELETE FROM CartItem ci WHERE ci.cart.id = :cartId AND ci.product.id = :productId")
+    void deleteByCartIdAndProductId(@Param("cartId") Long cartId, @Param("productId") Long productId);
 
-    @Query("SELECT ci FROM CartItem ci WHERE ci.cartItemId = :cartItemId AND ci.cart.user.userId = :userId")
-    Optional<CartItem> findByIdAndUserId(@Param("cartItemId") Long cartItemId, @Param("userId") Long userId);
+    /**
+     * Count items in cart
+     */
+    long countByCartId(Long cartId);
 }

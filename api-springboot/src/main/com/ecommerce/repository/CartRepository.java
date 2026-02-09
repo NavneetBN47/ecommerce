@@ -9,17 +9,34 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+/**
+ * Cart Repository
+ */
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
 
-    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.userId = :userId")
-    Optional<Cart> findByUserIdWithItems(@Param("userId") Long userId);
+    /**
+     * Find cart by user ID
+     */
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
+    Optional<Cart> findByUserId(@Param("userId") Long userId);
 
-    Optional<Cart> findByUserUserId(Long userId);
-
+    /**
+     * Delete cart by user ID
+     */
     @Modifying
-    @Query("DELETE FROM Cart c WHERE c.user.userId = :userId")
+    @Query("DELETE FROM Cart c WHERE c.user.id = :userId")
     void deleteByUserId(@Param("userId") Long userId);
 
-    boolean existsByUserUserId(Long userId);
+    /**
+     * Check if cart exists for user
+     */
+    boolean existsByUserId(Long userId);
+
+    /**
+     * Delete empty carts (carts with no items)
+     */
+    @Modifying
+    @Query("DELETE FROM Cart c WHERE c.id NOT IN (SELECT DISTINCT ci.cart.id FROM CartItem ci)")
+    void deleteEmptyCarts();
 }

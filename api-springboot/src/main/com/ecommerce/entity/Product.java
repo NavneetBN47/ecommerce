@@ -1,78 +1,127 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Product Entity - Represents a product in the e-commerce catalog
+ */
 @Entity
 @Table(name = "products", indexes = {
-    @Index(name = "idx_products_name", columnList = "name"),
-    @Index(name = "idx_products_category", columnList = "category_id"),
-    @Index(name = "idx_products_price", columnList = "price"),
-    @Index(name = "idx_products_stock", columnList = "stock_quantity"),
-    @Index(name = "idx_products_rating", columnList = "rating"),
-    @Index(name = "idx_products_created_at", columnList = "created_at")
+    @Index(name = "idx_product_name", columnList = "name"),
+    @Index(name = "idx_product_category", columnList = "category"),
+    @Index(name = "idx_product_sku", columnList = "sku", unique = true)
 })
+@EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "product_id")
-    private Long productId;
+    private Long id;
 
-    @Column(name = "name", nullable = false, length = 200)
+    @NotBlank(message = "Product name is required")
+    @Column(nullable = false, length = 200)
     private String name;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
+    @NotBlank(message = "SKU is required")
+    @Column(nullable = false, unique = true, length = 50)
+    private String sku;
+
+    @NotNull(message = "Price is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")
-    private Category category;
-
+    @NotNull(message = "Stock quantity is required")
+    @Min(value = 0, message = "Stock quantity cannot be negative")
     @Column(name = "stock_quantity", nullable = false)
+    @Builder.Default
     private Integer stockQuantity = 0;
+
+    @Column(length = 100)
+    private String category;
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
-    @Column(name = "rating", precision = 3, scale = 2)
-    private BigDecimal rating = BigDecimal.ZERO;
-
-    @Column(name = "review_count")
-    private Integer reviewCount = 0;
-
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 
-    @CreationTimestamp
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<CartItem> cartItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<OrderItem> orderItems = new ArrayList<>();
+
+    @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
+    @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProductTag> tags = new ArrayList<>();
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
+    }
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    private List<CartItem> cartItems = new ArrayList<>();
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    private List<OrderItem> orderItems = new ArrayList<>();
+    /**
+     * Check if product has sufficient stock
+     */
+    public boolean hasSufficientStock(Integer requestedQuantity) {
+        return this.stockQuantity >= requestedQuantity;
+    }
+
+    /**
+     * Reduce stock quantity
+     */
+    public void reduceStock(Integer quantity) {
+        if (!hasSufficientStock(quantity)) {
+            throw new IllegalStateException("Insufficient stock for product: " + this.name);
+        }
+        this.stockQuantity -= quantity;
+    }
+
+    /**
+     * Increase stock quantity
+     */
+    public void increaseStock(Integer quantity) {
+        this.stockQuantity += quantity;
+    }
 }

@@ -2,29 +2,47 @@ package com.ecommerce.repository;
 
 import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
+/**
+ * User Repository
+ */
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    /**
+     * Find user by username
+     */
     Optional<User> findByUsername(String username);
 
+    /**
+     * Find user by email
+     */
     Optional<User> findByEmail(String email);
 
+    /**
+     * Check if username exists
+     */
     boolean existsByUsername(String username);
 
+    /**
+     * Check if email exists
+     */
     boolean existsByEmail(String email);
 
-    @Modifying
-    @Query("UPDATE User u SET u.lastLoginAt = :loginTime WHERE u.userId = :userId")
-    void updateLastLogin(@Param("userId") Long userId, @Param("loginTime") LocalDateTime loginTime);
+    /**
+     * Find all active users
+     */
+    List<User> findByIsActiveTrue();
 
-    @Query("SELECT u FROM User u WHERE u.username = :username AND u.isActive = true")
-    Optional<User> findActiveUserByUsername(@Param("username") String username);
+    /**
+     * Find user by username or email
+     */
+    @Query("SELECT u FROM User u WHERE u.username = :identifier OR u.email = :identifier")
+    Optional<User> findByUsernameOrEmail(@Param("identifier") String identifier);
 }

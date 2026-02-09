@@ -1,31 +1,43 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Order;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
+/**
+ * Order Repository
+ */
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    @Query("SELECT o FROM Order o WHERE o.user.userId = :userId ORDER BY o.createdAt DESC")
-    Page<Order> findByUserId(@Param("userId") Long userId, Pageable pageable);
-
-    @Query("SELECT o FROM Order o WHERE o.user.userId = :userId AND o.status = :status ORDER BY o.createdAt DESC")
-    Page<Order> findByUserIdAndStatus(@Param("userId") Long userId, 
-                                       @Param("status") Order.OrderStatus status, 
-                                       Pageable pageable);
-
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.orderId = :orderId AND o.user.userId = :userId")
-    Optional<Order> findByIdAndUserId(@Param("orderId") Long orderId, @Param("userId") Long userId);
-
+    /**
+     * Find order by order number
+     */
     Optional<Order> findByOrderNumber(String orderNumber);
 
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.user.userId = :userId")
-    long countByUserId(@Param("userId") Long userId);
+    /**
+     * Find orders by user ID
+     */
+    @Query("SELECT o FROM Order o WHERE o.user.id = :userId ORDER BY o.createdAt DESC")
+    List<Order> findByUserId(@Param("userId") Long userId);
+
+    /**
+     * Find orders by user ID and status
+     */
+    List<Order> findByUserIdAndStatus(Long userId, Order.OrderStatus status);
+
+    /**
+     * Find orders by status
+     */
+    List<Order> findByStatus(Order.OrderStatus status);
+
+    /**
+     * Check if order number exists
+     */
+    boolean existsByOrderNumber(String orderNumber);
 }

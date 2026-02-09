@@ -2,73 +2,119 @@ package com.ecommerce.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Cart Entity - Represents a shopping cart for a user
+ * Implements lazy creation and auto-delete when empty
+ */
 @Entity
 @Table(name = "carts", indexes = {
-    @Index(name = "idx_carts_user", columnList = "user_id"),
-    @Index(name = "idx_carts_status", columnList = "status")
+    @Index(name = "idx_cart_user", columnList = "user_id", unique = true)
 })
+@EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Cart {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "cart_id")
-    private Long cartId;
+    private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(name = "subtotal", precision = 10, scale = 2)
-    private BigDecimal subtotal = BigDecimal.ZERO;
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<CartItem> items = new ArrayList<>();
 
-    @Column(name = "tax", precision = 10, scale = 2)
-    private BigDecimal tax = BigDecimal.ZERO;
+    @Column(name = "total_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal totalAmount = BigDecimal.ZERO;
 
-    @Column(name = "total", precision = 10, scale = 2)
-    private BigDecimal total = BigDecimal.ZERO;
+    @Column(name = "total_items")
+    @Builder.Default
+    private Integer totalItems = 0;
 
-    @Column(name = "item_count")
-    private Integer itemCount = 0;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
-    private CartStatus status = CartStatus.EMPTY;
-
-    @CreationTimestamp
+    @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
+    @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CartItem> items = new ArrayList<>();
-
-    public enum CartStatus {
-        EMPTY, ACTIVE, CHECKED_OUT, ABANDONED
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
     }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Add item to cart
+     */
+    public void addItem(CartItem item) {
+        items.add(item);
+        item.setCart(this);
+        recalculateTotals();
+    }
+
+    /**
+     * Remove item from cart
+     */
+    public void removeItem(CartItem item) {
+        items.remove(item);
+        item.setCart(null);
+        recalculateTotals();
+    }
+
+    /**
+     * Clear all items from cart
+     */
+    public void clearItems() {
+        items.clear();
+        recalculateTotals();
+    }
+
+    /**
+     * Recalculate cart totals
+     */
     public void recalculateTotals() {
-        this.subtotal = items.stream()
-            .map(CartItem::getLineTotal)
+        this.totalAmount = items.stream()
+            .map(CartItem::getSubtotal)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        this.tax = subtotal.multiply(new BigDecimal("0.08"));
-        this.total = subtotal.add(tax);
-        this.itemCount = items.size();
-        this.status = items.isEmpty() ? CartStatus.EMPTY : CartStatus.ACTIVE;
+        
+        this.totalItems = items.stream()
+            .mapToInt(CartItem::getQuantity)
+            .sum();
+    }
+
+    /**
+     * Check if cart is empty
+     */
+    public boolean isEmpty() {
+        return items == null || items.isEmpty();
     }
 }
