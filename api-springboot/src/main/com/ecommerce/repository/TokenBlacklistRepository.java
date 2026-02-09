@@ -8,16 +8,19 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
-/**
- * Repository interface for TokenBlacklist entity
- */
 @Repository
 public interface TokenBlacklistRepository extends JpaRepository<TokenBlacklist, Long> {
-    
-    Boolean existsByToken(String token);
-    
+
+    Optional<TokenBlacklist> findByToken(String token);
+
+    boolean existsByToken(String token);
+
     @Modifying
-    @Query("DELETE FROM TokenBlacklist tb WHERE tb.expiryDate < :now")
+    @Query("DELETE FROM TokenBlacklist tb WHERE tb.expiresAt < :now")
     void deleteExpiredTokens(@Param("now") LocalDateTime now);
+
+    @Query("SELECT tb FROM TokenBlacklist tb WHERE tb.user.userId = :userId")
+    java.util.List<TokenBlacklist> findByUserId(@Param("userId") Long userId);
 }
