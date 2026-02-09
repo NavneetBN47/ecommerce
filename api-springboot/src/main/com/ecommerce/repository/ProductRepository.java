@@ -1,42 +1,56 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Product;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repository interface for Product entity
+ * Provides database operations for product catalog
  */
 @Repository
-public interface ProductRepository extends JpaRepository<Product, Long> {
+public interface ProductRepository extends JpaRepository<Product, UUID> {
     
-    Page<Product> findByIsActive(Boolean isActive, Pageable pageable);
+    /**
+     * Find product by SKU
+     * @param sku product SKU
+     * @return Optional containing product if found
+     */
+    Optional<Product> findBySku(String sku);
     
-    Page<Product> findByCategoryIdAndIsActive(Long categoryId, Boolean isActive, Pageable pageable);
+    /**
+     * Search products by keyword (case-insensitive)
+     * Searches in name and description fields
+     * @param keyword search term
+     * @return list of matching products
+     */
+    @Query("SELECT p FROM Product p WHERE " +
+           "LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<Product> searchByKeyword(@Param("keyword") String keyword);
     
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND " +
-           "(LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    Page<Product> searchProducts(@Param("keyword") String keyword, Pageable pageable);
+    /**
+     * Find active products by category
+     * @param categoryId category UUID
+     * @return list of products in category
+     */
+    List<Product> findByCategoryIdAndIsActiveTrue(UUID categoryId);
     
-    @Query("SELECT p FROM Product p WHERE p.isActive = :isActive " +
-           "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
-           "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
-           "AND (:maxPrice IS NULL OR p.price <= :maxPrice) " +
-           "AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "OR LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    Page<Product> findByFilters(
-        @Param("isActive") Boolean isActive,
-        @Param("categoryId") Long categoryId,
-        @Param("minPrice") BigDecimal minPrice,
-        @Param("maxPrice") BigDecimal maxPrice,
-        @Param("keyword") String keyword,
-        Pageable pageable
-    );
+    /**
+     * Find all active products
+     * @return list of active products
+     */
+    List<Product> findByIsActiveTrue();
+    
+    /**
+     * Find featured products
+     * @return list of featured products
+     */
+    List<Product> findByIsFeaturedTrueAndIsActiveTrue();
 }
