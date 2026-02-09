@@ -1,47 +1,38 @@
 package com.ecommerce.controller;
 
-import com.ecommerce.dto.ApiResponse;
+import com.ecommerce.security.CurrentUser;
+import com.ecommerce.security.UserPrincipal;
 import com.ecommerce.service.CartService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
+import java.util.Map;
 
 /**
- * REST Controller for logout operations
- * Implements LLD logout with cart cleanup
+ * Logout Controller - REST API endpoint for logout
  */
 @RestController
-@RequestMapping("/logout")
-@Tag(name = "Authentication", description = "APIs for authentication operations")
+@RequiredArgsConstructor
+@Slf4j
 public class LogoutController {
 
-    private static final Logger logger = LoggerFactory.getLogger(LogoutController.class);
-
-    @Autowired
-    private CartService cartService;
+    private final CartService cartService;
 
     /**
-     * Logout endpoint with cart cleanup
-     * Implements LLD POST /api/logout
+     * POST /api/logout - Logout user and cleanup cart
      */
-    @PostMapping
-    @Operation(summary = "User logout", description = "Logout user and clear shopping cart")
-    public ResponseEntity<ApiResponse<Void>> logout(Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
-        logger.info("Logout request received for user ID: {}", userId);
-
-        // Clear cart on logout per LLD requirement
-        cartService.clearCartOnLogout(userId);
-
-        return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
+    @PostMapping("/logout")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, String>> logout(@CurrentUser UserPrincipal currentUser) {
+        log.info("Logout request for user: {}", currentUser.getId());
+        
+        // Cleanup cart on logout
+        cartService.cleanupCartOnLogout(currentUser.getId());
+        
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }

@@ -1,73 +1,160 @@
+```mermaid
 erDiagram
-    USER ||--o| CART : has
-    CART ||--|{ CART_ITEM : contains
-    CART_ITEM }o--|| PRODUCT : references
-    PRODUCT }o--|| CATEGORY : belongs_to
-    PRODUCT ||--o| PRODUCT_INVENTORY : has
-
-    USER {
-        uuid user_id PK
-        varchar username UK "Unique, immutable"
-        varchar password_hash "Hashed password"
-        varchar first_name
-        varchar last_name
-        varchar email UK
-        varchar phone
-        timestamp created_at
-        timestamp updated_at
-        boolean is_active
-        boolean email_verified
-        timestamp last_login
+    User ||--o| Cart : "has one"
+    Cart ||--|{ CartItem : "contains many"
+    CartItem }o--|| Product : "references"
+    
+    User {
+        UUID user_id PK "Primary Key"
+        VARCHAR username UK "Unique, Immutable"
+        VARCHAR password_hash "Hashed Password"
+        VARCHAR full_name "Full Name"
+        VARCHAR email UK "Unique Email"
+        TIMESTAMP created_at "Account Created"
+        BOOLEAN is_active "Active Status"
+        BOOLEAN email_verified "Email Verified"
     }
-
-    CATEGORY {
-        uuid category_id PK
-        varchar name UK
-        text description
-        boolean is_active
-        int sort_order
-        timestamp created_at
-        timestamp updated_at
+    
+    Product {
+        UUID product_id PK "Primary Key"
+        VARCHAR name "Product Name"
+        TEXT description "Description"
+        DECIMAL price "Price (>=0)"
+        INTEGER available_qty "Available Quantity (>=0)"
+        VARCHAR sku UK "Stock Keeping Unit"
+        BOOLEAN is_active "Active Status"
     }
-
-    PRODUCT {
-        uuid product_id PK
-        varchar name
-        text description
-        varchar sku UK
-        uuid category_id FK
-        decimal price "Price >= 0"
-        boolean is_active
-        boolean is_featured
-        timestamp created_at
-        timestamp updated_at
+    
+    Cart {
+        UUID cart_id PK "Primary Key"
+        UUID user_id FK,UK "Foreign Key to User (Unique)"
+        TIMESTAMP created_at "Cart Created"
     }
-
-    PRODUCT_INVENTORY {
-        uuid inventory_id PK
-        uuid product_id FK "Unique"
-        int quantity_available "Available qty >= 0"
-        int quantity_reserved
-        int reorder_level
-        int max_stock_level
-        timestamp last_restocked
-        timestamp updated_at
+    
+    CartItem {
+        UUID cart_item_id PK "Primary Key"
+        UUID cart_id FK "Foreign Key to Cart"
+        UUID product_id FK "Foreign Key to Product"
+        INTEGER quantity "Quantity (>0)"
+        DECIMAL unit_price "Unit Price"
     }
+```
 
-    CART {
-        uuid cart_id PK
-        uuid user_id FK "Unique - one cart per user"
-        timestamp created_at
-        timestamp updated_at
-        timestamp expires_at
-    }
+## Entity Relationships
 
-    CART_ITEM {
-        uuid cart_item_id PK
-        uuid cart_id FK
-        uuid product_id FK
-        int quantity "Quantity > 0"
-        decimal unit_price
-        timestamp added_at
-        timestamp updated_at
-    }
+### User ↔ Cart (1:1)
+- **Relationship**: One user has at most one active cart
+- **Constraint**: `shopping_carts.user_id` is UNIQUE
+- **Cascade**: ON DELETE CASCADE (cart deleted when user deleted)
+- **Business Rule**: Lazy creation - cart created on first item add
+- **Business Rule**: Auto-delete - cart deleted when empty
+
+### Cart ↔ CartItem (1:N)
+- **Relationship**: One cart contains many cart items
+- **Constraint**: `cart_items.cart_id` references `shopping_carts.cart_id`
+- **Cascade**: ON DELETE CASCADE (items deleted when cart deleted)
+- **Business Rule**: Cart cannot exist without items (enforced by trigger)
+- **Unique Constraint**: (cart_id, product_id) - one product per cart
+
+### CartItem ↔ Product (N:1)
+- **Relationship**: Many cart items reference one product
+- **Constraint**: `cart_items.product_id` references `products.product_id`
+- **Cascade**: ON DELETE RESTRICT (cannot delete product in cart)
+- **Business Rule**: Quantity must be > 0
+- **Business Rule**: Quantity cannot exceed available_qty
+
+## Key Constraints
+
+### Primary Keys
+- All entities use UUID as primary key
+- Generated using `uuid_generate_v4()` or application-level UUID generation
+
+### Unique Constraints
+- `users.username` - Unique, immutable identifier for login
+- `users.email` - Unique email address
+- `products.sku` - Unique stock keeping unit
+- `shopping_carts.user_id` - Enforces 1:1 user-cart relationship
+- `cart_items(cart_id, product_id)` - Prevents duplicate products in cart
+
+### Check Constraints
+- `products.price >= 0` - Non-negative price
+- `products.available_qty >= 0` - Non-negative quantity
+- `cart_items.quantity > 0` - Positive quantity (not zero)
+
+### Foreign Key Constraints
+- `shopping_carts.user_id → users.user_id` (ON DELETE CASCADE)
+- `cart_items.cart_id → shopping_carts.cart_id` (ON DELETE CASCADE)
+- `cart_items.product_id → products.product_id` (ON DELETE RESTRICT)
+
+## Indexes
+
+### Performance Indexes
+- `idx_users_username` - Unique index for login queries
+- `idx_users_email` - Unique index for email lookups
+- `idx_products_name_lower` - Case-insensitive product search
+- `idx_products_description_lower` - Case-insensitive description search
+- `idx_shopping_carts_user_id` - Unique index for cart lookups
+- `idx_cart_items_cart_id` - Index for cart item queries
+- `idx_cart_items_product_id` - Index for product references
+- `idx_cart_items_cart_product` - Composite unique index
+
+## Triggers
+
+### Username Immutability
+- **Trigger**: `username_immutable`
+- **Event**: BEFORE UPDATE ON users
+- **Purpose**: Prevents username changes after creation
+- **Implementation**: Raises exception if username is modified
+
+### Auto-Delete Empty Cart
+- **Trigger**: `auto_delete_empty_cart`
+- **Event**: AFTER DELETE ON cart_items
+- **Purpose**: Automatically deletes cart when last item removed
+- **Implementation**: Deletes cart if no items remain
+
+## Business Rules Enforcement
+
+### Database Level
+1. **One Cart Per User**: Enforced by UNIQUE constraint on `shopping_carts.user_id`
+2. **No Empty Carts**: Enforced by trigger `auto_delete_empty_cart`
+3. **Positive Quantities**: Enforced by CHECK constraint `cart_items.quantity > 0`
+4. **No Duplicate Products**: Enforced by UNIQUE constraint on `(cart_id, product_id)`
+5. **Username Immutability**: Enforced by trigger `username_immutable`
+
+### Application Level
+1. **Lazy Cart Creation**: Cart created only when first item added
+2. **Cart Cleanup on Logout**: Application deletes cart when user logs out
+3. **Quantity Validation**: Application validates quantity against `available_qty`
+4. **Stateless Login**: No session data stored in database
+5. **Case-Insensitive Search**: Application uses LOWER() function for product search
+
+## Data Flow
+
+### Add to Cart Flow
+1. User authenticated via JWT token
+2. Product validated (exists, active, sufficient quantity)
+3. Cart retrieved or created (lazy creation)
+4. Cart item created or quantity updated
+5. Cart state returned with items and totals
+
+### Remove from Cart Flow
+1. User authenticated via JWT token
+2. Cart item validated (exists, belongs to user)
+3. Cart item deleted
+4. Trigger checks if cart is empty
+5. If empty, cart auto-deleted
+6. Cart state returned (or 204 No Content if deleted)
+
+### Logout Flow
+1. User authenticated via JWT token
+2. User's cart retrieved
+3. Cart and all items deleted (cascade)
+4. Success response returned
+5. Client discards JWT token
+
+## Schema Version
+- **Current Version**: V002
+- **Last Updated**: 2024
+- **Migration Tool**: Flyway
+- **Baseline**: V001 (Initial schema alignment with LLD)
+- **Latest**: V002 (Seed data update and validation)

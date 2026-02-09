@@ -8,208 +8,237 @@ import com.ecommerce.entity.Cart;
 import com.ecommerce.entity.CartItem;
 import com.ecommerce.entity.Product;
 import com.ecommerce.entity.User;
+import com.ecommerce.exception.InvalidOperationException;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.exception.ValidationException;
 import com.ecommerce.repository.CartItemRepository;
 import com.ecommerce.repository.CartRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.ecommerce.repository.ProductRepository;
+import com.ecommerce.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Service for shopping cart operations
- * Implements LLD cart management business logic including:
- * - Lazy cart creation
+ * Cart Service - Business logic for shopping cart management
+ * 
+ * Implements:
+ * - Lazy cart creation on first add
  * - Auto-delete empty cart
  * - Cart cleanup on logout
+ * - One cart per user (1:1 relationship)
  */
 @Service
-@Transactional
+@RequiredArgsConstructor
+@Slf4j
 public class CartService {
 
-    private static final Logger logger = LoggerFactory.getLogger(CartService.class);
-
-    @Autowired
-    private CartRepository cartRepository;
-
-    @Autowired
-    private CartItemRepository cartItemRepository;
-
-    @Autowired
-    private ProductService productService;
-
-    @Autowired
-    private UserService userService;
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final ProductRepository productRepository;
+    private final UserRepository userRepository;
 
     /**
-     * Add product to cart with lazy cart creation
-     * Implements LLD POST /api/cart/items
+     * Add product to cart (lazy cart creation)
      */
+    @Transactional
     public CartResponse addProductToCart(UUID userId, AddToCartRequest request) {
-        logger.info("Adding product {} to cart for user {}", request.getProductId(), userId);
+        log.info("Adding product {} to cart for user {}", request.getProductId(), userId);
 
-        // Validate product exists
-        Product product = productService.getProductById(request.getProductId());
+        // Get user
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        // Get product
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
 
         // Validate product is active
         if (!product.getIsActive()) {
-            throw new ValidationException("Product is not available");
+            throw new InvalidOperationException("Product is not available");
         }
 
-        // Get or create cart (lazy creation per LLD)
-        Cart cart = getOrCreateCart(userId);
+        // Validate quantity
+        if (request.getQuantity() > product.getAvailableQty()) {
+            throw new InvalidOperationException(
+                    String.format("Requested quantity %d exceeds available quantity %d", 
+                            request.getQuantity(), product.getAvailableQty()));
+        }
+
+        // Get or create cart (lazy creation)
+        Cart cart = cartRepository.findByUser(user)
+                .orElseGet(() -> {
+                    log.info("Creating new cart for user {}", userId);
+                    Cart newCart = Cart.builder()
+                            .user(user)
+                            .build();
+                    return cartRepository.save(newCart);
+                });
 
         // Check if product already in cart
         Optional<CartItem> existingItem = cartItemRepository.findByCartAndProduct(cart, product);
 
         if (existingItem.isPresent()) {
-            // Update quantity if product already in cart
+            // Update quantity
             CartItem item = existingItem.get();
-            item.setQuantity(item.getQuantity() + request.getQuantity());
+            int newQuantity = item.getQuantity() + request.getQuantity();
+            
+            if (newQuantity > product.getAvailableQty()) {
+                throw new InvalidOperationException(
+                        String.format("Total quantity %d exceeds available quantity %d", 
+                                newQuantity, product.getAvailableQty()));
+            }
+            
+            item.setQuantity(newQuantity);
             cartItemRepository.save(item);
-            logger.info("Updated quantity for existing cart item: {}", item.getId());
+            log.info("Updated cart item quantity to {}", newQuantity);
         } else {
-            // Add new item to cart
-            CartItem newItem = new CartItem();
-            newItem.setCart(cart);
-            newItem.setProduct(product);
-            newItem.setQuantity(request.getQuantity());
-            newItem.setUnitPrice(product.getPrice());
+            // Add new item
+            CartItem newItem = CartItem.builder()
+                    .cart(cart)
+                    .product(product)
+                    .quantity(request.getQuantity())
+                    .unitPrice(product.getPrice())
+                    .build();
             cartItemRepository.save(newItem);
-            logger.info("Added new item to cart: {}", newItem.getId());
+            log.info("Added new item to cart");
         }
 
-        return getCartResponse(userId);
+        return getCartResponse(cart.getId());
     }
 
     /**
      * Update cart item quantity
-     * Implements LLD PUT /api/cart/items/{item_id}
      */
+    @Transactional
     public CartResponse updateCartItem(UUID userId, UUID itemId, UpdateCartItemRequest request) {
-        logger.info("Updating cart item {} for user {}", itemId, userId);
+        log.info("Updating cart item {} for user {}", itemId, userId);
 
-        // Find cart item and validate ownership
-        CartItem item = cartItemRepository.findByIdAndUserId(itemId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Cart item", "id", itemId));
+        // Get cart item with cart and product
+        CartItem cartItem = cartItemRepository.findByIdWithCartAndProduct(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("CartItem", "id", itemId));
 
-        // Update quantity
-        item.setQuantity(request.getQuantity());
-        cartItemRepository.save(item);
-        logger.info("Cart item {} updated with new quantity: {}", itemId, request.getQuantity());
+        // Verify cart belongs to user
+        if (!cartItem.getCart().getUser().getId().equals(userId)) {
+            throw new InvalidOperationException("Cart item does not belong to user");
+        }
 
-        return getCartResponse(userId);
+        // Validate quantity
+        if (request.getQuantity() > cartItem.getProduct().getAvailableQty()) {
+            throw new InvalidOperationException(
+                    String.format("Requested quantity %d exceeds available quantity %d", 
+                            request.getQuantity(), cartItem.getProduct().getAvailableQty()));
+        }
+
+        cartItem.setQuantity(request.getQuantity());
+        cartItemRepository.save(cartItem);
+        log.info("Cart item updated successfully");
+
+        return getCartResponse(cartItem.getCart().getId());
     }
 
     /**
-     * Remove cart item with auto-delete empty cart
-     * Implements LLD DELETE /api/cart/items/{item_id}
+     * Remove item from cart (auto-delete cart if empty)
      */
+    @Transactional
     public CartResponse removeCartItem(UUID userId, UUID itemId) {
-        logger.info("Removing cart item {} for user {}", itemId, userId);
+        log.info("Removing cart item {} for user {}", itemId, userId);
 
-        // Find cart item and validate ownership
-        CartItem item = cartItemRepository.findByIdAndUserId(itemId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Cart item", "id", itemId));
+        // Get cart item with cart
+        CartItem cartItem = cartItemRepository.findByIdWithCartAndProduct(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("CartItem", "id", itemId));
 
-        Cart cart = item.getCart();
+        // Verify cart belongs to user
+        if (!cartItem.getCart().getUser().getId().equals(userId)) {
+            throw new InvalidOperationException("Cart item does not belong to user");
+        }
+
+        Cart cart = cartItem.getCart();
         UUID cartId = cart.getId();
 
         // Remove item
-        cartItemRepository.delete(item);
-        logger.info("Cart item {} removed", itemId);
+        cartItemRepository.delete(cartItem);
+        log.info("Cart item removed successfully");
 
-        // Check if cart is now empty and auto-delete per LLD
-        long remainingItems = cartItemRepository.countByCartId(cartId);
-        if (remainingItems == 0) {
-            cartRepository.deleteById(cartId);
-            logger.info("Cart {} auto-deleted as it became empty", cartId);
-            return null; // Return null to indicate cart was deleted
+        // Check if cart is now empty and delete if so
+        long itemCount = cartItemRepository.countByCart(cart);
+        if (itemCount == 0) {
+            log.info("Cart is empty, deleting cart {}", cartId);
+            cartRepository.delete(cart);
+            return CartResponse.builder()
+                    .cartId(null)
+                    .items(List.of())
+                    .grandTotal(BigDecimal.ZERO)
+                    .totalItems(0)
+                    .build();
         }
 
-        return getCartResponse(userId);
+        return getCartResponse(cartId);
     }
 
     /**
-     * Get cart for user
-     * Implements LLD GET /api/cart
+     * Get user's cart
      */
     @Transactional(readOnly = true)
     public CartResponse getCart(UUID userId) {
-        logger.info("Fetching cart for user {}", userId);
-        return getCartResponse(userId);
+        log.info("Fetching cart for user {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        Cart cart = cartRepository.findByUserIdWithItems(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user"));
+
+        return getCartResponse(cart.getId());
     }
 
     /**
-     * Clear cart on logout
-     * Implements LLD POST /api/logout cart cleanup
+     * Cleanup cart on logout
      */
-    public void clearCartOnLogout(UUID userId) {
-        logger.info("Clearing cart for user {} on logout", userId);
+    @Transactional
+    public void cleanupCartOnLogout(UUID userId) {
+        log.info("Cleaning up cart for user {} on logout", userId);
 
-        // Delete all cart items first
-        cartItemRepository.deleteByUserId(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        // Delete cart
-        cartRepository.deleteByUserId(userId);
-
-        logger.info("Cart cleared successfully for user {}", userId);
-    }
-
-    /**
-     * Get or create cart (lazy creation per LLD)
-     */
-    private Cart getOrCreateCart(UUID userId) {
-        Optional<Cart> existingCart = cartRepository.findByUserId(userId);
-
-        if (existingCart.isPresent()) {
-            return existingCart.get();
+        Optional<Cart> cart = cartRepository.findByUser(user);
+        if (cart.isPresent()) {
+            cartRepository.delete(cart.get());
+            log.info("Cart deleted successfully for user {}", userId);
+        } else {
+            log.info("No cart found for user {}", userId);
         }
-
-        // Create new cart (lazy creation)
-        User user = userService.getUserById(userId);
-        Cart newCart = new Cart();
-        newCart.setUser(user);
-        newCart.setExpiresAt(LocalDateTime.now().plusDays(30));
-        newCart = cartRepository.save(newCart);
-        logger.info("Created new cart {} for user {}", newCart.getId(), userId);
-
-        return newCart;
     }
 
     /**
-     * Build cart response DTO
+     * Build cart response with items and totals
      */
-    @Transactional(readOnly = true)
-    private CartResponse getCartResponse(UUID userId) {
-        Optional<Cart> cartOpt = cartRepository.findByUserIdWithItems(userId);
+    private CartResponse getCartResponse(UUID cartId) {
+        Cart cart = cartRepository.findById(cartId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart", "id", cartId));
 
-        if (cartOpt.isEmpty()) {
-            throw new ResourceNotFoundException("Cart not found for user");
-        }
+        List<CartItem> items = cartItemRepository.findByCart(cart);
 
-        Cart cart = cartOpt.get();
-        List<CartItemResponse> items = cart.getItems().stream()
+        List<CartItemResponse> itemResponses = items.stream()
                 .map(this::mapToCartItemResponse)
                 .collect(Collectors.toList());
 
         BigDecimal grandTotal = items.stream()
-                .map(CartItemResponse::getTotal)
+                .map(CartItem::getTotalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return CartResponse.builder()
                 .cartId(cart.getId())
-                .items(items)
+                .items(itemResponses)
                 .grandTotal(grandTotal)
+                .totalItems(items.size())
                 .build();
     }
 
@@ -218,12 +247,12 @@ public class CartService {
      */
     private CartItemResponse mapToCartItemResponse(CartItem item) {
         return CartItemResponse.builder()
-                .itemId(item.getId())
+                .id(item.getId())
                 .productId(item.getProduct().getId())
-                .name(item.getProduct().getName())
+                .productName(item.getProduct().getName())
                 .quantity(item.getQuantity())
-                .price(item.getUnitPrice())
-                .total(item.getTotalPrice())
+                .unitPrice(item.getUnitPrice())
+                .totalPrice(item.getTotalPrice())
                 .build();
     }
 }

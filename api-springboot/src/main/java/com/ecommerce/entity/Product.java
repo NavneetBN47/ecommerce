@@ -2,63 +2,71 @@ package com.ecommerce.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.GenericGenerator;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Product entity representing catalog items
- * Implements LLD Product domain model
+ * Product Entity - Represents a product in the catalog
+ * 
+ * Aligned with LLD specifications:
+ * - id: UUID primary key
+ * - name: Product name
+ * - description: Product description
+ * - price: Product price (>= 0)
+ * - available_qty: Available quantity (>= 0)
  */
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+    @Index(name = "idx_products_name_lower", columnList = "name"),
+    @Index(name = "idx_products_active", columnList = "is_active")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EntityListeners(AuditingEntityListener.class)
+@Builder
 public class Product {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "product_id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, length = 255)
     private String name;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "sku", unique = true, nullable = false, length = 100)
-    private String sku;
-
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "is_active")
+    @Column(name = "available_qty", nullable = false)
+    private Integer availableQty;
+
+    @Column(name = "sku", unique = true, nullable = false, length = 100)
+    private String sku;
+
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
 
-    @Column(name = "is_featured")
-    private Boolean isFeatured = false;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    private Category category;
-
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private ProductInventory inventory;
+    /**
+     * Validates that price is non-negative
+     */
+    @PrePersist
+    @PreUpdate
+    protected void validatePrice() {
+        if (price != null && price.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Price must be greater than or equal to 0");
+        }
+        if (availableQty != null && availableQty < 0) {
+            throw new IllegalArgumentException("Available quantity must be greater than or equal to 0");
+        }
+    }
 }

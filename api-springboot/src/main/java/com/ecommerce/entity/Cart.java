@@ -2,11 +2,11 @@ package com.ecommerce.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,20 +14,32 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Shopping Cart entity
- * Implements LLD Cart domain model with one-to-one user relationship
- * and lazy creation pattern
+ * Cart Entity - Represents a shopping cart
+ * 
+ * Aligned with LLD specifications:
+ * - id: UUID primary key
+ * - user_id: Foreign key to User (unique - 1:1 relationship)
+ * - created_at: Timestamp of cart creation
+ * - items: One-to-Many relationship with CartItem
+ * 
+ * Business Rules:
+ * - One cart per user (enforced by unique constraint on user_id)
+ * - Cart cannot exist without items (auto-delete when empty)
+ * - Lazy creation on first add
  */
 @Entity
-@Table(name = "shopping_carts")
+@Table(name = "shopping_carts", indexes = {
+    @Index(name = "idx_shopping_carts_user_id", columnList = "user_id", unique = true)
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EntityListeners(AuditingEntityListener.class)
+@Builder
 public class Cart {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "cart_id", updatable = false, nullable = false)
     private UUID id;
 
@@ -35,19 +47,13 @@ public class Cart {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<CartItem> items = new ArrayList<>();
-
-    @CreatedDate
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<CartItem> items = new ArrayList<>();
 
     /**
      * Helper method to add item to cart
@@ -68,7 +74,6 @@ public class Cart {
     /**
      * Check if cart is empty
      */
-    @Transient
     public boolean isEmpty() {
         return items == null || items.isEmpty();
     }

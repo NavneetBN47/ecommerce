@@ -11,7 +11,6 @@ import java.util.UUID;
 
 /**
  * DTO for cart response
- * Implements LLD cart view contract
  */
 @Data
 @NoArgsConstructor
@@ -22,4 +21,5 @@ public class CartResponse {
     private UUID cartId;
     private List<CartItemResponse> items;
     private BigDecimal grandTotal;
+    private Integer totalItems;
 }

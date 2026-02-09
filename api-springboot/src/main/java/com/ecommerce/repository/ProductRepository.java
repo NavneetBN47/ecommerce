@@ -10,15 +10,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Repository for Product entity
- * Provides database access for product operations per LLD
+ * Product Repository - Data access layer for Product entity
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     /**
-     * Case-insensitive product search by keyword in name or description
-     * Implements LLD product search requirement
+     * Search products by keyword (case-insensitive)
+     * Searches in product name and description
+     * @param keyword the search keyword
+     * @return list of matching products
      */
     @Query("SELECT p FROM Product p WHERE " +
            "LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -26,16 +27,15 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     List<Product> searchByKeyword(@Param("keyword") String keyword);
 
     /**
-     * Find active products only
+     * Find all active products
+     * @return list of active products
      */
-    @Query("SELECT p FROM Product p WHERE p.isActive = true")
-    List<Product> findAllActive();
+    List<Product> findByIsActiveTrue();
 
     /**
-     * Case-insensitive search for active products only
+     * Find product by SKU
+     * @param sku the product SKU
+     * @return the product if found
      */
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND " +
-           "(LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    List<Product> searchActiveByKeyword(@Param("keyword") String keyword);
+    Product findBySku(String sku);
 }

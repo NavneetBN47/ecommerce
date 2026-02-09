@@ -4,41 +4,56 @@ import com.ecommerce.entity.Cart;
 import com.ecommerce.entity.CartItem;
 import com.ecommerce.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Repository for CartItem entity
- * Provides database access for cart item operations per LLD
+ * CartItem Repository - Data access layer for CartItem entity
  */
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, UUID> {
 
     /**
-     * Find cart item by cart and product (for duplicate check)
+     * Find cart item by cart and product
+     * @param cart the cart
+     * @param product the product
+     * @return Optional containing the cart item if found
      */
     Optional<CartItem> findByCartAndProduct(Cart cart, Product product);
 
     /**
-     * Find cart item by ID and cart user ID (for authorization)
+     * Find all items in a cart
+     * @param cart the cart
+     * @return list of cart items
      */
-    @Query("SELECT ci FROM CartItem ci WHERE ci.id = :itemId AND ci.cart.user.id = :userId")
-    Optional<CartItem> findByIdAndUserId(@Param("itemId") UUID itemId, @Param("userId") UUID userId);
+    List<CartItem> findByCart(Cart cart);
 
     /**
-     * Delete all cart items for a user (for logout cleanup per LLD)
+     * Find cart item by ID with cart and product eagerly loaded
+     * @param id the cart item ID
+     * @return Optional containing the cart item
      */
-    @Modifying
-    @Query("DELETE FROM CartItem ci WHERE ci.cart.user.id = :userId")
-    void deleteByUserId(@Param("userId") UUID userId);
+    @Query("SELECT ci FROM CartItem ci " +
+           "LEFT JOIN FETCH ci.cart c " +
+           "LEFT JOIN FETCH ci.product p " +
+           "WHERE ci.id = :id")
+    Optional<CartItem> findByIdWithCartAndProduct(@Param("id") UUID id);
 
     /**
      * Count items in a cart
+     * @param cart the cart
+     * @return number of items
      */
-    long countByCartId(UUID cartId);
+    long countByCart(Cart cart);
+
+    /**
+     * Delete all items in a cart
+     * @param cart the cart
+     */
+    void deleteByCart(Cart cart);
 }

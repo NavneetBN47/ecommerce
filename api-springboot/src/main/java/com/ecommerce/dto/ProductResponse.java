@@ -10,7 +10,6 @@ import java.util.UUID;
 
 /**
  * DTO for product response
- * Implements LLD product search response contract
  */
 @Data
 @NoArgsConstructor
@@ -23,4 +22,6 @@ public class ProductResponse {
     private String description;
     private BigDecimal price;
     private Integer availableQty;
+    private String sku;
+    private Boolean isActive;
 }

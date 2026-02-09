@@ -11,41 +11,36 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Repository for Cart entity
- * Provides database access for cart operations per LLD
- * Implements one cart per user constraint
+ * Cart Repository - Data access layer for Cart entity
  */
 @Repository
 public interface CartRepository extends JpaRepository<Cart, UUID> {
 
     /**
-     * Find cart by user (one cart per user per LLD)
+     * Find cart by user
+     * @param user the user
+     * @return Optional containing the cart if found
      */
     Optional<Cart> findByUser(User user);
 
     /**
-     * Find cart by user ID
+     * Find cart by user ID with items eagerly loaded
+     * @param userId the user ID
+     * @return Optional containing the cart with items
      */
-    Optional<Cart> findByUserId(UUID userId);
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
+    Optional<Cart> findByUserIdWithItems(@Param("userId") UUID userId);
 
     /**
-     * Delete cart by user (for logout cleanup per LLD)
+     * Delete cart by user
+     * @param user the user
      */
     void deleteByUser(User user);
 
     /**
-     * Delete cart by user ID
+     * Check if cart exists for user
+     * @param user the user
+     * @return true if cart exists
      */
-    void deleteByUserId(UUID userId);
-
-    /**
-     * Check if user has a cart
-     */
-    boolean existsByUserId(UUID userId);
-
-    /**
-     * Find cart with items eagerly loaded
-     */
-    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
-    Optional<Cart> findByUserIdWithItems(@Param("userId") UUID userId);
+    boolean existsByUser(User user);
 }

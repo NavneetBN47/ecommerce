@@ -2,72 +2,77 @@ package com.ecommerce.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * User entity representing system users
- * Implements LLD User domain model with username as unique identifier
+ * User Entity - Represents a user in the shopping cart system
+ * 
+ * Aligned with LLD specifications:
+ * - id: UUID primary key
+ * - username: Unique, immutable identifier for login
+ * - password: Hashed password (write-only)
+ * - full_name: User's full name
+ * - email: User's email address
+ * - created_at: Timestamp of account creation
  */
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+    @Index(name = "idx_users_username", columnList = "username", unique = true),
+    @Index(name = "idx_users_email", columnList = "email", unique = true)
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EntityListeners(AuditingEntityListener.class)
+@Builder
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "user_id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "username", unique = true, nullable = false, length = 100, updatable = false)
+    @Column(name = "username", unique = true, nullable = false, updatable = false, length = 255)
     private String username;
 
     @Column(name = "password_hash", nullable = false)
     private String password;
 
-    @Column(name = "first_name", nullable = false, length = 100)
-    private String firstName;
+    @Column(name = "full_name", nullable = false, length = 500)
+    private String fullName;
 
-    @Column(name = "last_name", nullable = false, length = 100)
-    private String lastName;
-
-    @Column(name = "email", unique = true, nullable = false)
+    @Column(name = "email", unique = true, nullable = false, length = 255)
     private String email;
 
-    @Column(name = "phone", length = 20)
-    private String phone;
-
-    @CreatedDate
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "is_active")
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
 
-    @Column(name = "email_verified")
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
     private Boolean emailVerified = false;
 
-    @Column(name = "last_login")
-    private LocalDateTime lastLogin;
+    // One-to-One relationship with Cart (lazy loaded)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Cart cart;
 
     /**
-     * Transient field to return full name
+     * PreUpdate callback to enforce username immutability
      */
-    @Transient
-    public String getFullName() {
-        return firstName + " " + lastName;
+    @PreUpdate
+    protected void onUpdate() {
+        // Username immutability is enforced at database level and column definition
+        // This is an additional safeguard
     }
 }

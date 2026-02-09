@@ -9,8 +9,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * DTO for cart item in cart response
- * Implements LLD cart item response contract
+ * DTO for cart item response
  */
 @Data
 @NoArgsConstructor
@@ -18,10 +17,10 @@ import java.util.UUID;
 @Builder
 public class CartItemResponse {
 
-    private UUID itemId;
+    private UUID id;
     private UUID productId;
-    private String name;
+    private String productName;
     private Integer quantity;
-    private BigDecimal price;
-    private BigDecimal total;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
 }

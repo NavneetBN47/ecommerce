@@ -10,7 +10,6 @@ import java.util.UUID;
 
 /**
  * DTO for user response (excludes password)
- * Implements LLD user response contract
  */
 @Data
 @NoArgsConstructor
@@ -23,5 +22,6 @@ public class UserResponse {
     private String fullName;
     private String email;
     private LocalDateTime createdAt;
-    private String token;  // JWT token for authentication
+    private Boolean isActive;
+    private Boolean emailVerified;
 }

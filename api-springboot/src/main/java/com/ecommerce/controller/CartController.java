@@ -1,100 +1,82 @@
 package com.ecommerce.controller;
 
-import com.ecommerce.dto.*;
+import com.ecommerce.dto.AddToCartRequest;
+import com.ecommerce.dto.CartResponse;
+import com.ecommerce.dto.UpdateCartItemRequest;
+import com.ecommerce.security.CurrentUser;
+import com.ecommerce.security.UserPrincipal;
 import com.ecommerce.service.CartService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
 /**
- * REST Controller for shopping cart operations
- * Implements LLD cart management API contracts
+ * Cart Controller - REST API endpoints for shopping cart management
  */
 @RestController
 @RequestMapping("/cart")
-@Tag(name = "Shopping Cart", description = "APIs for shopping cart management")
+@RequiredArgsConstructor
+@Slf4j
+@PreAuthorize("isAuthenticated()")
 public class CartController {
 
-    private static final Logger logger = LoggerFactory.getLogger(CartController.class);
-
-    @Autowired
-    private CartService cartService;
+    private final CartService cartService;
 
     /**
-     * Add product to cart endpoint
-     * Implements LLD POST /api/cart/items
+     * POST /api/cart/items - Add product to cart
      */
     @PostMapping("/items")
-    @Operation(summary = "Add product to cart", description = "Add a product to the shopping cart with lazy cart creation")
-    public ResponseEntity<ApiResponse<CartResponse>> addToCart(
-            Authentication authentication,
+    public ResponseEntity<CartResponse> addToCart(
+            @CurrentUser UserPrincipal currentUser,
             @Valid @RequestBody AddToCartRequest request) {
-        UUID userId = UUID.fromString(authentication.getName());
-        logger.info("Add to cart request received for user ID: {}", userId);
-        CartResponse response = cartService.addProductToCart(userId, request);
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Product added to cart", response));
+        log.info("Add to cart request for user: {}", currentUser.getId());
+        CartResponse response = cartService.addProductToCart(currentUser.getId(), request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     /**
-     * Update cart item endpoint
-     * Implements LLD PUT /api/cart/items/{item_id}
+     * PUT /api/cart/items/{itemId} - Update cart item quantity
      */
     @PutMapping("/items/{itemId}")
-    @Operation(summary = "Update cart item", description = "Update quantity of a cart item")
-    public ResponseEntity<ApiResponse<CartResponse>> updateCartItem(
-            Authentication authentication,
+    public ResponseEntity<CartResponse> updateCartItem(
+            @CurrentUser UserPrincipal currentUser,
             @PathVariable UUID itemId,
             @Valid @RequestBody UpdateCartItemRequest request) {
-        UUID userId = UUID.fromString(authentication.getName());
-        logger.info("Update cart item request received for user ID: {} and item ID: {}", userId, itemId);
-        CartResponse response = cartService.updateCartItem(userId, itemId, request);
-        return ResponseEntity.ok(ApiResponse.success("Cart item updated", response));
+        log.info("Update cart item request for user: {}, item: {}", currentUser.getId(), itemId);
+        CartResponse response = cartService.updateCartItem(currentUser.getId(), itemId, request);
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * Remove cart item endpoint with auto-delete empty cart
-     * Implements LLD DELETE /api/cart/items/{item_id}
+     * DELETE /api/cart/items/{itemId} - Remove item from cart
      */
     @DeleteMapping("/items/{itemId}")
-    @Operation(summary = "Remove cart item", description = "Remove item from cart, auto-delete cart if empty")
-    public ResponseEntity<ApiResponse<CartResponse>> removeCartItem(
-            Authentication authentication,
+    public ResponseEntity<CartResponse> removeCartItem(
+            @CurrentUser UserPrincipal currentUser,
             @PathVariable UUID itemId) {
-        UUID userId = UUID.fromString(authentication.getName());
-        logger.info("Remove cart item request received for user ID: {} and item ID: {}", userId, itemId);
-        CartResponse response = cartService.removeCartItem(userId, itemId);
-
-        if (response == null) {
-            // Cart was auto-deleted because it became empty
-            return ResponseEntity
-                    .status(HttpStatus.NO_CONTENT)
-                    .build();
+        log.info("Remove cart item request for user: {}, item: {}", currentUser.getId(), itemId);
+        CartResponse response = cartService.removeCartItem(currentUser.getId(), itemId);
+        
+        if (response.getCartId() == null) {
+            return ResponseEntity.noContent().build();
         }
-
-        return ResponseEntity.ok(ApiResponse.success("Cart item removed", response));
+        
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * Get cart endpoint
-     * Implements LLD GET /api/cart
+     * GET /api/cart - Get user's cart
      */
     @GetMapping
-    @Operation(summary = "Get shopping cart", description = "Retrieve user's shopping cart with all items")
-    public ResponseEntity<ApiResponse<CartResponse>> getCart(Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
-        logger.info("Get cart request received for user ID: {}", userId);
-        CartResponse response = cartService.getCart(userId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+    public ResponseEntity<CartResponse> getCart(@CurrentUser UserPrincipal currentUser) {
+        log.info("Get cart request for user: {}", currentUser.getId());
+        CartResponse response = cartService.getCart(currentUser.getId());
+        return ResponseEntity.ok(response);
     }
 }
