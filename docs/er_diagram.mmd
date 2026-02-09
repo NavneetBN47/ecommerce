@@ -1,1 +1,73 @@
-<complete Mermaid ER diagram content>
+erDiagram
+    USER ||--o| CART : has
+    CART ||--|{ CART_ITEM : contains
+    CART_ITEM }o--|| PRODUCT : references
+    PRODUCT }o--|| CATEGORY : belongs_to
+    PRODUCT ||--o| PRODUCT_INVENTORY : has
+
+    USER {
+        uuid user_id PK
+        varchar username UK "Unique, immutable"
+        varchar password_hash "Hashed password"
+        varchar first_name
+        varchar last_name
+        varchar email UK
+        varchar phone
+        timestamp created_at
+        timestamp updated_at
+        boolean is_active
+        boolean email_verified
+        timestamp last_login
+    }
+
+    CATEGORY {
+        uuid category_id PK
+        varchar name UK
+        text description
+        boolean is_active
+        int sort_order
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PRODUCT {
+        uuid product_id PK
+        varchar name
+        text description
+        varchar sku UK
+        uuid category_id FK
+        decimal price "Price >= 0"
+        boolean is_active
+        boolean is_featured
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PRODUCT_INVENTORY {
+        uuid inventory_id PK
+        uuid product_id FK "Unique"
+        int quantity_available "Available qty >= 0"
+        int quantity_reserved
+        int reorder_level
+        int max_stock_level
+        timestamp last_restocked
+        timestamp updated_at
+    }
+
+    CART {
+        uuid cart_id PK
+        uuid user_id FK "Unique - one cart per user"
+        timestamp created_at
+        timestamp updated_at
+        timestamp expires_at
+    }
+
+    CART_ITEM {
+        uuid cart_item_id PK
+        uuid cart_id FK
+        uuid product_id FK
+        int quantity "Quantity > 0"
+        decimal unit_price
+        timestamp added_at
+        timestamp updated_at
+    }

@@ -8,48 +8,36 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Product entity representing catalog items
- * Implements LLD Product domain model
+ * Category entity for product categorization
  */
 @Entity
-@Table(name = "products")
+@Table(name = "categories")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-public class Product {
+public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "product_id", updatable = false, nullable = false)
+    @Column(name = "category_id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", unique = true, nullable = false, length = 100)
     private String name;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "sku", unique = true, nullable = false, length = 100)
-    private String sku;
-
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
-
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "is_featured")
-    private Boolean isFeatured = false;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    private Category category;
+    @Column(name = "sort_order")
+    private Integer sortOrder = 0;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -58,7 +46,4 @@ public class Product {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private ProductInventory inventory;
 }
