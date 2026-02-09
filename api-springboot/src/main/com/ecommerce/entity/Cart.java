@@ -1,58 +1,53 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Cart entity representing user shopping carts
+ */
 @Entity
-@Table(name = "carts", indexes = {
-    @Index(name = "idx_user_id", columnList = "user_id"),
-    @Index(name = "idx_updated_at", columnList = "updated_at")
-}, uniqueConstraints = {
-    @UniqueConstraint(name = "uk_user_cart", columnNames = "user_id")
-})
+@Table(name = "carts")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class Cart {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
-    private User user;
+    @Column(name = "user_id", nullable = false, unique = true)
+    private Long userId;
 
-    @Column(name = "total_amount", precision = 10, scale = 2)
-    private BigDecimal totalAmount = BigDecimal.ZERO;
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<CartItem> items = new ArrayList<>();
 
-    @Column(name = "item_count")
-    private Integer itemCount = 0;
-
-    @CreationTimestamp
+    @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
+    @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CartItem> items = new ArrayList<>();
+    public void addItem(CartItem item) {
+        items.add(item);
+        item.setCart(this);
+    }
 
-    public void recalculateTotals() {
-        this.totalAmount = items.stream()
-            .map(CartItem::getSubtotal)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        this.itemCount = items.size();
+    public void removeItem(CartItem item) {
+        items.remove(item);
+        item.setCart(null);
     }
 }

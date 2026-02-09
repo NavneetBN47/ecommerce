@@ -1,12 +1,12 @@
 spring:
   application:
-    name: shopping-cart-api
+    name: ecommerce-api
   
   datasource:
-    url: jdbc:postgresql://localhost:5432/ecommerce
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:mysql://localhost:3306/ecommerce_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -20,13 +20,9 @@ spring:
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
         use_sql_comments: true
-        jdbc:
-          batch_size: 20
-        order_inserts: true
-        order_updates: true
     open-in-view: false
   
   flyway:
@@ -34,39 +30,55 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
     validate-on-migrate: true
+  
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
 
-server:
-  port: 8080
-  servlet:
-    context-path: /api
-  error:
-    include-message: always
-    include-binding-errors: always
-    include-stacktrace: on_param
-    include-exception: false
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    expiration-ms: 3600000  # 1 hour
+    refresh-expiration-ms: 604800000  # 7 days
+  
+  security:
+    allowed-origins: http://localhost:3000,http://localhost:4200
+    max-failed-attempts: 5
+    lock-duration-minutes: 15
+  
+  cart:
+    max-item-quantity: 100
+    abandoned-cart-days: 30
 
 logging:
   level:
     root: INFO
     com.ecommerce: DEBUG
-    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/shopping-cart-api.log
+    name: logs/ecommerce-api.log
     max-size: 10MB
     max-history: 30
 
-app:
-  jwt:
-    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    expiration: 86400000 # 24 hours in milliseconds
-  cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:4200}
-    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-    allowed-headers: "*"
-    allow-credentials: true
-    max-age: 3600
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

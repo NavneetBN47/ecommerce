@@ -7,37 +7,28 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * OrderItem entity representing items in an order
+ * TokenBlacklist entity for invalidated JWT tokens
  */
 @Entity
-@Table(name = "order_items")
+@Table(name = "token_blacklist")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-public class OrderItem {
+public class TokenBlacklist {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    @Column(nullable = false, unique = true, length = 500)
+    private String token;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
-
-    @Column(nullable = false)
-    private Integer quantity;
-
-    @Column(name = "price_at_order", nullable = false, precision = 10, scale = 2)
-    private BigDecimal priceAtOrder;
+    @Column(name = "expiry_date", nullable = false)
+    private LocalDateTime expiryDate;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

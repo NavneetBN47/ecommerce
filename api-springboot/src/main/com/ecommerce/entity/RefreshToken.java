@@ -7,37 +7,31 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * OrderItem entity representing items in an order
+ * RefreshToken entity for JWT token refresh mechanism
  */
 @Entity
-@Table(name = "order_items")
+@Table(name = "refresh_tokens")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-public class OrderItem {
+public class RefreshToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @Column(nullable = false, unique = true, length = 500)
+    private String token;
 
-    @Column(nullable = false)
-    private Integer quantity;
-
-    @Column(name = "price_at_order", nullable = false, precision = 10, scale = 2)
-    private BigDecimal priceAtOrder;
+    @Column(name = "expiry_date", nullable = false)
+    private LocalDateTime expiryDate;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
