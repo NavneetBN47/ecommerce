@@ -13,11 +13,11 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class CartItemResponse {
-    
-    private UUID itemId;
+
+    private UUID id;
     private UUID productId;
-    private String name;
+    private String productName;
     private Integer quantity;
-    private BigDecimal price;
-    private BigDecimal total;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
 }

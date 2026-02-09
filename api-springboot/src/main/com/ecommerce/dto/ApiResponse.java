@@ -1,30 +1,34 @@
 package com.ecommerce.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ApiResponse<T> {
-    
-    private boolean success;
+@Builder
+public class ApiResponse {
+
+    private Boolean success;
     private String message;
-    private T data;
-    private LocalDateTime timestamp;
-    
-    public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, "Success", data, LocalDateTime.now());
+    private Object data;
+
+    public ApiResponse(Boolean success, String message) {
+        this.success = success;
+        this.message = message;
     }
-    
-    public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(true, message, data, LocalDateTime.now());
+
+    public static ApiResponse success(String message) {
+        return new ApiResponse(true, message);
     }
-    
-    public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, message, null, LocalDateTime.now());
+
+    public static ApiResponse success(String message, Object data) {
+        return new ApiResponse(true, message, data);
+    }
+
+    public static ApiResponse error(String message) {
+        return new ApiResponse(false, message);
     }
 }

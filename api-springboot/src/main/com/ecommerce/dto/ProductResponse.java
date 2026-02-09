@@ -13,10 +13,15 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class ProductResponse {
-    
-    private UUID id;
+
+    private UUID productId;
     private String name;
     private String description;
+    private String sku;
+    private UUID categoryId;
+    private String categoryName;
     private BigDecimal price;
-    private Integer availableQty;
+    private Integer quantityAvailable;
+    private Boolean isActive;
+    private Boolean isFeatured;
 }
