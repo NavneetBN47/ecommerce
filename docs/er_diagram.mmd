@@ -1,160 +1,163 @@
 ```mermaid
 erDiagram
-    User ||--o| Cart : "has one"
-    Cart ||--|{ CartItem : "contains many"
-    CartItem }o--|| Product : "references"
-    
-    User {
-        UUID user_id PK "Primary Key"
-        VARCHAR username UK "Unique, Immutable"
-        VARCHAR password_hash "Hashed Password"
-        VARCHAR full_name "Full Name"
-        VARCHAR email UK "Unique Email"
-        TIMESTAMP created_at "Account Created"
-        BOOLEAN is_active "Active Status"
-        BOOLEAN email_verified "Email Verified"
+    users ||--o| shopping_carts : "has one"
+    users ||--o{ user_addresses : "has many"
+    shopping_carts ||--|{ cart_items : "contains"
+    products ||--o{ cart_items : "in"
+    products ||--|| product_inventory : "has"
+    products }o--|| categories : "belongs to"
+    products ||--o{ product_images : "has"
+    users ||--o{ orders : "places"
+    orders ||--|{ order_items : "contains"
+    products ||--o{ order_items : "in"
+    orders ||--o{ payment_transactions : "has"
+    user_addresses ||--o{ orders : "billing address"
+    user_addresses ||--o{ orders : "shipping address"
+
+    users {
+        UUID user_id PK
+        VARCHAR username UK "Unique, immutable"
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR first_name
+        VARCHAR last_name
+        VARCHAR phone
+        DATE date_of_birth
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BOOLEAN is_active
+        BOOLEAN email_verified
+        TIMESTAMP last_login
     }
-    
-    Product {
-        UUID product_id PK "Primary Key"
-        VARCHAR name "Product Name"
-        TEXT description "Description"
-        DECIMAL price "Price (>=0)"
-        INTEGER available_qty "Available Quantity (>=0)"
-        VARCHAR sku UK "Stock Keeping Unit"
-        BOOLEAN is_active "Active Status"
+
+    user_addresses {
+        UUID address_id PK
+        UUID user_id FK
+        VARCHAR address_type
+        VARCHAR street_address
+        VARCHAR city
+        VARCHAR state
+        VARCHAR postal_code
+        VARCHAR country
+        BOOLEAN is_default
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-    
-    Cart {
-        UUID cart_id PK "Primary Key"
-        UUID user_id FK,UK "Foreign Key to User (Unique)"
-        TIMESTAMP created_at "Cart Created"
+
+    categories {
+        UUID category_id PK
+        VARCHAR name UK
+        TEXT description
+        UUID parent_category_id FK
+        VARCHAR image_url
+        BOOLEAN is_active
+        INTEGER sort_order
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-    
-    CartItem {
-        UUID cart_item_id PK "Primary Key"
-        UUID cart_id FK "Foreign Key to Cart"
-        UUID product_id FK "Foreign Key to Product"
-        INTEGER quantity "Quantity (>0)"
-        DECIMAL unit_price "Unit Price"
+
+    products {
+        UUID product_id PK
+        VARCHAR name
+        TEXT description
+        VARCHAR sku UK
+        UUID category_id FK
+        DECIMAL price
+        DECIMAL cost_price
+        DECIMAL weight
+        DECIMAL dimensions_length
+        DECIMAL dimensions_width
+        DECIMAL dimensions_height
+        BOOLEAN is_active
+        BOOLEAN is_featured
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    product_inventory {
+        UUID inventory_id PK
+        UUID product_id FK "One-to-One"
+        INTEGER quantity_available
+        INTEGER quantity_reserved
+        INTEGER reorder_level
+        INTEGER max_stock_level
+        TIMESTAMP last_restocked
+        TIMESTAMP updated_at
+    }
+
+    product_images {
+        UUID image_id PK
+        UUID product_id FK
+        VARCHAR image_url
+        VARCHAR alt_text
+        BOOLEAN is_primary
+        INTEGER sort_order
+        TIMESTAMP created_at
+    }
+
+    shopping_carts {
+        UUID cart_id PK
+        UUID user_id FK "Unique - One cart per user"
+        VARCHAR session_id
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        TIMESTAMP expires_at
+    }
+
+    cart_items {
+        UUID cart_item_id PK
+        UUID cart_id FK "Cascade on delete"
+        UUID product_id FK
+        INTEGER quantity "Must be > 0"
+        DECIMAL unit_price
+        TIMESTAMP added_at
+        TIMESTAMP updated_at
+    }
+
+    orders {
+        UUID order_id PK
+        UUID user_id FK
+        VARCHAR order_number UK
+        VARCHAR status
+        DECIMAL subtotal
+        DECIMAL tax_amount
+        DECIMAL shipping_amount
+        DECIMAL discount_amount
+        DECIMAL total_amount
+        VARCHAR currency
+        UUID billing_address_id FK
+        UUID shipping_address_id FK
+        VARCHAR payment_method
+        VARCHAR payment_status
+        TEXT notes
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        TIMESTAMP shipped_at
+        TIMESTAMP delivered_at
+    }
+
+    order_items {
+        UUID order_item_id PK
+        UUID order_id FK
+        UUID product_id FK
+        INTEGER quantity
+        DECIMAL unit_price
+        DECIMAL total_price
+        TIMESTAMP created_at
+    }
+
+    payment_transactions {
+        UUID transaction_id PK
+        UUID order_id FK
+        VARCHAR transaction_type
+        DECIMAL amount
+        VARCHAR currency
+        VARCHAR payment_method
+        VARCHAR payment_gateway
+        VARCHAR gateway_transaction_id
+        VARCHAR status
+        TEXT gateway_response
+        TIMESTAMP created_at
+        TIMESTAMP processed_at
     }
 ```
-
-## Entity Relationships
-
-### User ↔ Cart (1:1)
-- **Relationship**: One user has at most one active cart
-- **Constraint**: `shopping_carts.user_id` is UNIQUE
-- **Cascade**: ON DELETE CASCADE (cart deleted when user deleted)
-- **Business Rule**: Lazy creation - cart created on first item add
-- **Business Rule**: Auto-delete - cart deleted when empty
-
-### Cart ↔ CartItem (1:N)
-- **Relationship**: One cart contains many cart items
-- **Constraint**: `cart_items.cart_id` references `shopping_carts.cart_id`
-- **Cascade**: ON DELETE CASCADE (items deleted when cart deleted)
-- **Business Rule**: Cart cannot exist without items (enforced by trigger)
-- **Unique Constraint**: (cart_id, product_id) - one product per cart
-
-### CartItem ↔ Product (N:1)
-- **Relationship**: Many cart items reference one product
-- **Constraint**: `cart_items.product_id` references `products.product_id`
-- **Cascade**: ON DELETE RESTRICT (cannot delete product in cart)
-- **Business Rule**: Quantity must be > 0
-- **Business Rule**: Quantity cannot exceed available_qty
-
-## Key Constraints
-
-### Primary Keys
-- All entities use UUID as primary key
-- Generated using `uuid_generate_v4()` or application-level UUID generation
-
-### Unique Constraints
-- `users.username` - Unique, immutable identifier for login
-- `users.email` - Unique email address
-- `products.sku` - Unique stock keeping unit
-- `shopping_carts.user_id` - Enforces 1:1 user-cart relationship
-- `cart_items(cart_id, product_id)` - Prevents duplicate products in cart
-
-### Check Constraints
-- `products.price >= 0` - Non-negative price
-- `products.available_qty >= 0` - Non-negative quantity
-- `cart_items.quantity > 0` - Positive quantity (not zero)
-
-### Foreign Key Constraints
-- `shopping_carts.user_id → users.user_id` (ON DELETE CASCADE)
-- `cart_items.cart_id → shopping_carts.cart_id` (ON DELETE CASCADE)
-- `cart_items.product_id → products.product_id` (ON DELETE RESTRICT)
-
-## Indexes
-
-### Performance Indexes
-- `idx_users_username` - Unique index for login queries
-- `idx_users_email` - Unique index for email lookups
-- `idx_products_name_lower` - Case-insensitive product search
-- `idx_products_description_lower` - Case-insensitive description search
-- `idx_shopping_carts_user_id` - Unique index for cart lookups
-- `idx_cart_items_cart_id` - Index for cart item queries
-- `idx_cart_items_product_id` - Index for product references
-- `idx_cart_items_cart_product` - Composite unique index
-
-## Triggers
-
-### Username Immutability
-- **Trigger**: `username_immutable`
-- **Event**: BEFORE UPDATE ON users
-- **Purpose**: Prevents username changes after creation
-- **Implementation**: Raises exception if username is modified
-
-### Auto-Delete Empty Cart
-- **Trigger**: `auto_delete_empty_cart`
-- **Event**: AFTER DELETE ON cart_items
-- **Purpose**: Automatically deletes cart when last item removed
-- **Implementation**: Deletes cart if no items remain
-
-## Business Rules Enforcement
-
-### Database Level
-1. **One Cart Per User**: Enforced by UNIQUE constraint on `shopping_carts.user_id`
-2. **No Empty Carts**: Enforced by trigger `auto_delete_empty_cart`
-3. **Positive Quantities**: Enforced by CHECK constraint `cart_items.quantity > 0`
-4. **No Duplicate Products**: Enforced by UNIQUE constraint on `(cart_id, product_id)`
-5. **Username Immutability**: Enforced by trigger `username_immutable`
-
-### Application Level
-1. **Lazy Cart Creation**: Cart created only when first item added
-2. **Cart Cleanup on Logout**: Application deletes cart when user logs out
-3. **Quantity Validation**: Application validates quantity against `available_qty`
-4. **Stateless Login**: No session data stored in database
-5. **Case-Insensitive Search**: Application uses LOWER() function for product search
-
-## Data Flow
-
-### Add to Cart Flow
-1. User authenticated via JWT token
-2. Product validated (exists, active, sufficient quantity)
-3. Cart retrieved or created (lazy creation)
-4. Cart item created or quantity updated
-5. Cart state returned with items and totals
-
-### Remove from Cart Flow
-1. User authenticated via JWT token
-2. Cart item validated (exists, belongs to user)
-3. Cart item deleted
-4. Trigger checks if cart is empty
-5. If empty, cart auto-deleted
-6. Cart state returned (or 204 No Content if deleted)
-
-### Logout Flow
-1. User authenticated via JWT token
-2. User's cart retrieved
-3. Cart and all items deleted (cascade)
-4. Success response returned
-5. Client discards JWT token
-
-## Schema Version
-- **Current Version**: V002
-- **Last Updated**: 2024
-- **Migration Tool**: Flyway
-- **Baseline**: V001 (Initial schema alignment with LLD)
-- **Latest**: V002 (Seed data update and validation)
