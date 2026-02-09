@@ -4,67 +4,55 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EntityListeners(AuditingEntityListener.class)
 public class User {
-    
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
-    private UUID id;
-    
-    @Column(name = "username", unique = true, nullable = false, updatable = false)
+    private Long userId;
+
+    @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
-    
-    @Column(name = "email", unique = true, nullable = false)
+
+    @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
-    
-    @Column(name = "password_hash", nullable = false)
+
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
-    
-    @Column(name = "first_name", nullable = false)
+
+    @Column(name = "first_name", nullable = false, length = 50)
     private String firstName;
-    
-    @Column(name = "last_name", nullable = false)
+
+    @Column(name = "last_name", nullable = false, length = 50)
     private String lastName;
-    
-    @Column(name = "phone")
-    private String phone;
-    
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
-    
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-    
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-    
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
-    
-    @Column(name = "email_verified")
-    private Boolean emailVerified = false;
-    
-    @Column(name = "last_login")
-    private LocalDateTime lastLogin;
-    
-    @Transient
-    public String getFullName() {
-        return firstName + " " + lastName;
-    }
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Cart cart;
 }
