@@ -1,0 +1,63 @@
+erDiagram
+    USERS ||--o{ CART : "has"
+    USERS ||--o{ CART_HISTORY : "performs"
+    CART ||--|{ CART_ITEM : "contains"
+    CART ||--o{ CART_HISTORY : "tracks"
+    PRODUCTS ||--o{ CART_ITEM : "included_in"
+
+    USERS {
+        UUID user_id PK
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR first_name
+        VARCHAR last_name
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BOOLEAN is_active
+    }
+
+    PRODUCTS {
+        UUID product_id PK
+        VARCHAR product_name
+        TEXT product_description
+        DECIMAL price
+        INTEGER stock_quantity
+        UUID category_id
+        VARCHAR sku UK
+        BOOLEAN is_active
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    CART {
+        UUID cart_id PK
+        UUID user_id FK
+        VARCHAR cart_status
+        VARCHAR session_id
+        DECIMAL total_amount
+        INTEGER total_items
+        VARCHAR currency_code
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        TIMESTAMP expires_at
+    }
+
+    CART_ITEM {
+        UUID cart_item_id PK
+        UUID cart_id FK
+        UUID product_id FK
+        INTEGER quantity
+        DECIMAL unit_price
+        DECIMAL total_price
+        TIMESTAMP added_at
+        TIMESTAMP updated_at
+    }
+
+    CART_HISTORY {
+        UUID history_id PK
+        UUID cart_id FK
+        VARCHAR action_type
+        JSONB action_details
+        UUID performed_by FK
+        TIMESTAMP performed_at
+    }
