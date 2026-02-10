@@ -147,7 +147,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM product_images pi WHERE pi.product_id = p.product_id AND pi.is_primary = TRUE
 );
 
--- Insert additional product images (gallery images)
 INSERT INTO product_images (product_id, image_url, alt_text, is_primary, sort_order)
 SELECT 
     p.product_id,
