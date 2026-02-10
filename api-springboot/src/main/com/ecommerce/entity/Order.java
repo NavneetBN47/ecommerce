@@ -1,8 +1,9 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -15,51 +16,44 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Order Entity representing orders table
- * Manages customer orders with status tracking
+ * Order Entity representing customer orders
  */
 @Entity
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_user_id", columnList = "user_id"),
-    @Index(name = "idx_order_status", columnList = "order_status"),
-    @Index(name = "idx_created_at", columnList = "created_at")
+    @Index(name = "idx_order_user", columnList = "user_id"),
+    @Index(name = "idx_order_status", columnList = "status"),
+    @Index(name = "idx_order_number", columnList = "order_number", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "order_id")
-    private Long orderId;
+    private Long id;
 
-    @NotNull(message = "User ID is required")
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "order_number", nullable = false, unique = true, length = 50)
+    private String orderNumber;
 
-    @NotBlank(message = "Order status is required")
-    @Column(name = "order_status", nullable = false, length = 50)
-    private String orderStatus = "PENDING";
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @NotNull(message = "Subtotal is required")
-    @DecimalMin(value = "0.0", message = "Subtotal cannot be negative")
-    @Digits(integer = 8, fraction = 2)
-    @Column(name = "subtotal", nullable = false, precision = 10, scale = 2)
-    private BigDecimal subtotal;
-
-    @NotNull(message = "Tax amount is required")
-    @DecimalMin(value = "0.0", message = "Tax amount cannot be negative")
-    @Digits(integer = 8, fraction = 2)
-    @Column(name = "tax_amount", nullable = false, precision = 10, scale = 2)
-    private BigDecimal taxAmount = BigDecimal.ZERO;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<OrderItem> items = new ArrayList<>();
 
     @NotNull(message = "Total amount is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Total amount must be greater than 0")
-    @Digits(integer = 8, fraction = 2)
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private OrderStatus status = OrderStatus.PENDING;
 
     @Column(name = "shipping_address", columnDefinition = "TEXT")
     private String shippingAddress;
@@ -67,8 +61,12 @@ public class Order {
     @Column(name = "billing_address", columnDefinition = "TEXT")
     private String billingAddress;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<OrderItem> orderItems = new ArrayList<>();
+    @Column(name = "payment_method", length = 50)
+    private String paymentMethod;
+
+    @Column(name = "payment_status", length = 20)
+    @Builder.Default
+    private String paymentStatus = "PENDING";
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -78,35 +76,7 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (updatedAt == null) {
-            updatedAt = LocalDateTime.now();
-        }
-        if (orderStatus == null) {
-            orderStatus = "PENDING";
-        }
-        if (taxAmount == null) {
-            taxAmount = BigDecimal.ZERO;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    /**
-     * Add order item
-     */
-    public void addItem(OrderItem item) {
-        if (orderItems == null) {
-            orderItems = new ArrayList<>();
-        }
-        orderItems.add(item);
-        item.setOrder(this);
+    public enum OrderStatus {
+        PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED
     }
 }

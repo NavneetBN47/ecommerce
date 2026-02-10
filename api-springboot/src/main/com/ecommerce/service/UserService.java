@@ -1,6 +1,7 @@
 package com.ecommerce.service;
 
-import com.ecommerce.dto.RegisterRequest;
+import com.ecommerce.dto.UserDTO;
+import com.ecommerce.dto.UserRegistrationDTO;
 import com.ecommerce.entity.User;
 import com.ecommerce.exception.ResourceAlreadyExistsException;
 import com.ecommerce.exception.ResourceNotFoundException;
@@ -12,12 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for user management
- * Handles user registration and profile operations
+ * Service class for User entity operations
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class UserService {
 
     private final UserRepository userRepository;
@@ -26,60 +27,108 @@ public class UserService {
     /**
      * Register a new user
      */
-    @Transactional
-    public User registerUser(RegisterRequest request) {
-        log.info("Registering new user: {}", request.getUsername());
+    public UserDTO registerUser(UserRegistrationDTO registrationDTO) {
+        log.info("Registering new user: {}", registrationDTO.getUsername());
 
         // Check if username already exists
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new ResourceAlreadyExistsException("Username already exists: " + request.getUsername());
+        if (userRepository.existsByUsername(registrationDTO.getUsername())) {
+            throw new ResourceAlreadyExistsException("Username already exists: " + registrationDTO.getUsername());
         }
 
         // Check if email already exists
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ResourceAlreadyExistsException("Email already exists: " + request.getEmail());
+        if (userRepository.existsByEmail(registrationDTO.getEmail())) {
+            throw new ResourceAlreadyExistsException("Email already exists: " + registrationDTO.getEmail());
         }
 
         // Create new user
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setIsActive(true);
+        User user = User.builder()
+            .username(registrationDTO.getUsername())
+            .email(registrationDTO.getEmail())
+            .password(passwordEncoder.encode(registrationDTO.getPassword()))
+            .firstName(registrationDTO.getFirstName())
+            .lastName(registrationDTO.getLastName())
+            .phoneNumber(registrationDTO.getPhoneNumber())
+            .active(true)
+            .build();
 
-        User savedUser = userRepository.save(user);
-        log.info("User registered successfully: {}", savedUser.getUserId());
+        user = userRepository.save(user);
+        log.info("User registered successfully: {}", user.getUsername());
 
-        return savedUser;
+        return mapToDTO(user);
     }
 
     /**
-     * Find user by username
+     * Get user by ID
      */
     @Transactional(readOnly = true)
-    public User findByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+    public UserDTO getUserById(Long id) {
+        log.debug("Fetching user by ID: {}", id);
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
+        return mapToDTO(user);
     }
 
     /**
-     * Find user by ID
+     * Get user by username
      */
     @Transactional(readOnly = true)
-    public User findById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+    public UserDTO getUserByUsername(String username) {
+        log.debug("Fetching user by username: {}", username);
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+        return mapToDTO(user);
     }
 
     /**
-     * Find active user by username
+     * Update user profile
      */
-    @Transactional(readOnly = true)
-    public User findActiveUserByUsername(String username) {
-        return userRepository.findByUsernameAndIsActiveTrue(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Active user not found: " + username));
+    public UserDTO updateUser(Long id, UserDTO userDTO) {
+        log.info("Updating user: {}", id);
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
+
+        if (userDTO.getFirstName() != null) {
+            user.setFirstName(userDTO.getFirstName());
+        }
+        if (userDTO.getLastName() != null) {
+            user.setLastName(userDTO.getLastName());
+        }
+        if (userDTO.getPhoneNumber() != null) {
+            user.setPhoneNumber(userDTO.getPhoneNumber());
+        }
+
+        user = userRepository.save(user);
+        log.info("User updated successfully: {}", user.getUsername());
+
+        return mapToDTO(user);
+    }
+
+    /**
+     * Deactivate user
+     */
+    public void deactivateUser(Long id) {
+        log.info("Deactivating user: {}", id);
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
+        user.setActive(false);
+        userRepository.save(user);
+        log.info("User deactivated successfully: {}", user.getUsername());
+    }
+
+    /**
+     * Map User entity to UserDTO
+     */
+    private UserDTO mapToDTO(User user) {
+        return UserDTO.builder()
+            .id(user.getId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
+            .phoneNumber(user.getPhoneNumber())
+            .active(user.getActive())
+            .createdAt(user.getCreatedAt())
+            .updatedAt(user.getUpdatedAt())
+            .build();
     }
 }

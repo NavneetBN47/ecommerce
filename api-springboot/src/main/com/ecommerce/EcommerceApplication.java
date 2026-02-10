@@ -3,15 +3,17 @@ package com.ecommerce;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
- * Main Spring Boot Application Class for E-Commerce API
+ * Main Spring Boot Application Class for E-Commerce System
  * 
- * @author E-Commerce Development Team
+ * @author Backend Automation Agent
  * @version 1.0.0
  */
 @SpringBootApplication
 @EnableJpaAuditing
+@EnableTransactionManagement
 public class EcommerceApplication {
 
     public static void main(String[] args) {

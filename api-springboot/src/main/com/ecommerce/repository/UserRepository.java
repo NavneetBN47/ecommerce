@@ -2,13 +2,14 @@ package com.ecommerce.repository;
 
 import com.ecommerce.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 /**
- * Repository interface for User entity
- * Provides database operations for user management
+ * Repository interface for User entity operations
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -24,6 +25,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
     /**
+     * Find user by username or email
+     */
+    @Query("SELECT u FROM User u WHERE u.username = :identifier OR u.email = :identifier")
+    Optional<User> findByUsernameOrEmail(@Param("identifier") String identifier);
+
+    /**
      * Check if username exists
      */
     boolean existsByUsername(String username);
@@ -36,5 +43,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * Find active user by username
      */
-    Optional<User> findByUsernameAndIsActiveTrue(String username);
+    Optional<User> findByUsernameAndActiveTrue(String username);
 }

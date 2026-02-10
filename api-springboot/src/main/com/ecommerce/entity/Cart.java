@@ -15,8 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Cart Entity - Represents a shopping cart for a user
- * Implements lazy creation and auto-delete when empty
+ * Cart Entity representing user shopping cart
+ * Implements lazy creation and auto-cleanup on logout
  */
 @Entity
 @Table(name = "carts", indexes = {
@@ -33,7 +33,7 @@ public class Cart {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
@@ -57,23 +57,8 @@ public class Cart {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (updatedAt == null) {
-            updatedAt = LocalDateTime.now();
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
     /**
-     * Add item to cart
+     * Helper method to add item to cart
      */
     public void addItem(CartItem item) {
         items.add(item);
@@ -82,19 +67,11 @@ public class Cart {
     }
 
     /**
-     * Remove item from cart
+     * Helper method to remove item from cart
      */
     public void removeItem(CartItem item) {
         items.remove(item);
         item.setCart(null);
-        recalculateTotals();
-    }
-
-    /**
-     * Clear all items from cart
-     */
-    public void clearItems() {
-        items.clear();
         recalculateTotals();
     }
 
@@ -105,7 +82,6 @@ public class Cart {
         this.totalAmount = items.stream()
             .map(CartItem::getSubtotal)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
         this.totalItems = items.stream()
             .mapToInt(CartItem::getQuantity)
             .sum();

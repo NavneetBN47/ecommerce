@@ -1,21 +1,27 @@
 package com.ecommerce.service;
 
+import com.ecommerce.dto.CreateOrderRequestDTO;
 import com.ecommerce.dto.OrderDTO;
 import com.ecommerce.dto.OrderItemDTO;
+import com.ecommerce.dto.ProductDTO;
 import com.ecommerce.entity.*;
-import com.ecommerce.exception.InsufficientStockException;
+import com.ecommerce.exception.BusinessException;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.repository.*;
+import com.ecommerce.repository.OrderRepository;
+import com.ecommerce.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 
 /**
- * Order Service - Handles order-related business logic
+ * Service class for Order entity operations
  */
 @Service
 @RequiredArgsConstructor
@@ -24,76 +30,60 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
-    private final CartRepository cartRepository;
     private final UserRepository userRepository;
-    private final ProductRepository productRepository;
+    private final CartService cartService;
+    private final ProductService productService;
 
     /**
      * Create order from cart
      */
-    public OrderDTO createOrderFromCart(Long userId, OrderDTO orderDTO) {
-        log.info("Creating order from cart for user ID: {}", userId);
+    public OrderDTO createOrder(Long userId, CreateOrderRequestDTO request) {
+        log.info("Creating order for user: {}", userId);
 
-        // Validate user
+        // Get user
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
         // Get cart
-        Cart cart = cartRepository.findByUserId(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
-
-        if (cart.isEmpty()) {
-            throw new IllegalStateException("Cannot create order from empty cart");
+        var cartDTO = cartService.getCartByUserId(userId);
+        if (cartDTO.getItems() == null || cartDTO.getItems().isEmpty()) {
+            throw new BusinessException("Cannot create order from empty cart");
         }
 
         // Create order
         Order order = Order.builder()
+            .orderNumber(generateOrderNumber())
             .user(user)
-            .totalAmount(cart.getTotalAmount())
-            .totalItems(cart.getTotalItems())
+            .totalAmount(cartDTO.getTotalAmount())
             .status(Order.OrderStatus.PENDING)
-            .shippingAddress(orderDTO.getShippingAddress())
-            .billingAddress(orderDTO.getBillingAddress())
-            .paymentMethod(orderDTO.getPaymentMethod())
-            .notes(orderDTO.getNotes())
+            .shippingAddress(request.getShippingAddress())
+            .billingAddress(request.getBillingAddress() != null ? request.getBillingAddress() : request.getShippingAddress())
+            .paymentMethod(request.getPaymentMethod())
+            .paymentStatus("PENDING")
             .build();
 
-        Order savedOrder = orderRepository.save(order);
-
         // Create order items from cart items
-        for (CartItem cartItem : cart.getItems()) {
-            Product product = cartItem.getProduct();
+        for (var cartItemDTO : cartDTO.getItems()) {
+            // Reduce product stock
+            productService.reduceStock(cartItemDTO.getProductId(), cartItemDTO.getQuantity());
 
-            // Check stock availability
-            if (!product.hasSufficientStock(cartItem.getQuantity())) {
-                throw new InsufficientStockException("Insufficient stock for product: " + product.getName());
-            }
-
-            // Reduce stock
-            product.reduceStock(cartItem.getQuantity());
-            productRepository.save(product);
-
-            // Create order item
             OrderItem orderItem = OrderItem.builder()
-                .order(savedOrder)
-                .product(product)
-                .quantity(cartItem.getQuantity())
-                .price(cartItem.getPrice())
+                .order(order)
+                .product(Product.builder().id(cartItemDTO.getProductId()).build())
+                .quantity(cartItemDTO.getQuantity())
+                .price(cartItemDTO.getPrice())
                 .build();
-
-            savedOrder.addItem(orderItem);
-            orderItemRepository.save(orderItem);
+            orderItem.calculateSubtotal();
+            order.getItems().add(orderItem);
         }
 
-        savedOrder.recalculateTotals();
-        Order finalOrder = orderRepository.save(savedOrder);
+        order = orderRepository.save(order);
 
         // Clear cart after order creation
-        cartRepository.delete(cart);
+        cartService.clearCart(userId);
 
-        log.info("Order created successfully with order number: {}", finalOrder.getOrderNumber());
-        return convertToDTO(finalOrder);
+        log.info("Order created successfully: {}", order.getOrderNumber());
+        return mapToDTO(order);
     }
 
     /**
@@ -101,10 +91,10 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public OrderDTO getOrderById(Long orderId) {
-        log.info("Fetching order by ID: {}", orderId);
-        Order order = orderRepository.findById(orderId)
+        log.debug("Fetching order by ID: {}", orderId);
+        Order order = orderRepository.findByIdWithItems(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
-        return convertToDTO(order);
+        return mapToDTO(order);
     }
 
     /**
@@ -112,105 +102,112 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public OrderDTO getOrderByOrderNumber(String orderNumber) {
-        log.info("Fetching order by order number: {}", orderNumber);
+        log.debug("Fetching order by order number: {}", orderNumber);
         Order order = orderRepository.findByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with order number: " + orderNumber));
-        return convertToDTO(order);
+        return mapToDTO(order);
     }
 
     /**
-     * Get user orders
+     * Get all orders for a user
      */
     @Transactional(readOnly = true)
-    public List<OrderDTO> getUserOrders(Long userId) {
-        log.info("Fetching orders for user ID: {}", userId);
-        return orderRepository.findByUserId(userId).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
+    public Page<OrderDTO> getUserOrders(Long userId, Pageable pageable) {
+        log.debug("Fetching orders for user: {}", userId);
+        return orderRepository.findByUserId(userId, pageable)
+            .map(this::mapToDTO);
     }
 
     /**
      * Update order status
      */
     public OrderDTO updateOrderStatus(Long orderId, Order.OrderStatus status) {
-        log.info("Updating order status for order ID: {} to {}", orderId, status);
-
+        log.info("Updating order: {} status to: {}", orderId, status);
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
-
+        
         order.setStatus(status);
-        Order updatedOrder = orderRepository.save(order);
-        log.info("Order status updated successfully");
-
-        return convertToDTO(updatedOrder);
+        order = orderRepository.save(order);
+        
+        log.info("Order status updated successfully: {}", order.getOrderNumber());
+        return mapToDTO(order);
     }
 
     /**
      * Cancel order
      */
     public OrderDTO cancelOrder(Long orderId) {
-        log.info("Cancelling order ID: {}", orderId);
-
-        Order order = orderRepository.findById(orderId)
+        log.info("Cancelling order: {}", orderId);
+        Order order = orderRepository.findByIdWithItems(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
 
-        if (order.getStatus() == Order.OrderStatus.SHIPPED || 
-            order.getStatus() == Order.OrderStatus.DELIVERED) {
-            throw new IllegalStateException("Cannot cancel order in status: " + order.getStatus());
-        }
-
-        // Restore stock
-        for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-            product.increaseStock(item.getQuantity());
-            productRepository.save(product);
+        if (order.getStatus() == Order.OrderStatus.DELIVERED || 
+            order.getStatus() == Order.OrderStatus.CANCELLED) {
+            throw new BusinessException("Cannot cancel order with status: " + order.getStatus());
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
-        Order cancelledOrder = orderRepository.save(order);
-        log.info("Order cancelled successfully");
+        order = orderRepository.save(order);
 
-        return convertToDTO(cancelledOrder);
+        log.info("Order cancelled successfully: {}", order.getOrderNumber());
+        return mapToDTO(order);
     }
 
     /**
-     * Convert Order entity to DTO
+     * Generate unique order number
      */
-    private OrderDTO convertToDTO(Order order) {
+    private String generateOrderNumber() {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        String random = String.format("%04d", (int) (Math.random() * 10000));
+        return "ORD-" + timestamp + "-" + random;
+    }
+
+    /**
+     * Map Order entity to OrderDTO
+     */
+    private OrderDTO mapToDTO(Order order) {
         return OrderDTO.builder()
             .id(order.getId())
             .orderNumber(order.getOrderNumber())
             .userId(order.getUser().getId())
             .items(order.getItems().stream()
-                .map(this::convertItemToDTO)
+                .map(this::mapOrderItemToDTO)
                 .collect(Collectors.toList()))
             .totalAmount(order.getTotalAmount())
-            .totalItems(order.getTotalItems())
             .status(order.getStatus())
             .shippingAddress(order.getShippingAddress())
             .billingAddress(order.getBillingAddress())
             .paymentMethod(order.getPaymentMethod())
             .paymentStatus(order.getPaymentStatus())
-            .notes(order.getNotes())
             .createdAt(order.getCreatedAt())
             .updatedAt(order.getUpdatedAt())
             .build();
     }
 
     /**
-     * Convert OrderItem entity to DTO
+     * Map OrderItem entity to OrderItemDTO
      */
-    private OrderItemDTO convertItemToDTO(OrderItem item) {
+    private OrderItemDTO mapOrderItemToDTO(OrderItem orderItem) {
         return OrderItemDTO.builder()
-            .id(item.getId())
-            .orderId(item.getOrder().getId())
-            .productId(item.getProduct().getId())
-            .productName(item.getProductName())
-            .productSku(item.getProductSku())
-            .quantity(item.getQuantity())
-            .price(item.getPrice())
-            .subtotal(item.getSubtotal())
-            .createdAt(item.getCreatedAt())
+            .id(orderItem.getId())
+            .productId(orderItem.getProduct().getId())
+            .product(mapProductToDTO(orderItem.getProduct()))
+            .quantity(orderItem.getQuantity())
+            .price(orderItem.getPrice())
+            .subtotal(orderItem.getSubtotal())
+            .build();
+    }
+
+    /**
+     * Map Product entity to ProductDTO
+     */
+    private ProductDTO mapProductToDTO(Product product) {
+        return ProductDTO.builder()
+            .id(product.getId())
+            .name(product.getName())
+            .sku(product.getSku())
+            .price(product.getPrice())
+            .imageUrl(product.getImageUrl())
             .build();
     }
 }

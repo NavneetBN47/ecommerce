@@ -1,8 +1,12 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -13,52 +17,56 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Product Entity representing products table
- * Manages product catalog with inventory tracking
+ * Product Entity representing items available for purchase
  */
 @Entity
 @Table(name = "products", indexes = {
-    @Index(name = "idx_product_name", columnList = "product_name"),
-    @Index(name = "idx_category", columnList = "category"),
-    @Index(name = "idx_price", columnList = "price")
+    @Index(name = "idx_product_name", columnList = "name"),
+    @Index(name = "idx_product_category", columnList = "category"),
+    @Index(name = "idx_product_sku", columnList = "sku", unique = true)
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "product_id")
-    private Long productId;
+    private Long id;
 
     @NotBlank(message = "Product name is required")
-    @Size(max = 255, message = "Product name must not exceed 255 characters")
-    @Column(name = "product_name", nullable = false, length = 255)
-    private String productName;
+    @Column(nullable = false, length = 200)
+    private String name;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Size(max = 100, message = "Category must not exceed 100 characters")
-    @Column(name = "category", length = 100)
-    private String category;
+    @NotBlank(message = "SKU is required")
+    @Column(nullable = false, unique = true, length = 50)
+    private String sku;
 
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
-    @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 integer digits and 2 decimal places")
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")
     @Column(name = "stock_quantity", nullable = false)
+    @Builder.Default
     private Integer stockQuantity = 0;
 
-    @Size(max = 500, message = "Image URL must not exceed 500 characters")
+    @Column(length = 100)
+    private String category;
+
     @Column(name = "image_url", length = 500)
     private String imageUrl;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -67,52 +75,4 @@ public class Product {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (updatedAt == null) {
-            updatedAt = LocalDateTime.now();
-        }
-        if (isActive == null) {
-            isActive = true;
-        }
-        if (stockQuantity == null) {
-            stockQuantity = 0;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    /**
-     * Check if product has sufficient stock
-     */
-    public boolean hasStock(int quantity) {
-        return this.stockQuantity >= quantity;
-    }
-
-    /**
-     * Reduce stock quantity
-     */
-    public void reduceStock(int quantity) {
-        if (!hasStock(quantity)) {
-            throw new IllegalStateException("Insufficient stock");
-        }
-        this.stockQuantity -= quantity;
-    }
-
-    /**
-     * Increase stock quantity
-     */
-    public void increaseStock(int quantity) {
-        this.stockQuantity += quantity;
-    }
 }

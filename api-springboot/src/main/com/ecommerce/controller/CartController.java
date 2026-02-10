@@ -1,118 +1,88 @@
 package com.ecommerce.controller;
 
-import com.ecommerce.dto.*;
-import com.ecommerce.entity.User;
+import com.ecommerce.dto.AddToCartRequestDTO;
+import com.ecommerce.dto.ApiResponseDTO;
+import com.ecommerce.dto.CartDTO;
+import com.ecommerce.dto.UpdateCartItemRequestDTO;
 import com.ecommerce.service.CartService;
-import com.ecommerce.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * REST Controller for shopping cart endpoints
- * Implements:
- * - Lazy cart creation
- * - Auto-delete empty cart
- * - Quantity validation
- * - Cart totals calculation
+ * REST Controller for cart operations
+ * Implements lazy cart creation, auto-delete empty cart, and logout cleanup
  */
 @RestController
-@RequestMapping("/cart")
+@RequestMapping("/api/cart")
 @RequiredArgsConstructor
 @Slf4j
 public class CartController {
 
     private final CartService cartService;
-    private final UserService userService;
+
+    /**
+     * Get current user's cart (lazy creation)
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponseDTO<CartDTO>> getCart(Authentication authentication) {
+        Long userId = Long.parseLong(authentication.getName());
+        log.info("Get cart request for user: {}", userId);
+        CartDTO cart = cartService.getOrCreateCart(userId);
+        return ResponseEntity.ok(ApiResponseDTO.success(cart));
+    }
 
     /**
      * Add item to cart
-     * POST /api/cart/add
-     * Business Rule: Cart is created lazily - only when first item is added
-     * Business Rule: Validate stock before adding to cart
      */
-    @PostMapping("/add")
-    public ResponseEntity<ApiResponse<CartSummaryResponse>> addToCart(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody AddToCartRequest request) {
-        log.info("Add to cart request received for user: {}", userDetails.getUsername());
-        User user = userService.findByUsername(userDetails.getUsername());
-        CartSummaryResponse response = cartService.addToCart(user.getUserId(), request);
-        return ResponseEntity.ok(ApiResponse.success("Item added to cart successfully", response));
+    @PostMapping("/items")
+    public ResponseEntity<ApiResponseDTO<CartDTO>> addItemToCart(
+            @Valid @RequestBody AddToCartRequestDTO request,
+            Authentication authentication) {
+        Long userId = Long.parseLong(authentication.getName());
+        log.info("Add item to cart request for user: {}", userId);
+        CartDTO cart = cartService.addItemToCart(userId, request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Item added to cart successfully", cart));
     }
 
     /**
      * Update cart item quantity
-     * PUT /api/cart/items/{id}
-     * Business Rule: Validate stock before updating quantity
      */
-    @PutMapping("/items/{id}")
-    public ResponseEntity<ApiResponse<CartSummaryResponse>> updateCartItem(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long id,
-            @Valid @RequestBody UpdateCartItemRequest request) {
-        log.info("Update cart item request received for user: {}", userDetails.getUsername());
-        User user = userService.findByUsername(userDetails.getUsername());
-        CartSummaryResponse response = cartService.updateCartItem(user.getUserId(), id, request);
-        return ResponseEntity.ok(ApiResponse.success("Cart item updated successfully", response));
+    @PutMapping("/items/{cartItemId}")
+    public ResponseEntity<ApiResponseDTO<CartDTO>> updateCartItem(
+            @PathVariable Long cartItemId,
+            @Valid @RequestBody UpdateCartItemRequestDTO request,
+            Authentication authentication) {
+        Long userId = Long.parseLong(authentication.getName());
+        log.info("Update cart item request for user: {}, item: {}", userId, cartItemId);
+        CartDTO cart = cartService.updateCartItemQuantity(userId, cartItemId, request.getQuantity());
+        return ResponseEntity.ok(ApiResponseDTO.success("Cart item updated successfully", cart));
     }
 
     /**
-     * Remove item from cart
-     * DELETE /api/cart/items/{id}
-     * Business Rule: Auto-delete empty cart when last item is removed
+     * Remove item from cart (auto-delete empty cart)
      */
-    @DeleteMapping("/items/{id}")
-    public ResponseEntity<ApiResponse<CartSummaryResponse>> removeFromCart(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long id) {
-        log.info("Remove from cart request received for user: {}", userDetails.getUsername());
-        User user = userService.findByUsername(userDetails.getUsername());
-        CartSummaryResponse response = cartService.removeFromCart(user.getUserId(), id);
-        return ResponseEntity.ok(ApiResponse.success("Item removed from cart successfully", response));
-    }
-
-    /**
-     * Get cart summary
-     * GET /api/cart
-     * Business Rule: Calculate subtotal, tax, and grand total
-     */
-    @GetMapping
-    public ResponseEntity<ApiResponse<CartSummaryResponse>> getCart(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Get cart request received for user: {}", userDetails.getUsername());
-        User user = userService.findByUsername(userDetails.getUsername());
-        CartSummaryResponse response = cartService.getCartSummary(user.getUserId());
-        return ResponseEntity.ok(ApiResponse.success("Cart retrieved successfully", response));
-    }
-
-    /**
-     * Get cart summary (alias endpoint)
-     * GET /api/cart/summary
-     */
-    @GetMapping("/summary")
-    public ResponseEntity<ApiResponse<CartSummaryResponse>> getCartSummary(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Get cart summary request received for user: {}", userDetails.getUsername());
-        User user = userService.findByUsername(userDetails.getUsername());
-        CartSummaryResponse response = cartService.getCartSummary(user.getUserId());
-        return ResponseEntity.ok(ApiResponse.success("Cart summary retrieved successfully", response));
+    @DeleteMapping("/items/{cartItemId}")
+    public ResponseEntity<ApiResponseDTO<CartDTO>> removeItemFromCart(
+            @PathVariable Long cartItemId,
+            Authentication authentication) {
+        Long userId = Long.parseLong(authentication.getName());
+        log.info("Remove cart item request for user: {}, item: {}", userId, cartItemId);
+        CartDTO cart = cartService.removeItemFromCart(userId, cartItemId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Item removed from cart successfully", cart));
     }
 
     /**
      * Clear cart
-     * DELETE /api/cart
      */
     @DeleteMapping
-    public ResponseEntity<ApiResponse<Void>> clearCart(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Clear cart request received for user: {}", userDetails.getUsername());
-        User user = userService.findByUsername(userDetails.getUsername());
-        cartService.clearCart(user.getUserId());
-        return ResponseEntity.ok(ApiResponse.success("Cart cleared successfully", null));
+    public ResponseEntity<ApiResponseDTO<Void>> clearCart(Authentication authentication) {
+        Long userId = Long.parseLong(authentication.getName());
+        log.info("Clear cart request for user: {}", userId);
+        cartService.clearCart(userId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Cart cleared successfully", null));
     }
 }

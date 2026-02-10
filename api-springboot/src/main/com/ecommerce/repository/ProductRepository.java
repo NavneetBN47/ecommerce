@@ -1,6 +1,8 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,47 +12,51 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Repository interface for Product entity
- * Provides database operations for product management with case-insensitive search
+ * Repository interface for Product entity operations
+ * Implements case-insensitive search functionality
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     /**
-     * Find all active products
+     * Find product by SKU
      */
-    List<Product> findByIsActiveTrue();
+    Optional<Product> findBySku(String sku);
 
     /**
-     * Find active product by ID
+     * Find all active products
      */
-    Optional<Product> findByProductIdAndIsActiveTrue(Long productId);
+    List<Product> findByActiveTrue();
 
     /**
      * Find products by category (case-insensitive)
      */
-    List<Product> findByCategoryIgnoreCaseAndIsActiveTrue(String category);
+    @Query("SELECT p FROM Product p WHERE LOWER(p.category) = LOWER(:category) AND p.active = true")
+    List<Product> findByCategoryIgnoreCase(@Param("category") String category);
 
     /**
-     * Case-insensitive search across product name, description, and category
-     * This implements the business requirement for case-insensitive product search
+     * Search products by name (case-insensitive)
      */
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND " +
-           "(LOWER(p.productName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(p.category) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
-    List<Product> searchProducts(@Param("searchTerm") String searchTerm);
+    @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.active = true")
+    Page<Product> searchByNameIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
 
     /**
-     * Find products with stock available
+     * Search products by name or description (case-insensitive)
      */
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.stockQuantity > 0")
-    List<Product> findProductsInStock();
+    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "OR LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.active = true")
+    Page<Product> searchByNameOrDescriptionIgnoreCase(@Param("searchTerm") String searchTerm, Pageable pageable);
+
+    /**
+     * Find products with stock greater than specified quantity
+     */
+    @Query("SELECT p FROM Product p WHERE p.stockQuantity > :quantity AND p.active = true")
+    List<Product> findByStockQuantityGreaterThan(@Param("quantity") Integer quantity);
 
     /**
      * Check if product has sufficient stock
      */
     @Query("SELECT CASE WHEN p.stockQuantity >= :quantity THEN true ELSE false END " +
-           "FROM Product p WHERE p.productId = :productId")
-    boolean hasStock(@Param("productId") Long productId, @Param("quantity") int quantity);
+           "FROM Product p WHERE p.id = :productId")
+    boolean hasSufficientStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 }

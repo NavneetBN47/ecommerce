@@ -8,11 +8,10 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Cart Data Transfer Object
+ * Data Transfer Object for Cart entity
  */
 @Data
 @NoArgsConstructor
@@ -23,10 +22,7 @@ public class CartDTO {
 
     private Long id;
     private Long userId;
-    
-    @Builder.Default
-    private List<CartItemDTO> items = new ArrayList<>();
-    
+    private List<CartItemDTO> items;
     private BigDecimal totalAmount;
     private Integer totalItems;
     private LocalDateTime createdAt;
