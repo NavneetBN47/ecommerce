@@ -1,12 +1,8 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -15,68 +11,54 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Product Entity - Represents a product in the e-commerce catalog
+ * Product Entity representing products table
+ * Manages product catalog with inventory tracking
  */
 @Entity
 @Table(name = "products", indexes = {
-    @Index(name = "idx_product_name", columnList = "name"),
-    @Index(name = "idx_product_category", columnList = "category"),
-    @Index(name = "idx_product_sku", columnList = "sku", unique = true)
+    @Index(name = "idx_product_name", columnList = "product_name"),
+    @Index(name = "idx_category", columnList = "category"),
+    @Index(name = "idx_price", columnList = "price")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "product_id")
+    private Long productId;
 
     @NotBlank(message = "Product name is required")
-    @Column(nullable = false, length = 200)
-    private String name;
+    @Size(max = 255, message = "Product name must not exceed 255 characters")
+    @Column(name = "product_name", nullable = false, length = 255)
+    private String productName;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @NotBlank(message = "SKU is required")
-    @Column(nullable = false, unique = true, length = 50)
-    private String sku;
+    @Size(max = 100, message = "Category must not exceed 100 characters")
+    @Column(name = "category", length = 100)
+    private String category;
 
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 integer digits and 2 decimal places")
+    @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")
     @Column(name = "stock_quantity", nullable = false)
-    @Builder.Default
     private Integer stockQuantity = 0;
 
-    @Column(length = 100)
-    private String category;
-
+    @Size(max = 500, message = "Image URL must not exceed 500 characters")
     @Column(name = "image_url", length = 500)
     private String imageUrl;
-
-    @Column(name = "is_active")
-    @Builder.Default
-    private Boolean isActive = true;
-
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<CartItem> cartItems = new ArrayList<>();
-
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<OrderItem> orderItems = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -86,6 +68,9 @@ public class Product {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
@@ -93,6 +78,12 @@ public class Product {
         }
         if (updatedAt == null) {
             updatedAt = LocalDateTime.now();
+        }
+        if (isActive == null) {
+            isActive = true;
+        }
+        if (stockQuantity == null) {
+            stockQuantity = 0;
         }
     }
 
@@ -104,16 +95,16 @@ public class Product {
     /**
      * Check if product has sufficient stock
      */
-    public boolean hasSufficientStock(Integer requestedQuantity) {
-        return this.stockQuantity >= requestedQuantity;
+    public boolean hasStock(int quantity) {
+        return this.stockQuantity >= quantity;
     }
 
     /**
      * Reduce stock quantity
      */
-    public void reduceStock(Integer quantity) {
-        if (!hasSufficientStock(quantity)) {
-            throw new IllegalStateException("Insufficient stock for product: " + this.name);
+    public void reduceStock(int quantity) {
+        if (!hasStock(quantity)) {
+            throw new IllegalStateException("Insufficient stock");
         }
         this.stockQuantity -= quantity;
     }
@@ -121,7 +112,7 @@ public class Product {
     /**
      * Increase stock quantity
      */
-    public void increaseStock(Integer quantity) {
+    public void increaseStock(int quantity) {
         this.stockQuantity += quantity;
     }
 }

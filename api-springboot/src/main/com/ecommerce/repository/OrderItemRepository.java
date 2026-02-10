@@ -7,18 +7,14 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * OrderItem Repository
+ * Repository interface for OrderItem entity
+ * Provides database operations for order item management
  */
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     /**
-     * Find order items by order ID
+     * Find all items in an order
      */
-    List<OrderItem> findByOrderId(Long orderId);
-
-    /**
-     * Find order items by product ID
-     */
-    List<OrderItem> findByProductId(Long productId);
+    List<OrderItem> findByOrder_OrderId(Long orderId);
 }

@@ -1,10 +1,8 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -15,45 +13,46 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * CartItem Entity - Represents an item in a shopping cart
+ * CartItem Entity representing cart_items table
+ * Manages individual items in shopping cart
  */
 @Entity
-@Table(name = "cart_items", indexes = {
-    @Index(name = "idx_cart_item_cart", columnList = "cart_id"),
-    @Index(name = "idx_cart_item_product", columnList = "product_id")
-}, uniqueConstraints = {
-    @UniqueConstraint(name = "uk_cart_product", columnNames = {"cart_id", "product_id"})
-})
+@Table(name = "cart_items", 
+    uniqueConstraints = @UniqueConstraint(name = "unique_cart_product", columnNames = {"cart_id", "product_id"}),
+    indexes = {
+        @Index(name = "idx_cart_id", columnList = "cart_id"),
+        @Index(name = "idx_product_id", columnList = "product_id")
+    }
+)
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class CartItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "cart_item_id")
+    private Long cartItemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cart_id", nullable = false)
-    private Cart cart;
+    @JoinColumn(name = "cart_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cart_item_cart"))
+    private ShoppingCart cart;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "product_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cart_item_product"))
     private Product product;
 
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity = 1;
 
-    @NotNull(message = "Price is required")
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
-
-    @Column(precision = 10, scale = 2)
-    private BigDecimal subtotal;
+    @NotNull(message = "Price at addition is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 integer digits and 2 decimal places")
+    @Column(name = "price_at_addition", nullable = false, precision = 10, scale = 2)
+    private BigDecimal priceAtAddition;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -71,31 +70,20 @@ public class CartItem {
         if (updatedAt == null) {
             updatedAt = LocalDateTime.now();
         }
-        calculateSubtotal();
+        if (quantity == null) {
+            quantity = 1;
+        }
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
-        calculateSubtotal();
     }
 
     /**
-     * Calculate subtotal for this cart item
-     */
-    public void calculateSubtotal() {
-        if (price != null && quantity != null) {
-            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
-        }
-    }
-
-    /**
-     * Get subtotal
+     * Calculate item subtotal
      */
     public BigDecimal getSubtotal() {
-        if (subtotal == null) {
-            calculateSubtotal();
-        }
-        return subtotal;
+        return priceAtAddition.multiply(BigDecimal.valueOf(quantity));
     }
 }

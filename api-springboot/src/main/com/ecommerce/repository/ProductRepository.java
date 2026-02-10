@@ -10,15 +10,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Product Repository
+ * Repository interface for Product entity
+ * Provides database operations for product management with case-insensitive search
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
-
-    /**
-     * Find product by SKU
-     */
-    Optional<Product> findBySku(String sku);
 
     /**
      * Find all active products
@@ -26,30 +22,35 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByIsActiveTrue();
 
     /**
-     * Find products by category
+     * Find active product by ID
      */
-    List<Product> findByCategoryAndIsActiveTrue(String category);
+    Optional<Product> findByProductIdAndIsActiveTrue(Long productId);
 
     /**
-     * Case-insensitive search by product name
+     * Find products by category (case-insensitive)
      */
-    @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND p.isActive = true")
-    List<Product> searchByName(@Param("searchTerm") String searchTerm);
+    List<Product> findByCategoryIgnoreCaseAndIsActiveTrue(String category);
 
     /**
-     * Case-insensitive search by name or category
+     * Case-insensitive search across product name, description, and category
+     * This implements the business requirement for case-insensitive product search
      */
-    @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR LOWER(p.category) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.isActive = true")
-    List<Product> searchByNameOrCategory(@Param("searchTerm") String searchTerm);
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND " +
+           "(LOWER(p.productName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(p.category) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    List<Product> searchProducts(@Param("searchTerm") String searchTerm);
 
     /**
-     * Find products with sufficient stock
+     * Find products with stock available
      */
-    @Query("SELECT p FROM Product p WHERE p.stockQuantity >= :minQuantity AND p.isActive = true")
-    List<Product> findByStockQuantityGreaterThanEqual(@Param("minQuantity") Integer minQuantity);
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.stockQuantity > 0")
+    List<Product> findProductsInStock();
 
     /**
-     * Check if SKU exists
+     * Check if product has sufficient stock
      */
-    boolean existsBySku(String sku);
+    @Query("SELECT CASE WHEN p.stockQuantity >= :quantity THEN true ELSE false END " +
+           "FROM Product p WHERE p.productId = :productId")
+    boolean hasStock(@Param("productId") Long productId, @Param("quantity") int quantity);
 }

@@ -3,14 +3,16 @@ package com.ecommerce.dto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * DTO for update cart item request
+ * Includes quantity validation
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class UpdateCartItemRequest {
 
     @NotNull(message = "Quantity is required")

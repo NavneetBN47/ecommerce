@@ -7,37 +7,32 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
- * Order Repository
+ * Repository interface for Order entity
+ * Provides database operations for order management
  */
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
     /**
-     * Find order by order number
+     * Find all orders for a user
      */
-    Optional<Order> findByOrderNumber(String orderNumber);
-
-    /**
-     * Find orders by user ID
-     */
-    @Query("SELECT o FROM Order o WHERE o.user.id = :userId ORDER BY o.createdAt DESC")
-    List<Order> findByUserId(@Param("userId") Long userId);
-
-    /**
-     * Find orders by user ID and status
-     */
-    List<Order> findByUserIdAndStatus(Long userId, Order.OrderStatus status);
+    List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     /**
      * Find orders by status
      */
-    List<Order> findByStatus(Order.OrderStatus status);
+    List<Order> findByOrderStatus(String orderStatus);
 
     /**
-     * Check if order number exists
+     * Find orders by user and status
      */
-    boolean existsByOrderNumber(String orderNumber);
+    List<Order> findByUserIdAndOrderStatus(Long userId, String orderStatus);
+
+    /**
+     * Find order with items
+     */
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.orderItems WHERE o.orderId = :orderId")
+    Order findByIdWithItems(@Param("orderId") Long orderId);
 }

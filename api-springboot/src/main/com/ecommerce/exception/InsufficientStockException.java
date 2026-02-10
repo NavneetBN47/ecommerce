@@ -1,7 +1,7 @@
 package com.ecommerce.exception;
 
 /**
- * Exception thrown when product stock is insufficient
+ * Exception thrown when product stock is insufficient for requested quantity
  */
 public class InsufficientStockException extends RuntimeException {
 

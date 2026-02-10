@@ -1,9 +1,8 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -16,48 +15,51 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Order Entity - Represents a customer order
+ * Order Entity representing orders table
+ * Manages customer orders with status tracking
  */
 @Entity
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_order_user", columnList = "user_id"),
-    @Index(name = "idx_order_number", columnList = "order_number", unique = true),
-    @Index(name = "idx_order_status", columnList = "status")
+    @Index(name = "idx_user_id", columnList = "user_id"),
+    @Index(name = "idx_order_status", columnList = "order_status"),
+    @Index(name = "idx_created_at", columnList = "created_at")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "order_id")
+    private Long orderId;
 
-    @Column(name = "order_number", nullable = false, unique = true, length = 50)
-    private String orderNumber;
+    @NotNull(message = "User ID is required")
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @NotBlank(message = "Order status is required")
+    @Column(name = "order_status", nullable = false, length = 50)
+    private String orderStatus = "PENDING";
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<OrderItem> items = new ArrayList<>();
+    @NotNull(message = "Subtotal is required")
+    @DecimalMin(value = "0.0", message = "Subtotal cannot be negative")
+    @Digits(integer = 8, fraction = 2)
+    @Column(name = "subtotal", nullable = false, precision = 10, scale = 2)
+    private BigDecimal subtotal;
+
+    @NotNull(message = "Tax amount is required")
+    @DecimalMin(value = "0.0", message = "Tax amount cannot be negative")
+    @Digits(integer = 8, fraction = 2)
+    @Column(name = "tax_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal taxAmount = BigDecimal.ZERO;
 
     @NotNull(message = "Total amount is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Total amount must be greater than 0")
+    @Digits(integer = 8, fraction = 2)
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
-
-    @Column(name = "total_items")
-    @Builder.Default
-    private Integer totalItems = 0;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    @Builder.Default
-    private OrderStatus status = OrderStatus.PENDING;
 
     @Column(name = "shipping_address", columnDefinition = "TEXT")
     private String shippingAddress;
@@ -65,15 +67,8 @@ public class Order {
     @Column(name = "billing_address", columnDefinition = "TEXT")
     private String billingAddress;
 
-    @Column(name = "payment_method", length = 50)
-    private String paymentMethod;
-
-    @Column(name = "payment_status", length = 20)
-    @Builder.Default
-    private String paymentStatus = "PENDING";
-
-    @Column(columnDefinition = "TEXT")
-    private String notes;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<OrderItem> orderItems = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -91,8 +86,11 @@ public class Order {
         if (updatedAt == null) {
             updatedAt = LocalDateTime.now();
         }
-        if (orderNumber == null) {
-            orderNumber = generateOrderNumber();
+        if (orderStatus == null) {
+            orderStatus = "PENDING";
+        }
+        if (taxAmount == null) {
+            taxAmount = BigDecimal.ZERO;
         }
     }
 
@@ -102,41 +100,13 @@ public class Order {
     }
 
     /**
-     * Generate unique order number
-     */
-    private String generateOrderNumber() {
-        return "ORD-" + System.currentTimeMillis();
-    }
-
-    /**
-     * Add item to order
+     * Add order item
      */
     public void addItem(OrderItem item) {
-        items.add(item);
+        if (orderItems == null) {
+            orderItems = new ArrayList<>();
+        }
+        orderItems.add(item);
         item.setOrder(this);
-        recalculateTotals();
-    }
-
-    /**
-     * Recalculate order totals
-     */
-    public void recalculateTotals() {
-        this.totalAmount = items.stream()
-            .map(OrderItem::getSubtotal)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
-        this.totalItems = items.stream()
-            .mapToInt(OrderItem::getQuantity)
-            .sum();
-    }
-
-    public enum OrderStatus {
-        PENDING,
-        CONFIRMED,
-        PROCESSING,
-        SHIPPED,
-        DELIVERED,
-        CANCELLED,
-        REFUNDED
     }
 }

@@ -1,75 +1,82 @@
 package com.ecommerce.service;
 
-import com.ecommerce.dto.AuthRequest;
-import com.ecommerce.dto.AuthResponse;
+import com.ecommerce.dto.LoginRequest;
+import com.ecommerce.dto.LoginResponse;
 import com.ecommerce.entity.User;
-import com.ecommerce.exception.AuthenticationException;
-import com.ecommerce.repository.CartRepository;
-import com.ecommerce.repository.UserRepository;
+import com.ecommerce.exception.UnauthorizedException;
 import com.ecommerce.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Authentication Service - Handles authentication and logout cleanup
+ * Service for authentication
+ * Implements stateless login with JWT tokens
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final CartRepository cartRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserService userService;
+    private final CartService cartService;
 
     /**
-     * Authenticate user (stateless login)
+     * Login user and return JWT token
+     * Business Rule: Stateless authentication using JWT
      */
-    public AuthResponse login(AuthRequest authRequest) {
-        log.info("Authenticating user: {}", authRequest.getUsername());
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+        log.info("Attempting login for user: {}", request.getUsername());
 
-        User user = userRepository.findByUsernameOrEmail(authRequest.getUsername())
-            .orElseThrow(() -> new AuthenticationException("Invalid username or password"));
+        try {
+            // Authenticate user
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getUsername(),
+                            request.getPassword()
+                    )
+            );
 
-        if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
-            throw new AuthenticationException("Invalid username or password");
+            // Get user details
+            User user = userService.findActiveUserByUsername(request.getUsername());
+
+            // Generate JWT token
+            String token = jwtTokenProvider.generateToken(authentication);
+
+            log.info("Login successful for user: {}", request.getUsername());
+
+            return new LoginResponse(
+                    token,
+                    user.getUserId(),
+                    user.getUsername(),
+                    user.getEmail()
+            );
+
+        } catch (AuthenticationException e) {
+            log.error("Login failed for user: {}", request.getUsername());
+            throw new UnauthorizedException("Invalid username or password");
         }
-
-        if (!user.getIsActive()) {
-            throw new AuthenticationException("User account is inactive");
-        }
-
-        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
-
-        log.info("User authenticated successfully: {}", user.getUsername());
-
-        return AuthResponse.builder()
-            .token(token)
-            .type("Bearer")
-            .userId(user.getId())
-            .username(user.getUsername())
-            .email(user.getEmail())
-            .message("Login successful")
-            .build();
     }
 
     /**
-     * Logout user with cart cleanup
+     * Logout user and cleanup cart
+     * Business Rule: All cart data must be cleaned up when user logs out
      */
+    @Transactional
     public void logout(Long userId) {
-        log.info("Logging out user ID: {}", userId);
-
-        // Clear user's cart on logout
-        cartRepository.findByUserId(userId).ifPresent(cart -> {
-            log.info("Clearing cart for user ID: {} on logout", userId);
-            cartRepository.delete(cart);
-        });
-
-        log.info("User logged out successfully: {}", userId);
+        log.info("Logging out user: {}", userId);
+        
+        // Clear cart on logout
+        cartService.clearCart(userId);
+        
+        log.info("Logout successful for user: {}", userId);
     }
 }

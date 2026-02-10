@@ -3,7 +3,6 @@ package com.ecommerce.service;
 import com.ecommerce.dto.ProductDTO;
 import com.ecommerce.entity.Product;
 import com.ecommerce.exception.ResourceNotFoundException;
-import com.ecommerce.exception.DuplicateResourceException;
 import com.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,54 +13,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Product Service - Handles product-related business logic
+ * Service for product management
+ * Implements case-insensitive product search and stock validation
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class ProductService {
 
     private final ProductRepository productRepository;
-
-    /**
-     * Create a new product
-     */
-    public ProductDTO createProduct(ProductDTO productDTO) {
-        log.info("Creating new product: {}", productDTO.getName());
-
-        // Check if SKU already exists
-        if (productRepository.existsBySku(productDTO.getSku())) {
-            throw new DuplicateResourceException("Product with SKU already exists: " + productDTO.getSku());
-        }
-
-        Product product = Product.builder()
-            .name(productDTO.getName())
-            .description(productDTO.getDescription())
-            .sku(productDTO.getSku())
-            .price(productDTO.getPrice())
-            .stockQuantity(productDTO.getStockQuantity())
-            .category(productDTO.getCategory())
-            .imageUrl(productDTO.getImageUrl())
-            .isActive(true)
-            .build();
-
-        Product savedProduct = productRepository.save(product);
-        log.info("Product created successfully with ID: {}", savedProduct.getId());
-
-        return convertToDTO(savedProduct);
-    }
-
-    /**
-     * Get product by ID
-     */
-    @Transactional(readOnly = true)
-    public ProductDTO getProductById(Long id) {
-        log.info("Fetching product by ID: {}", id);
-        Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
-        return convertToDTO(product);
-    }
 
     /**
      * Get all active products
@@ -70,106 +30,91 @@ public class ProductService {
     public List<ProductDTO> getAllProducts() {
         log.info("Fetching all active products");
         return productRepository.findByIsActiveTrue().stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     /**
-     * Search products by name (case-insensitive)
+     * Get product by ID
+     */
+    @Transactional(readOnly = true)
+    public ProductDTO getProductById(Long productId) {
+        log.info("Fetching product with ID: {}", productId);
+        Product product = productRepository.findByProductIdAndIsActiveTrue(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+        return convertToDTO(product);
+    }
+
+    /**
+     * Search products with case-insensitive search
+     * Business Rule: Product search must be case-insensitive
      */
     @Transactional(readOnly = true)
     public List<ProductDTO> searchProducts(String searchTerm) {
         log.info("Searching products with term: {}", searchTerm);
-        return productRepository.searchByNameOrCategory(searchTerm).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
+        
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return getAllProducts();
+        }
+
+        return productRepository.searchProducts(searchTerm.trim()).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     /**
-     * Get products by category
+     * Get products by category (case-insensitive)
      */
     @Transactional(readOnly = true)
     public List<ProductDTO> getProductsByCategory(String category) {
-        log.info("Fetching products by category: {}", category);
-        return productRepository.findByCategoryAndIsActiveTrue(category).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
+        log.info("Fetching products in category: {}", category);
+        return productRepository.findByCategoryIgnoreCaseAndIsActiveTrue(category).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     /**
-     * Update product
+     * Get products in stock
      */
-    public ProductDTO updateProduct(Long id, ProductDTO productDTO) {
-        log.info("Updating product with ID: {}", id);
-
-        Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
-
-        // Update fields
-        if (productDTO.getName() != null) {
-            product.setName(productDTO.getName());
-        }
-
-        if (productDTO.getDescription() != null) {
-            product.setDescription(productDTO.getDescription());
-        }
-
-        if (productDTO.getPrice() != null) {
-            product.setPrice(productDTO.getPrice());
-        }
-
-        if (productDTO.getStockQuantity() != null) {
-            product.setStockQuantity(productDTO.getStockQuantity());
-        }
-
-        if (productDTO.getCategory() != null) {
-            product.setCategory(productDTO.getCategory());
-        }
-
-        if (productDTO.getImageUrl() != null) {
-            product.setImageUrl(productDTO.getImageUrl());
-        }
-
-        if (productDTO.getIsActive() != null) {
-            product.setIsActive(productDTO.getIsActive());
-        }
-
-        Product updatedProduct = productRepository.save(product);
-        log.info("Product updated successfully: {}", updatedProduct.getId());
-
-        return convertToDTO(updatedProduct);
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getProductsInStock() {
+        log.info("Fetching products in stock");
+        return productRepository.findProductsInStock().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     /**
-     * Delete product (soft delete)
+     * Validate product stock
+     * Business Rule: Always check stock before cart operations
      */
-    public void deleteProduct(Long id) {
-        log.info("Deleting product with ID: {}", id);
+    @Transactional(readOnly = true)
+    public boolean hasStock(Long productId, int quantity) {
+        return productRepository.hasStock(productId, quantity);
+    }
 
-        Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
-
-        product.setIsActive(false);
-        productRepository.save(product);
-        log.info("Product deleted successfully: {}", id);
+    /**
+     * Get product entity (internal use)
+     */
+    @Transactional(readOnly = true)
+    public Product getProductEntity(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
     }
 
     /**
      * Convert Product entity to DTO
      */
     private ProductDTO convertToDTO(Product product) {
-        return ProductDTO.builder()
-            .id(product.getId())
-            .name(product.getName())
-            .description(product.getDescription())
-            .sku(product.getSku())
-            .price(product.getPrice())
-            .stockQuantity(product.getStockQuantity())
-            .category(product.getCategory())
-            .imageUrl(product.getImageUrl())
-            .isActive(product.getIsActive())
-            .createdAt(product.getCreatedAt())
-            .updatedAt(product.getUpdatedAt())
-            .build();
+        ProductDTO dto = new ProductDTO();
+        dto.setProductId(product.getProductId());
+        dto.setProductName(product.getProductName());
+        dto.setDescription(product.getDescription());
+        dto.setCategory(product.getCategory());
+        dto.setPrice(product.getPrice());
+        dto.setStockQuantity(product.getStockQuantity());
+        dto.setImageUrl(product.getImageUrl());
+        dto.setIsActive(product.getIsActive());
+        return dto;
     }
 }
