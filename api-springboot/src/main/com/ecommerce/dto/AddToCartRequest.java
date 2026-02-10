@@ -6,19 +6,17 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO for add to cart request
- * Includes quantity validation
- */
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class AddToCartRequest {
-
+    
     @NotNull(message = "Product ID is required")
-    private Long productId;
-
+    private UUID productId;
+    
     @NotNull(message = "Quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
+    @Min(value = 1, message = "Quantity must be greater than 0")
     private Integer quantity;
 }

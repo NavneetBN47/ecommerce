@@ -6,16 +6,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO for update cart item request
- * Includes quantity validation
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateCartItemRequest {
-
+    
     @NotNull(message = "Quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
+    @Min(value = 1, message = "Quantity must be greater than 0")
     private Integer quantity;
 }

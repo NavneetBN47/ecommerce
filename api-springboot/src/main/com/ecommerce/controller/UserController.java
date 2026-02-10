@@ -1,58 +1,51 @@
 package com.ecommerce.controller;
 
-import com.ecommerce.dto.ApiResponseDTO;
-import com.ecommerce.dto.UserDTO;
+import com.ecommerce.dto.*;
 import com.ecommerce.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * REST Controller for user operations
- */
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
-
+    
     private final UserService userService;
-
-    /**
-     * Get current user profile
-     */
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponseDTO<UserDTO>> getCurrentUser(Authentication authentication) {
-        Long userId = Long.parseLong(authentication.getName());
-        log.info("Get current user request for: {}", userId);
-        UserDTO user = userService.getUserById(userId);
-        return ResponseEntity.ok(ApiResponseDTO.success(user));
+    
+    @PostMapping("/signup")
+    public ResponseEntity<UserResponse> signup(@Valid @RequestBody SignupRequest request) {
+        log.info("POST /api/users/signup - Registering new user: {}", request.getUsername());
+        UserResponse response = userService.signup(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-
-    /**
-     * Update current user profile
-     */
-    @PutMapping("/me")
-    public ResponseEntity<ApiResponseDTO<UserDTO>> updateCurrentUser(
-            @Valid @RequestBody UserDTO userDTO,
-            Authentication authentication) {
-        Long userId = Long.parseLong(authentication.getName());
-        log.info("Update user request for: {}", userId);
-        UserDTO updatedUser = userService.updateUser(userId, userDTO);
-        return ResponseEntity.ok(ApiResponseDTO.success("User updated successfully", updatedUser));
+    
+    @PostMapping("/login")
+    public ResponseEntity<UserResponse> login(@Valid @RequestBody LoginRequest request) {
+        log.info("POST /api/users/login - User login attempt: {}", request.getUsername());
+        UserResponse response = userService.login(request);
+        return ResponseEntity.ok(response);
     }
-
-    /**
-     * Deactivate current user account
-     */
-    @DeleteMapping("/me")
-    public ResponseEntity<ApiResponseDTO<Void>> deactivateCurrentUser(Authentication authentication) {
-        Long userId = Long.parseLong(authentication.getName());
-        log.info("Deactivate user request for: {}", userId);
-        userService.deactivateUser(userId);
-        return ResponseEntity.ok(ApiResponseDTO.success("User deactivated successfully", null));
+    
+    @GetMapping("/profile")
+    public ResponseEntity<UserResponse> getProfile(@RequestHeader("X-User-Id") UUID userId) {
+        log.info("GET /api/users/profile - Fetching profile for user: {}", userId);
+        UserResponse response = userService.getProfile(userId);
+        return ResponseEntity.ok(response);
+    }
+    
+    @PutMapping("/profile")
+    public ResponseEntity<UserResponse> updateProfile(
+            @RequestHeader("X-User-Id") UUID userId,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        log.info("PUT /api/users/profile - Updating profile for user: {}", userId);
+        UserResponse response = userService.updateProfile(userId, request);
+        return ResponseEntity.ok(response);
     }
 }

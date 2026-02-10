@@ -1,96 +1,49 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
-/**
- * Cart Entity representing user shopping cart
- * Implements lazy creation and auto-cleanup on logout
- */
 @Entity
-@Table(name = "carts", indexes = {
-    @Index(name = "idx_cart_user", columnList = "user_id", unique = true)
-})
+@Table(name = "shopping_carts")
 @EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Cart {
-
+    
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "cart_id", updatable = false, nullable = false)
+    private UUID id;
+    
     @OneToOne
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", unique = true, nullable = false)
     private User user;
-
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<CartItem> items = new ArrayList<>();
-
-    @Column(name = "total_amount", precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal totalAmount = BigDecimal.ZERO;
-
-    @Column(name = "total_items")
-    @Builder.Default
-    private Integer totalItems = 0;
-
+    
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    /**
-     * Helper method to add item to cart
-     */
+    
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<CartItem> items = new ArrayList<>();
+    
     public void addItem(CartItem item) {
         items.add(item);
         item.setCart(this);
-        recalculateTotals();
     }
-
-    /**
-     * Helper method to remove item from cart
-     */
+    
     public void removeItem(CartItem item) {
         items.remove(item);
         item.setCart(null);
-        recalculateTotals();
-    }
-
-    /**
-     * Recalculate cart totals
-     */
-    public void recalculateTotals() {
-        this.totalAmount = items.stream()
-            .map(CartItem::getSubtotal)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        this.totalItems = items.stream()
-            .mapToInt(CartItem::getQuantity)
-            .sum();
-    }
-
-    /**
-     * Check if cart is empty
-     */
-    public boolean isEmpty() {
-        return items == null || items.isEmpty();
     }
 }

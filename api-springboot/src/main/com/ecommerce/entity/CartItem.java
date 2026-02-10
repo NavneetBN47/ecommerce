@@ -1,76 +1,34 @@
 package com.ecommerce.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import lombok.*;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.UUID;
 
-/**
- * CartItem Entity representing individual items in a shopping cart
- */
 @Entity
-@Table(name = "cart_items", indexes = {
-    @Index(name = "idx_cart_item_cart", columnList = "cart_id"),
-    @Index(name = "idx_cart_item_product", columnList = "product_id")
-}, uniqueConstraints = {
-    @UniqueConstraint(name = "uk_cart_product", columnNames = {"cart_id", "product_id"})
+@Table(name = "cart_items", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"cart_id", "product_id"})
 })
-@EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CartItem {
-
+    
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "cart_item_id", updatable = false, nullable = false)
+    private UUID id;
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
-
+    
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
-
-    @NotNull(message = "Quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
-    @Column(nullable = false)
+    
+    @Column(name = "quantity", nullable = false)
     private Integer quantity;
-
-    @NotNull(message = "Price is required")
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
-
-    @Column(precision = 10, scale = 2)
-    private BigDecimal subtotal;
-
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    /**
-     * Calculate subtotal before persist/update
-     */
-    @PrePersist
-    @PreUpdate
-    public void calculateSubtotal() {
-        if (price != null && quantity != null) {
-            this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
-        }
-    }
 }

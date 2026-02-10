@@ -1,0 +1,36 @@
+erDiagram
+    USER ||--o| CART : "has one"
+    CART ||--|{ CART_ITEM : "contains"
+    CART_ITEM }o--|| PRODUCT : "references"
+
+    USER {
+        UUID id PK
+        VARCHAR username UK "Unique, Immutable"
+        VARCHAR password_hash "Hashed"
+        VARCHAR full_name
+        VARCHAR email
+        TIMESTAMP created_at
+    }
+
+    PRODUCT {
+        UUID id PK
+        VARCHAR name
+        TEXT description
+        DECIMAL price ">=0"
+        INTEGER available_qty ">=0"
+        VARCHAR sku UK
+    }
+
+    CART {
+        UUID id PK
+        UUID user_id FK,UK "One-to-One with User"
+        TIMESTAMP created_at
+    }
+
+    CART_ITEM {
+        UUID id PK
+        UUID cart_id FK "Cascade on delete"
+        UUID product_id FK
+        INTEGER quantity ">0"
+        DECIMAL unit_price ">=0"
+    }
