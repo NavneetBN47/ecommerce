@@ -3,31 +3,29 @@
   "info": {
     "title": "Ecommerce Cart API",
     "version": "1.0.0",
-    "description": "API for cart management operations"
+    "description": "API for managing shopping carts in the ecommerce platform"
   },
   "servers": [
     {
-      "url": "http://localhost:8080",
-      "description": "Development server"
+      "url": "/api",
+      "description": "API base path"
     }
   ],
   "paths": {
-    "/api/cart/{userId}": {
+    "/carts/{cartId}": {
       "get": {
-        "tags": ["Cart"],
-        "summary": "Get cart for user",
-        "description": "Retrieve the cart for a specific user",
-        "operationId": "getCart",
+        "summary": "View cart",
+        "description": "Retrieve cart details by cart ID",
+        "operationId": "viewCart",
         "parameters": [
           {
-            "name": "userId",
+            "name": "cartId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             },
-            "description": "User ID"
+            "description": "Cart identifier"
           }
         ],
         "responses": {
@@ -62,84 +60,22 @@
             }
           }
         }
-      },
-      "post": {
-        "tags": ["Cart"],
-        "summary": "Create cart for user",
-        "description": "Create a new cart for a specific user",
-        "operationId": "createCart",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "description": "User ID"
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Cart created successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CartDTO"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
       }
     },
-    "/api/cart/{userId}/items": {
+    "/carts/{cartId}/items": {
       "post": {
-        "tags": ["Cart Items"],
         "summary": "Add item to cart",
-        "description": "Add an item to the user's cart",
+        "description": "Add a new item to the specified cart",
         "operationId": "addItemToCart",
         "parameters": [
           {
-            "name": "userId",
+            "name": "cartId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             },
-            "description": "User ID"
+            "description": "Cart identifier"
           }
         ],
         "requestBody": {
@@ -164,7 +100,7 @@
             }
           },
           "400": {
-            "description": "Bad request - Invalid input or insufficient stock",
+            "description": "Bad request - validation error",
             "content": {
               "application/json": {
                 "schema": {
@@ -174,7 +110,7 @@
             }
           },
           "404": {
-            "description": "Cart, product, or user not found",
+            "description": "Cart not found or Product not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -183,8 +119,8 @@
               }
             }
           },
-          "422": {
-            "description": "Product not available",
+          "409": {
+            "description": "Product not available or insufficient stock",
             "content": {
               "application/json": {
                 "schema": {
@@ -204,91 +140,25 @@
             }
           }
         }
-      }
-    },
-    "/api/cart/{userId}/items/{itemId}": {
+      },
       "delete": {
-        "tags": ["Cart Items"],
-        "summary": "Remove item from cart",
-        "description": "Remove a specific item from the user's cart",
-        "operationId": "removeItemFromCart",
+        "summary": "Cleanup cart",
+        "description": "Remove all items from the cart",
+        "operationId": "cleanupCart",
         "parameters": [
           {
-            "name": "userId",
+            "name": "cartId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             },
-            "description": "User ID"
-          },
-          {
-            "name": "itemId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "description": "Cart Item ID"
+            "description": "Cart identifier"
           }
         ],
         "responses": {
           "200": {
-            "description": "Item removed from cart successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CartDTO"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Cart or cart item not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/cart/{userId}/clear": {
-      "delete": {
-        "tags": ["Cart"],
-        "summary": "Clear cart",
-        "description": "Remove all items from the user's cart",
-        "operationId": "clearCart",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "description": "User ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Cart cleared successfully",
+            "description": "Cart cleaned up successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -320,9 +190,117 @@
         }
       }
     },
-    "/api/cart/logout/{userId}": {
+    "/carts/{cartId}/items/{itemId}": {
+      "delete": {
+        "summary": "Remove item from cart",
+        "description": "Remove a specific item from the cart",
+        "operationId": "removeItemFromCart",
+        "parameters": [
+          {
+            "name": "cartId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Cart identifier"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Cart item identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item removed from cart successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cart not found or Cart item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/carts/user/{userId}": {
       "post": {
-        "tags": ["Cart"],
+        "summary": "Get or create cart for user",
+        "description": "Retrieve existing cart or create a new cart for the specified user",
+        "operationId": "getOrCreateCartForUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cart retrieved or created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/carts/logout/{userId}": {
+      "post": {
         "summary": "Logout cleanup",
         "description": "Perform cleanup operations when user logs out",
         "operationId": "logoutCleanup",
@@ -332,28 +310,14 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             },
-            "description": "User ID"
+            "description": "User identifier"
           }
         ],
         "responses": {
           "200": {
-            "description": "Logout cleanup completed successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Logout cleanup completed"
-                    }
-                  }
-                }
-              }
-            }
+            "description": "Logout cleanup completed successfully"
           },
           "404": {
             "description": "User not found",
@@ -386,15 +350,13 @@
         "required": ["productId", "quantity"],
         "properties": {
           "productId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Product ID",
-            "minimum": 1
+            "type": "string",
+            "description": "Product identifier",
+            "minLength": 1
           },
           "quantity": {
             "type": "integer",
-            "format": "int32",
-            "description": "Quantity of the product",
+            "description": "Quantity of the product to add",
             "minimum": 1
           }
         }
@@ -403,73 +365,63 @@
         "type": "object",
         "properties": {
           "cartId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Cart ID"
-          },
-          "userId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "User ID"
+            "type": "string",
+            "description": "Cart identifier"
           },
           "items": {
             "type": "array",
+            "description": "List of items in the cart",
             "items": {
               "$ref": "#/components/schemas/CartItemDTO"
-            },
-            "description": "List of cart items"
+            }
           },
           "totalAmount": {
             "type": "number",
             "format": "double",
-            "description": "Total amount of the cart",
+            "description": "Total amount of all items in the cart",
             "minimum": 0
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Cart creation timestamp"
+          "totalItems": {
+            "type": "integer",
+            "description": "Total number of items in the cart",
+            "minimum": 0
           },
-          "updatedAt": {
+          "userId": {
             "type": "string",
-            "format": "date-time",
-            "description": "Cart last update timestamp"
+            "description": "User identifier who owns the cart"
           }
         }
       },
       "CartItemDTO": {
         "type": "object",
         "properties": {
-          "cartItemId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Cart item ID"
-          },
-          "productId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Product ID"
-          },
-          "productName": {
+          "itemId": {
             "type": "string",
-            "description": "Product name"
+            "description": "Cart item identifier"
           },
           "price": {
             "type": "number",
             "format": "double",
-            "description": "Product price",
+            "description": "Price per unit of the product",
             "minimum": 0
+          },
+          "productId": {
+            "type": "string",
+            "description": "Product identifier"
+          },
+          "productName": {
+            "type": "string",
+            "description": "Name of the product"
           },
           "quantity": {
             "type": "integer",
-            "format": "int32",
-            "description": "Quantity of the product",
+            "description": "Quantity of the product in the cart",
             "minimum": 1
           },
           "subtotal": {
             "type": "number",
             "format": "double",
-            "description": "Subtotal for this item",
+            "description": "Subtotal for this item (price * quantity)",
             "minimum": 0
           }
         }
@@ -479,38 +431,23 @@
         "properties": {
           "error": {
             "type": "string",
-            "description": "Error type or code"
+            "description": "Error type or category"
           },
           "message": {
             "type": "string",
-            "description": "Error message"
+            "description": "Detailed error message"
           },
           "status": {
             "type": "integer",
-            "format": "int32",
             "description": "HTTP status code"
           },
           "timestamp": {
             "type": "string",
             "format": "date-time",
-            "description": "Error timestamp"
-          },
-          "path": {
-            "type": "string",
-            "description": "Request path that caused the error"
+            "description": "Timestamp when the error occurred"
           }
         }
       }
     }
-  },
-  "tags": [
-    {
-      "name": "Cart",
-      "description": "Cart management operations"
-    },
-    {
-      "name": "Cart Items",
-      "description": "Cart item management operations"
-    }
-  ]
+  }
 }
