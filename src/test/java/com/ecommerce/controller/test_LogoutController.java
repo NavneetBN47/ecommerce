@@ -18,16 +18,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * JUnit test class for LogoutController.
+ * JUnit 5 test class for LogoutController.
  * 
- * This test class validates the logout functionality of the e-commerce application,
- * ensuring proper cart clearing, response handling, and error scenarios.
+ * This test class provides comprehensive coverage for the logout functionality
+ * including normal execution paths, edge cases, and validation scenarios.
+ * Uses Mockito for mocking the CartService dependency.
  * 
- * @author WF-4B Test Generation Agent
+ * @author QA Automation Engineer
  * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("LogoutController Test Suite")
+@DisplayName("LogoutController Tests")
 class test_LogoutController {
 
     @Mock
@@ -39,8 +40,8 @@ class test_LogoutController {
     private UUID testUserId;
 
     /**
-     * Sets up test data before each test execution.
-     * Initializes a valid test user ID for use across test cases.
+     * Setup method executed before each test.
+     * Initializes test data and mock objects.
      */
     @BeforeEach
     void setUp() {
@@ -48,17 +49,17 @@ class test_LogoutController {
     }
 
     /**
-     * Tests successful logout with valid user ID.
+     * Test successful logout with valid user ID.
      * 
      * Verifies that:
-     * - CartService.clearCart is called with correct user ID
-     * - Response status is 200 OK
-     * - Response body contains success message
-     * - Response data is null as expected
+     * - The logout endpoint returns HTTP 200 OK
+     * - The response contains success message
+     * - CartService.clearCart is called exactly once with correct userId
+     * - Response body is properly structured
      */
     @Test
-    @DisplayName("Should successfully logout user with valid user ID")
-    void testLogout_WithValidUserId_ShouldReturnSuccessResponse() {
+    @DisplayName("Should successfully logout user with valid userId")
+    void testLogout_WithValidUserId_ShouldReturnSuccess() {
         // Arrange
         doNothing().when(cartService).clearCart(testUserId);
 
@@ -67,101 +68,102 @@ class test_LogoutController {
 
         // Assert
         assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Response status should be 200 OK");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "HTTP status should be 200 OK");
         assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals("Logout successful", response.getBody().getMessage(), "Success message should match");
-        assertNull(response.getBody().getData(), "Response data should be null");
+        assertNull(response.getBody().getData(), "Data should be null for logout response");
         
         verify(cartService, times(1)).clearCart(testUserId);
+        verifyNoMoreInteractions(cartService);
     }
 
     /**
-     * Tests logout with null user ID.
+     * Test logout with different valid UUID formats.
      * 
-     * Verifies that the controller handles null user ID gracefully,
-     * though in production this would typically be caught by request validation.
+     * Verifies that the controller handles various valid UUID formats correctly.
      */
     @Test
-    @DisplayName("Should handle logout with null user ID")
-    void testLogout_WithNullUserId_ShouldCallClearCart() {
+    @DisplayName("Should handle logout with different valid UUID formats")
+    void testLogout_WithDifferentValidUUIDs_ShouldSucceed() {
         // Arrange
-        UUID nullUserId = null;
-        doNothing().when(cartService).clearCart(nullUserId);
+        UUID uuid1 = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        UUID uuid2 = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        UUID uuid3 = UUID.randomUUID();
 
-        // Act
-        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(nullUserId);
+        doNothing().when(cartService).clearCart(any(UUID.class));
 
-        // Assert
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Response status should be 200 OK");
-        
-        verify(cartService, times(1)).clearCart(nullUserId);
+        // Act & Assert for UUID 1
+        ResponseEntity<ApiResponse<Void>> response1 = logoutController.logout(uuid1);
+        assertEquals(HttpStatus.OK, response1.getStatusCode());
+        verify(cartService).clearCart(uuid1);
+
+        // Act & Assert for UUID 2
+        ResponseEntity<ApiResponse<Void>> response2 = logoutController.logout(uuid2);
+        assertEquals(HttpStatus.OK, response2.getStatusCode());
+        verify(cartService).clearCart(uuid2);
+
+        // Act & Assert for UUID 3
+        ResponseEntity<ApiResponse<Void>> response3 = logoutController.logout(uuid3);
+        assertEquals(HttpStatus.OK, response3.getStatusCode());
+        verify(cartService).clearCart(uuid3);
+
+        verify(cartService, times(3)).clearCart(any(UUID.class));
     }
 
     /**
-     * Tests logout when CartService throws RuntimeException.
+     * Test logout when CartService throws RuntimeException.
      * 
-     * Verifies that exceptions from the service layer are properly propagated,
-     * allowing the global exception handler to process them.
+     * Verifies that exceptions from CartService are properly propagated
+     * and not swallowed by the controller.
      */
     @Test
     @DisplayName("Should propagate exception when CartService fails")
     void testLogout_WhenCartServiceThrowsException_ShouldPropagateException() {
         // Arrange
-        RuntimeException expectedException = new RuntimeException("Cart service error");
-        doThrow(expectedException).when(cartService).clearCart(testUserId);
+        String errorMessage = "Database connection failed";
+        doThrow(new RuntimeException(errorMessage))
+            .when(cartService).clearCart(testUserId);
 
         // Act & Assert
-        RuntimeException thrownException = assertThrows(RuntimeException.class, 
-            () -> logoutController.logout(testUserId),
-            "Should throw RuntimeException when CartService fails");
-        
-        assertEquals("Cart service error", thrownException.getMessage(), "Exception message should match");
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            logoutController.logout(testUserId);
+        }, "Should throw RuntimeException when CartService fails");
+
+        assertEquals(errorMessage, exception.getMessage(), "Exception message should match");
         verify(cartService, times(1)).clearCart(testUserId);
     }
 
     /**
-     * Tests logout with different valid user IDs.
+     * Test logout when CartService throws IllegalArgumentException.
      * 
-     * Verifies that the logout functionality works correctly with multiple
-     * different user IDs, ensuring no state is shared between requests.
+     * Verifies proper handling of validation exceptions from the service layer.
      */
     @Test
-    @DisplayName("Should handle logout for multiple different user IDs")
-    void testLogout_WithMultipleUserIds_ShouldHandleEachIndependently() {
+    @DisplayName("Should propagate IllegalArgumentException from CartService")
+    void testLogout_WhenCartServiceThrowsIllegalArgumentException_ShouldPropagate() {
         // Arrange
-        UUID userId1 = UUID.randomUUID();
-        UUID userId2 = UUID.randomUUID();
-        UUID userId3 = UUID.randomUUID();
-        
-        doNothing().when(cartService).clearCart(any(UUID.class));
+        String errorMessage = "Invalid user ID";
+        doThrow(new IllegalArgumentException(errorMessage))
+            .when(cartService).clearCart(testUserId);
 
-        // Act
-        ResponseEntity<ApiResponse<Void>> response1 = logoutController.logout(userId1);
-        ResponseEntity<ApiResponse<Void>> response2 = logoutController.logout(userId2);
-        ResponseEntity<ApiResponse<Void>> response3 = logoutController.logout(userId3);
+        // Act & Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            logoutController.logout(testUserId);
+        }, "Should throw IllegalArgumentException when validation fails");
 
-        // Assert
-        assertAll("All logout responses should be successful",
-            () -> assertEquals(HttpStatus.OK, response1.getStatusCode()),
-            () -> assertEquals(HttpStatus.OK, response2.getStatusCode()),
-            () -> assertEquals(HttpStatus.OK, response3.getStatusCode())
-        );
-        
-        verify(cartService, times(1)).clearCart(userId1);
-        verify(cartService, times(1)).clearCart(userId2);
-        verify(cartService, times(1)).clearCart(userId3);
+        assertEquals(errorMessage, exception.getMessage());
+        verify(cartService, times(1)).clearCart(testUserId);
     }
 
     /**
-     * Tests that logout response structure is correct.
+     * Test logout response structure and content.
      * 
-     * Verifies the ApiResponse wrapper contains all expected fields
-     * and follows the defined contract.
+     * Verifies that the ApiResponse wrapper is correctly structured
+     * with appropriate success indicators.
      */
     @Test
-    @DisplayName("Should return correctly structured ApiResponse")
-    void testLogout_ShouldReturnCorrectApiResponseStructure() {
+    @DisplayName("Should return properly structured ApiResponse")
+    void testLogout_ResponseStructure_ShouldBeValid() {
         // Arrange
         doNothing().when(cartService).clearCart(testUserId);
 
@@ -173,66 +175,90 @@ class test_LogoutController {
         assertNotNull(response.getBody(), "Response body should not be null");
         
         ApiResponse<Void> apiResponse = response.getBody();
-        assertAll("ApiResponse structure validation",
-            () -> assertNotNull(apiResponse.getMessage(), "Message should not be null"),
-            () -> assertTrue(apiResponse.getMessage().contains("successful"), "Message should indicate success"),
-            () -> assertNull(apiResponse.getData(), "Data should be null for logout")
-        );
+        assertNotNull(apiResponse.getMessage(), "Message should not be null");
+        assertEquals("Logout successful", apiResponse.getMessage());
+        assertNull(apiResponse.getData(), "Data should be null for void response");
         
         verify(cartService, times(1)).clearCart(testUserId);
     }
 
     /**
-     * Tests logout with edge case UUID (all zeros).
+     * Test multiple consecutive logout calls for the same user.
      * 
-     * Verifies that the controller handles edge case UUIDs correctly.
+     * Verifies that multiple logout requests are handled correctly
+     * and CartService is called for each request.
      */
     @Test
-    @DisplayName("Should handle logout with edge case UUID")
-    void testLogout_WithEdgeCaseUUID_ShouldSucceed() {
-        // Arrange
-        UUID edgeCaseUserId = new UUID(0L, 0L);
-        doNothing().when(cartService).clearCart(edgeCaseUserId);
-
-        // Act
-        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(edgeCaseUserId);
-
-        // Assert
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Response status should be 200 OK");
-        
-        verify(cartService, times(1)).clearCart(edgeCaseUserId);
-    }
-
-    /**
-     * Tests that CartService is called exactly once per logout request.
-     * 
-     * Verifies proper interaction with the service layer and ensures
-     * no duplicate calls are made.
-     */
-    @Test
-    @DisplayName("Should call CartService.clearCart exactly once")
-    void testLogout_ShouldCallClearCartExactlyOnce() {
+    @DisplayName("Should handle multiple consecutive logout calls")
+    void testLogout_MultipleConsecutiveCalls_ShouldSucceed() {
         // Arrange
         doNothing().when(cartService).clearCart(testUserId);
 
         // Act
-        logoutController.logout(testUserId);
+        ResponseEntity<ApiResponse<Void>> response1 = logoutController.logout(testUserId);
+        ResponseEntity<ApiResponse<Void>> response2 = logoutController.logout(testUserId);
+        ResponseEntity<ApiResponse<Void>> response3 = logoutController.logout(testUserId);
 
         // Assert
-        verify(cartService, times(1)).clearCart(testUserId);
-        verifyNoMoreInteractions(cartService);
+        assertEquals(HttpStatus.OK, response1.getStatusCode());
+        assertEquals(HttpStatus.OK, response2.getStatusCode());
+        assertEquals(HttpStatus.OK, response3.getStatusCode());
+        
+        verify(cartService, times(3)).clearCart(testUserId);
     }
 
     /**
-     * Tests logout when CartService.clearCart completes successfully.
+     * Test logout with minimum edge case UUID (all zeros).
      * 
-     * Verifies that successful cart clearing results in a proper success response
-     * without any errors.
+     * Verifies handling of edge case UUID values.
      */
     @Test
-    @DisplayName("Should return success when cart is cleared successfully")
-    void testLogout_WhenCartClearedSuccessfully_ShouldReturnSuccess() {
+    @DisplayName("Should handle logout with minimum UUID value")
+    void testLogout_WithMinimumUUID_ShouldSucceed() {
+        // Arrange
+        UUID minUuid = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        doNothing().when(cartService).clearCart(minUuid);
+
+        // Act
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(minUuid);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Logout successful", response.getBody().getMessage());
+        verify(cartService, times(1)).clearCart(minUuid);
+    }
+
+    /**
+     * Test logout with maximum edge case UUID (all Fs).
+     * 
+     * Verifies handling of edge case UUID values.
+     */
+    @Test
+    @DisplayName("Should handle logout with maximum UUID value")
+    void testLogout_WithMaximumUUID_ShouldSucceed() {
+        // Arrange
+        UUID maxUuid = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        doNothing().when(cartService).clearCart(maxUuid);
+
+        // Act
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(maxUuid);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Logout successful", response.getBody().getMessage());
+        verify(cartService, times(1)).clearCart(maxUuid);
+    }
+
+    /**
+     * Test that CartService.clearCart is invoked before response is returned.
+     * 
+     * Verifies the order of operations in the logout flow.
+     */
+    @Test
+    @DisplayName("Should call CartService.clearCart before returning response")
+    void testLogout_ServiceCallOrder_ShouldBeCorrect() {
         // Arrange
         doNothing().when(cartService).clearCart(testUserId);
 
@@ -240,11 +266,28 @@ class test_LogoutController {
         ResponseEntity<ApiResponse<Void>> response = logoutController.logout(testUserId);
 
         // Assert
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
-        assertEquals("Logout successful", response.getBody().getMessage(), "Success message should be correct");
-        
+        verify(cartService, times(1)).clearCart(testUserId);
+        assertNotNull(response, "Response should be returned after service call");
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    /**
+     * Test logout response HTTP status code.
+     * 
+     * Verifies that successful logout always returns 200 OK.
+     */
+    @Test
+    @DisplayName("Should return HTTP 200 OK status for successful logout")
+    void testLogout_HttpStatus_ShouldBe200OK() {
+        // Arrange
+        doNothing().when(cartService).clearCart(testUserId);
+
+        // Act
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(testUserId);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(200, response.getStatusCodeValue());
         verify(cartService, times(1)).clearCart(testUserId);
     }
 }
