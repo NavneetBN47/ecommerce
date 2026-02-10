@@ -7,11 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -25,25 +27,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * JUnit 5 test class for CartController.
- * Tests all REST endpoints for cart management operations.
- * Uses MockMvc for controller testing and Mockito for service layer mocking.
- *
- * @author QA Automation Team
+ * Tests all public REST endpoints for cart management operations.
+ * Uses Mockito to mock the CartService layer.
+ * 
+ * @author Test Generation Agent
  * @version 1.0
  */
-@WebMvcTest(CartController.class)
+@ExtendWith(MockitoExtension.class)
 @DisplayName("CartController Test Suite")
-public class test_CartController {
+class test_CartController {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private CartService cartService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private CartController cartController;
 
+    private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
     private UUID testCartId;
     private UUID testUserId;
     private UUID testItemId;
@@ -51,305 +52,370 @@ public class test_CartController {
     private AddItemRequest testAddItemRequest;
 
     /**
-     * Set up test data before each test execution.
-     * Initializes test UUIDs, CartDTO, and AddItemRequest objects.
+     * Set up test fixtures before each test method.
+     * Initializes MockMvc, test data, and common objects.
      */
     @BeforeEach
-    public void setUp() {
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(cartController).build();
+        objectMapper = new ObjectMapper();
+        
         testCartId = UUID.randomUUID();
         testUserId = UUID.randomUUID();
         testItemId = UUID.randomUUID();
-
+        
+        // Initialize test CartDTO
         testCartDTO = new CartDTO();
         testCartDTO.setCartId(testCartId);
         testCartDTO.setUserId(testUserId);
         testCartDTO.setItems(new ArrayList<>());
-        testCartDTO.setTotalAmount(BigDecimal.ZERO);
-
+        testCartDTO.setTotalPrice(BigDecimal.ZERO);
+        
+        // Initialize test AddItemRequest
         testAddItemRequest = new AddItemRequest();
         testAddItemRequest.setProductId(UUID.randomUUID());
         testAddItemRequest.setQuantity(2);
-        testAddItemRequest.setPrice(BigDecimal.valueOf(29.99));
     }
 
     /**
-     * Test adding an item to cart with valid request.
-     * Verifies that the endpoint returns HTTP 200 and the correct CartDTO.
-     *
-     * @throws Exception if the request fails
+     * Test successful addition of item to cart.
+     * Verifies that the endpoint returns 200 OK and the correct CartDTO.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should successfully add item to cart")
-    public void testAddItemToCart_Success() throws Exception {
+    void testAddItemToCart_Success() throws Exception {
+        // Arrange
         when(cartService.addItemToCart(eq(testCartId), any(AddItemRequest.class)))
-                .thenReturn(testCartDTO);
+            .thenReturn(testCartDTO);
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/{cartId}/items", testCartId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testAddItemRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
-                .andExpect(jsonPath("$.userId").value(testUserId.toString()));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testAddItemRequest)))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
+            .andExpect(jsonPath("$.userId").value(testUserId.toString()));
 
         verify(cartService, times(1)).addItemToCart(eq(testCartId), any(AddItemRequest.class));
     }
 
     /**
-     * Test adding an item to cart with invalid request (missing required fields).
-     * Verifies that the endpoint returns HTTP 400 Bad Request.
-     *
-     * @throws Exception if the request fails
+     * Test adding item to cart with invalid request body.
+     * Verifies that validation errors are handled properly.
+     * 
+     * @throws Exception if request fails
      */
     @Test
-    @DisplayName("Should return bad request when adding item with invalid data")
-    public void testAddItemToCart_InvalidRequest() throws Exception {
+    @DisplayName("Should return 400 when adding item with invalid request")
+    void testAddItemToCart_InvalidRequest() throws Exception {
+        // Arrange
         AddItemRequest invalidRequest = new AddItemRequest();
+        // Missing required fields
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/{cartId}/items", testCartId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidRequest)))
+            .andExpect(status().isBadRequest());
 
         verify(cartService, never()).addItemToCart(any(UUID.class), any(AddItemRequest.class));
     }
 
     /**
-     * Test removing an item from cart with valid IDs.
-     * Verifies that the endpoint returns HTTP 200 and the updated CartDTO.
-     *
-     * @throws Exception if the request fails
+     * Test successful removal of item from cart.
+     * Verifies that the endpoint returns 200 OK and updated CartDTO.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should successfully remove item from cart")
-    public void testRemoveItemFromCart_Success() throws Exception {
+    void testRemoveItemFromCart_Success() throws Exception {
+        // Arrange
         when(cartService.removeItemFromCart(testCartId, testItemId))
-                .thenReturn(testCartDTO);
+            .thenReturn(testCartDTO);
 
+        // Act & Assert
         mockMvc.perform(delete("/api/carts/{cartId}/items/{itemId}", testCartId, testItemId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cartId").value(testCartId.toString()));
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.cartId").value(testCartId.toString()));
 
         verify(cartService, times(1)).removeItemFromCart(testCartId, testItemId);
     }
 
     /**
-     * Test removing a non-existent item from cart.
-     * Verifies proper error handling when item is not found.
-     *
-     * @throws Exception if the request fails
+     * Test removing non-existent item from cart.
+     * Verifies that appropriate error handling occurs.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should handle removal of non-existent item")
-    public void testRemoveItemFromCart_ItemNotFound() throws Exception {
+    void testRemoveItemFromCart_ItemNotFound() throws Exception {
+        // Arrange
         UUID nonExistentItemId = UUID.randomUUID();
         when(cartService.removeItemFromCart(testCartId, nonExistentItemId))
-                .thenThrow(new RuntimeException("Item not found"));
+            .thenThrow(new RuntimeException("Item not found"));
 
+        // Act & Assert
         mockMvc.perform(delete("/api/carts/{cartId}/items/{itemId}", testCartId, nonExistentItemId))
-                .andExpect(status().is5xxServerError());
+            .andExpect(status().is5xxServerError());
 
         verify(cartService, times(1)).removeItemFromCart(testCartId, nonExistentItemId);
     }
 
     /**
-     * Test viewing cart with valid cart ID.
-     * Verifies that the endpoint returns HTTP 200 and the correct CartDTO.
-     *
-     * @throws Exception if the request fails
+     * Test successful cart viewing.
+     * Verifies that the endpoint returns 200 OK and the correct CartDTO.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should successfully view cart")
-    public void testViewCart_Success() throws Exception {
+    void testViewCart_Success() throws Exception {
+        // Arrange
         when(cartService.viewCart(testCartId)).thenReturn(testCartDTO);
 
+        // Act & Assert
         mockMvc.perform(get("/api/carts/{cartId}", testCartId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
-                .andExpect(jsonPath("$.userId").value(testUserId.toString()));
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
+            .andExpect(jsonPath("$.userId").value(testUserId.toString()));
 
         verify(cartService, times(1)).viewCart(testCartId);
     }
 
     /**
-     * Test viewing a non-existent cart.
-     * Verifies proper error handling when cart is not found.
-     *
-     * @throws Exception if the request fails
+     * Test viewing non-existent cart.
+     * Verifies that appropriate error is returned.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should handle viewing non-existent cart")
-    public void testViewCart_CartNotFound() throws Exception {
+    void testViewCart_CartNotFound() throws Exception {
+        // Arrange
         UUID nonExistentCartId = UUID.randomUUID();
         when(cartService.viewCart(nonExistentCartId))
-                .thenThrow(new RuntimeException("Cart not found"));
+            .thenThrow(new RuntimeException("Cart not found"));
 
+        // Act & Assert
         mockMvc.perform(get("/api/carts/{cartId}", nonExistentCartId))
-                .andExpect(status().is5xxServerError());
+            .andExpect(status().is5xxServerError());
 
         verify(cartService, times(1)).viewCart(nonExistentCartId);
     }
 
     /**
-     * Test cleaning up cart (removing all items) with valid cart ID.
-     * Verifies that the endpoint returns HTTP 200 and an empty CartDTO.
-     *
-     * @throws Exception if the request fails
+     * Test successful cart cleanup (removing all items).
+     * Verifies that the endpoint returns 200 OK and empty cart.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should successfully cleanup cart")
-    public void testCleanupCart_Success() throws Exception {
+    void testCleanupCart_Success() throws Exception {
+        // Arrange
         CartDTO emptyCart = new CartDTO();
         emptyCart.setCartId(testCartId);
         emptyCart.setUserId(testUserId);
         emptyCart.setItems(new ArrayList<>());
-        emptyCart.setTotalAmount(BigDecimal.ZERO);
-
+        emptyCart.setTotalPrice(BigDecimal.ZERO);
+        
         when(cartService.cleanupCart(testCartId)).thenReturn(emptyCart);
 
+        // Act & Assert
         mockMvc.perform(delete("/api/carts/{cartId}/items", testCartId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
-                .andExpect(jsonPath("$.items").isEmpty());
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
+            .andExpect(jsonPath("$.items").isEmpty());
 
         verify(cartService, times(1)).cleanupCart(testCartId);
     }
 
     /**
-     * Test getting or creating cart for a user.
-     * Verifies that the endpoint returns HTTP 200 and the CartDTO.
-     *
-     * @throws Exception if the request fails
+     * Test cleanup of non-existent cart.
+     * Verifies that appropriate error handling occurs.
+     * 
+     * @throws Exception if request fails
+     */
+    @Test
+    @DisplayName("Should handle cleanup of non-existent cart")
+    void testCleanupCart_CartNotFound() throws Exception {
+        // Arrange
+        UUID nonExistentCartId = UUID.randomUUID();
+        when(cartService.cleanupCart(nonExistentCartId))
+            .thenThrow(new RuntimeException("Cart not found"));
+
+        // Act & Assert
+        mockMvc.perform(delete("/api/carts/{cartId}/items", nonExistentCartId))
+            .andExpect(status().is5xxServerError());
+
+        verify(cartService, times(1)).cleanupCart(nonExistentCartId);
+    }
+
+    /**
+     * Test successful get or create cart for user.
+     * Verifies that the endpoint returns 200 OK and CartDTO.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should successfully get or create cart for user")
-    public void testGetOrCreateCart_Success() throws Exception {
+    void testGetOrCreateCart_Success() throws Exception {
+        // Arrange
         when(cartService.getOrCreateCart(testUserId)).thenReturn(testCartDTO);
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/user/{userId}", testUserId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
-                .andExpect(jsonPath("$.userId").value(testUserId.toString()));
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.cartId").value(testCartId.toString()))
+            .andExpect(jsonPath("$.userId").value(testUserId.toString()));
 
         verify(cartService, times(1)).getOrCreateCart(testUserId);
     }
 
     /**
-     * Test getting or creating cart for a new user (lazy creation).
-     * Verifies that a new cart is created when user doesn't have one.
-     *
-     * @throws Exception if the request fails
+     * Test get or create cart with new user (lazy creation).
+     * Verifies that a new cart is created for new users.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should create new cart for new user")
-    public void testGetOrCreateCart_NewUser() throws Exception {
+    void testGetOrCreateCart_NewUser() throws Exception {
+        // Arrange
         UUID newUserId = UUID.randomUUID();
+        UUID newCartId = UUID.randomUUID();
         CartDTO newCartDTO = new CartDTO();
-        newCartDTO.setCartId(UUID.randomUUID());
+        newCartDTO.setCartId(newCartId);
         newCartDTO.setUserId(newUserId);
         newCartDTO.setItems(new ArrayList<>());
-        newCartDTO.setTotalAmount(BigDecimal.ZERO);
-
+        newCartDTO.setTotalPrice(BigDecimal.ZERO);
+        
         when(cartService.getOrCreateCart(newUserId)).thenReturn(newCartDTO);
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/user/{userId}", newUserId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId.toString()));
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.cartId").value(newCartId.toString()))
+            .andExpect(jsonPath("$.userId").value(newUserId.toString()));
 
         verify(cartService, times(1)).getOrCreateCart(newUserId);
     }
 
     /**
-     * Test logout cleanup for a user.
-     * Verifies that the endpoint returns HTTP 204 No Content.
-     *
-     * @throws Exception if the request fails
+     * Test successful logout cleanup.
+     * Verifies that the endpoint returns 204 No Content.
+     * 
+     * @throws Exception if request fails
      */
     @Test
     @DisplayName("Should successfully perform logout cleanup")
-    public void testLogoutCleanup_Success() throws Exception {
+    void testLogoutCleanup_Success() throws Exception {
+        // Arrange
         doNothing().when(cartService).logoutCleanup(testUserId);
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/logout/{userId}", testUserId))
-                .andExpect(status().isNoContent());
+            .andExpect(status().isNoContent());
 
         verify(cartService, times(1)).logoutCleanup(testUserId);
     }
 
     /**
      * Test logout cleanup with invalid user ID.
-     * Verifies proper error handling during logout cleanup.
-     *
-     * @throws Exception if the request fails
+     * Verifies that appropriate error handling occurs.
+     * 
+     * @throws Exception if request fails
      */
     @Test
-    @DisplayName("Should handle logout cleanup errors gracefully")
-    public void testLogoutCleanup_Error() throws Exception {
+    @DisplayName("Should handle logout cleanup with invalid user")
+    void testLogoutCleanup_InvalidUser() throws Exception {
+        // Arrange
         UUID invalidUserId = UUID.randomUUID();
-        doThrow(new RuntimeException("User not found")).when(cartService).logoutCleanup(invalidUserId);
+        doThrow(new RuntimeException("User not found"))
+            .when(cartService).logoutCleanup(invalidUserId);
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/logout/{userId}", invalidUserId))
-                .andExpect(status().is5xxServerError());
+            .andExpect(status().is5xxServerError());
 
         verify(cartService, times(1)).logoutCleanup(invalidUserId);
     }
 
     /**
-     * Test adding item to cart with null cart ID.
-     * Verifies proper validation of path variables.
-     *
-     * @throws Exception if the request fails
+     * Test logout cleanup is idempotent.
+     * Verifies that multiple logout calls don't cause issues.
+     * 
+     * @throws Exception if request fails
      */
     @Test
-    @DisplayName("Should handle invalid UUID format in path variable")
-    public void testAddItemToCart_InvalidUUID() throws Exception {
-        mockMvc.perform(post("/api/carts/{cartId}/items", "invalid-uuid")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testAddItemRequest)))
-                .andExpect(status().isBadRequest());
+    @DisplayName("Should handle multiple logout cleanup calls")
+    void testLogoutCleanup_Idempotent() throws Exception {
+        // Arrange
+        doNothing().when(cartService).logoutCleanup(testUserId);
 
-        verify(cartService, never()).addItemToCart(any(UUID.class), any(AddItemRequest.class));
+        // Act & Assert - First call
+        mockMvc.perform(post("/api/carts/logout/{userId}", testUserId))
+            .andExpect(status().isNoContent());
+
+        // Act & Assert - Second call
+        mockMvc.perform(post("/api/carts/logout/{userId}", testUserId))
+            .andExpect(status().isNoContent());
+
+        verify(cartService, times(2)).logoutCleanup(testUserId);
     }
 
     /**
      * Test adding item with zero quantity.
-     * Verifies validation of business rules in the request.
-     *
-     * @throws Exception if the request fails
+     * Verifies that edge case validation works properly.
+     * 
+     * @throws Exception if request fails
      */
     @Test
-    @DisplayName("Should validate quantity in add item request")
-    public void testAddItemToCart_ZeroQuantity() throws Exception {
+    @DisplayName("Should handle adding item with zero quantity")
+    void testAddItemToCart_ZeroQuantity() throws Exception {
+        // Arrange
         AddItemRequest zeroQuantityRequest = new AddItemRequest();
         zeroQuantityRequest.setProductId(UUID.randomUUID());
         zeroQuantityRequest.setQuantity(0);
-        zeroQuantityRequest.setPrice(BigDecimal.valueOf(29.99));
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/{cartId}/items", testCartId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(zeroQuantityRequest)))
-                .andExpect(status().isBadRequest());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(zeroQuantityRequest)))
+            .andExpect(status().isBadRequest());
 
         verify(cartService, never()).addItemToCart(any(UUID.class), any(AddItemRequest.class));
     }
 
     /**
-     * Test adding item with negative price.
-     * Verifies validation of price field in the request.
-     *
-     * @throws Exception if the request fails
+     * Test adding item with negative quantity.
+     * Verifies that validation rejects negative quantities.
+     * 
+     * @throws Exception if request fails
      */
     @Test
-    @DisplayName("Should validate price in add item request")
-    public void testAddItemToCart_NegativePrice() throws Exception {
-        AddItemRequest negativePriceRequest = new AddItemRequest();
-        negativePriceRequest.setProductId(UUID.randomUUID());
-        negativePriceRequest.setQuantity(2);
-        negativePriceRequest.setPrice(BigDecimal.valueOf(-10.00));
+    @DisplayName("Should handle adding item with negative quantity")
+    void testAddItemToCart_NegativeQuantity() throws Exception {
+        // Arrange
+        AddItemRequest negativeQuantityRequest = new AddItemRequest();
+        negativeQuantityRequest.setProductId(UUID.randomUUID());
+        negativeQuantityRequest.setQuantity(-1);
 
+        // Act & Assert
         mockMvc.perform(post("/api/carts/{cartId}/items", testCartId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(negativePriceRequest)))
-                .andExpect(status().isBadRequest());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(negativeQuantityRequest)))
+            .andExpect(status().isBadRequest());
 
         verify(cartService, never()).addItemToCart(any(UUID.class), any(AddItemRequest.class));
     }
