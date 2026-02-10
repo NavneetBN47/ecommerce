@@ -1,26 +1,14 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "E-Commerce API",
-    "description": "RESTful API for E-Commerce platform with authentication, user management, product catalog, shopping cart, and order processing",
+    "title": "Shopping Cart API",
     "version": "1.0.0",
-    "contact": {
-      "name": "E-Commerce API Team",
-      "email": "api-support@ecommerce.com"
-    },
-    "license": {
-      "name": "MIT",
-      "url": "https://opensource.org/licenses/MIT"
-    }
+    "description": "Shopping Cart System Backend API"
   },
   "servers": [
     {
       "url": "http://localhost:8080",
       "description": "Development server"
-    },
-    {
-      "url": "https://api.ecommerce.com",
-      "description": "Production server"
     }
   ],
   "security": [
@@ -28,396 +16,421 @@
       "bearerAuth": []
     }
   ],
-  "paths": {
-    "/api/auth/register": {
-      "post": {
-        "tags": ["Authentication"],
-        "summary": "Register a new user",
-        "description": "Register a new user account in the system",
-        "operationId": "register",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserRegistrationDTO"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "User registered successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/ApiResponseDTO"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/UserDTO"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid registration data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "User already exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/login": {
-      "post": {
-        "tags": ["Authentication"],
-        "summary": "Login user (stateless with JWT)",
-        "description": "Authenticate user and return JWT token",
-        "operationId": "login",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequestDTO"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Login successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/ApiResponseDTO"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/LoginResponseDTO"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid login credentials",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/logout": {
-      "post": {
-        "tags": ["Authentication"],
-        "summary": "Logout user (cleanup cart)",
-        "description": "Logout user and cleanup associated cart data",
-        "operationId": "logout",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Logout successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/ApiResponseDTO"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "null"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - Invalid or missing JWT token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
   "components": {
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT token for authentication"
+        "description": "JWT authentication token"
       }
     },
     "schemas": {
-      "ApiResponseDTO": {
+      "AuthRequest": {
         "type": "object",
-        "required": ["success", "message", "timestamp"],
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "Indicates if the operation was successful"
-          },
-          "message": {
-            "type": "string",
-            "description": "Human-readable message describing the result"
-          },
-          "data": {
-            "type": "object",
-            "description": "Response payload data",
-            "nullable": true
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Timestamp of the response"
-          }
-        }
-      },
-      "UserRegistrationDTO": {
-        "type": "object",
-        "required": ["username", "email", "password", "firstName", "lastName"],
+        "required": ["username", "password"],
         "properties": {
           "username": {
             "type": "string",
             "minLength": 3,
             "maxLength": 50,
-            "pattern": "^[a-zA-Z0-9_]+$",
-            "description": "Unique username for the account"
-          },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "maxLength": 100,
-            "description": "User's email address"
+            "description": "Username for authentication"
           },
           "password": {
             "type": "string",
-            "minLength": 8,
-            "maxLength": 100,
-            "description": "User's password (will be encrypted)"
-          },
-          "firstName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50,
-            "description": "User's first name"
-          },
-          "lastName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50,
-            "description": "User's last name"
-          },
-          "phoneNumber": {
-            "type": "string",
-            "pattern": "^\\+?[1-9]\\d{1,14}$",
-            "description": "User's phone number (optional)"
+            "minLength": 6,
+            "description": "Password for authentication"
           }
         }
       },
-      "UserDTO": {
+      "AuthResponse": {
         "type": "object",
-        "required": ["id", "username", "email", "firstName", "lastName", "createdAt"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT authentication token"
+          },
+          "type": {
+            "type": "string",
+            "example": "Bearer",
+            "description": "Token type"
+          },
+          "username": {
+            "type": "string",
+            "description": "Authenticated username"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "User roles"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": ["username", "email", "password"],
         "properties": {
           "id": {
             "type": "integer",
             "format": "int64",
-            "description": "Unique user identifier"
+            "description": "User ID"
           },
           "username": {
             "type": "string",
-            "description": "User's username"
+            "minLength": 3,
+            "maxLength": 50,
+            "description": "Username"
           },
           "email": {
             "type": "string",
             "format": "email",
-            "description": "User's email address"
-          },
-          "firstName": {
-            "type": "string",
-            "description": "User's first name"
-          },
-          "lastName": {
-            "type": "string",
-            "description": "User's last name"
-          },
-          "phoneNumber": {
-            "type": "string",
-            "description": "User's phone number",
-            "nullable": true
-          },
-          "role": {
-            "type": "string",
-            "enum": ["USER", "ADMIN"],
-            "description": "User's role in the system"
-          },
-          "active": {
-            "type": "boolean",
-            "description": "Whether the user account is active"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Account creation timestamp"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Last account update timestamp",
-            "nullable": true
-          }
-        }
-      },
-      "LoginRequestDTO": {
-        "type": "object",
-        "required": ["identifier", "password"],
-        "properties": {
-          "identifier": {
-            "type": "string",
-            "description": "Username or email address"
+            "maxLength": 100,
+            "description": "User email address"
           },
           "password": {
             "type": "string",
-            "description": "User's password"
+            "minLength": 6,
+            "description": "User password"
           },
-          "rememberMe": {
-            "type": "boolean",
-            "default": false,
-            "description": "Whether to extend token expiration"
+          "firstName": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "User first name"
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "User last name"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "User roles"
           }
         }
       },
-      "LoginResponseDTO": {
+      "Product": {
         "type": "object",
-        "required": ["token", "tokenType", "expiresIn", "user"],
+        "required": ["name", "price"],
         "properties": {
-          "token": {
-            "type": "string",
-            "description": "JWT access token"
-          },
-          "tokenType": {
-            "type": "string",
-            "enum": ["Bearer"],
-            "description": "Token type (always Bearer)"
-          },
-          "expiresIn": {
+          "id": {
             "type": "integer",
             "format": "int64",
-            "description": "Token expiration time in seconds"
+            "description": "Product ID"
           },
-          "refreshToken": {
+          "name": {
             "type": "string",
-            "description": "Refresh token for obtaining new access tokens",
-            "nullable": true
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Product name"
           },
-          "user": {
-            "$ref": "#/components/schemas/UserDTO"
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Product description"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "description": "Product price"
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Product category"
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Available stock quantity"
+          },
+          "imageUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Product image URL"
+          }
+        }
+      },
+      "CartItem": {
+        "type": "object",
+        "required": ["productId", "quantity"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cart item ID"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Product ID"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Item quantity"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      },
+      "Cart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cart ID"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "User ID"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartItem"
+            },
+            "description": "Cart items"
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "double",
+            "description": "Total cart amount"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Order ID"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "User ID"
+          },
+          "orderDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Order date"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"],
+            "description": "Order status"
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "double",
+            "description": "Total order amount"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            },
+            "description": "Order items"
+          },
+          "shippingAddress": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Shipping address"
+          }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Order item ID"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Product ID"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Item quantity"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "description": "Item price at time of order"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      },
+      "AddToCartRequest": {
+        "type": "object",
+        "required": ["productId", "quantity"],
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Product ID to add to cart"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Quantity to add"
+          }
+        }
+      },
+      "UpdateCartItemRequest": {
+        "type": "object",
+        "required": ["quantity"],
+        "properties": {
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "New quantity"
+          }
+        }
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": ["shippingAddress"],
+        "properties": {
+          "shippingAddress": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200,
+            "description": "Shipping address for the order"
           }
         }
       },
       "ErrorResponse": {
         "type": "object",
-        "required": ["success", "message", "timestamp"],
         "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [false],
-            "description": "Always false for error responses"
+          "error": {
+            "type": "string",
+            "description": "Error message"
           },
           "message": {
             "type": "string",
-            "description": "Error message describing what went wrong"
-          },
-          "error": {
-            "type": "string",
-            "description": "Error code or type"
-          },
-          "details": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Additional error details or validation messages"
+            "description": "Detailed error message"
           },
           "timestamp": {
             "type": "string",
             "format": "date-time",
-            "description": "Timestamp when the error occurred"
+            "description": "Error timestamp"
           },
           "path": {
             "type": "string",
-            "description": "API path where the error occurred"
+            "description": "Request path that caused the error"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Validation failed",
+            "description": "Error type"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Field-specific validation errors"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Error timestamp"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized access",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Access forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Validation error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
           }
         }
       }
     }
   },
-  "tags": [
-    {
-      "name": "Authentication",
-      "description": "User authentication and authorization operations"
-    }
-  ]
+  "paths": { ... },
+  "tags": [ ... ]
 }
