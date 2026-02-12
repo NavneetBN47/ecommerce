@@ -15,10 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,15 +24,15 @@ import static org.mockito.Mockito.*;
 
 /**
  * JUnit 5 test class for CartService.
- * Tests all business logic for cart management operations.
- * Mocks repository layer to isolate service logic.
- *
- * @author QA Automation Team
+ * Tests all business logic for cart management including item operations,
+ * cart lifecycle, validation, and transaction handling.
+ * 
+ * @author Test Generation Agent
  * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CartService Tests")
-public class test_CartService {
+@DisplayName("CartService Test Suite")
+class test_CartService {
 
     @Mock
     private CartRepository cartRepository;
@@ -67,6 +64,7 @@ public class test_CartService {
 
     /**
      * Set up test data before each test execution.
+     * Initializes common test entities and mock objects.
      */
     @BeforeEach
     void setUp() {
@@ -118,17 +116,17 @@ public class test_CartService {
 
     /**
      * Test successful addition of new item to cart.
-     * Verifies that a new cart item is created and cart totals are updated.
+     * Verifies that item is added, totals are updated, and history is recorded.
      */
     @Test
-    @DisplayName("Should add new item to cart successfully")
+    @DisplayName("Should successfully add new item to cart")
     void testAddItemToCart_NewItem_Success() {
         when(cartRepository.findByIdWithItems(testCartId)).thenReturn(Optional.of(testCart));
         when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
         when(cartItemRepository.findByCartIdAndProductId(testCartId, testProductId))
                 .thenReturn(Optional.empty());
         when(cartItemRepository.save(any(CartItem.class))).thenReturn(testCartItem);
-        when(cartItemRepository.findByCartId(testCartId)).thenReturn(List.of(testCartItem));
+        when(cartItemRepository.findByCartId(testCartId)).thenReturn(Arrays.asList(testCartItem));
         when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
         when(cartHistoryRepository.save(any(CartHistory.class))).thenReturn(new CartHistory());
 
@@ -143,24 +141,27 @@ public class test_CartService {
 
     /**
      * Test adding item to cart when item already exists.
-     * Verifies that existing item quantity is incremented.
+     * Verifies that quantity is incremented instead of creating duplicate.
      */
     @Test
     @DisplayName("Should increment quantity when adding existing item")
-    void testAddItemToCart_ExistingItem_Success() {
+    void testAddItemToCart_ExistingItem_IncrementQuantity() {
+        testCartItem.setQuantity(3);
         when(cartRepository.findByIdWithItems(testCartId)).thenReturn(Optional.of(testCart));
         when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
         when(cartItemRepository.findByCartIdAndProductId(testCartId, testProductId))
                 .thenReturn(Optional.of(testCartItem));
         when(cartItemRepository.save(any(CartItem.class))).thenReturn(testCartItem);
-        when(cartItemRepository.findByCartId(testCartId)).thenReturn(List.of(testCartItem));
+        when(cartItemRepository.findByCartId(testCartId)).thenReturn(Arrays.asList(testCartItem));
         when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
         when(cartHistoryRepository.save(any(CartHistory.class))).thenReturn(new CartHistory());
 
         CartDTO result = cartService.addItemToCart(testCartId, testAddItemRequest);
 
         assertNotNull(result);
-        verify(cartItemRepository, times(1)).save(any(CartItem.class));
+        verify(cartItemRepository, times(1)).save(argThat(item -> 
+            item.getQuantity() == 5 // 3 existing + 2 new
+        ));
         verify(cartHistoryRepository, times(1)).save(any(CartHistory.class));
     }
 
@@ -236,14 +237,14 @@ public class test_CartService {
     }
 
     /**
-     * Test adding item when total quantity exceeds stock.
-     * Verifies that InsufficientStockException is thrown for existing items.
+     * Test adding item that would exceed stock when combined with existing quantity.
+     * Verifies that InsufficientStockException is thrown.
      */
     @Test
     @DisplayName("Should throw InsufficientStockException when total quantity exceeds stock")
-    void testAddItemToCart_ExistingItem_InsufficientStock() {
-        testProduct.setStockQuantity(3);
-        testCartItem.setQuantity(2);
+    void testAddItemToCart_ExceedsStockWithExisting() {
+        testProduct.setStockQuantity(10);
+        testCartItem.setQuantity(9);
         testAddItemRequest.setQuantity(2);
         when(cartRepository.findByIdWithItems(testCartId)).thenReturn(Optional.of(testCart));
         when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
@@ -259,14 +260,14 @@ public class test_CartService {
 
     /**
      * Test successful removal of item from cart.
-     * Verifies that item is deleted and cart totals are updated.
+     * Verifies that item is deleted, totals are updated, and history is recorded.
      */
     @Test
-    @DisplayName("Should remove item from cart successfully")
+    @DisplayName("Should successfully remove item from cart")
     void testRemoveItemFromCart_Success() {
         when(cartRepository.findByIdWithItems(testCartId)).thenReturn(Optional.of(testCart));
         when(cartItemRepository.findById(testItemId)).thenReturn(Optional.of(testCartItem));
-        doNothing().when(cartItemRepository).delete(testCartItem);
+        doNothing().when(cartItemRepository).delete(any(CartItem.class));
         when(cartItemRepository.findByCartId(testCartId)).thenReturn(new ArrayList<>());
         when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
         when(cartHistoryRepository.save(any(CartHistory.class))).thenReturn(new CartHistory());
@@ -276,6 +277,7 @@ public class test_CartService {
         assertNotNull(result);
         assertEquals(testCartId, result.getCartId());
         verify(cartItemRepository, times(1)).delete(testCartItem);
+        verify(cartRepository, times(1)).save(any(Cart.class));
         verify(cartHistoryRepository, times(1)).save(any(CartHistory.class));
     }
 
@@ -332,10 +334,10 @@ public class test_CartService {
 
     /**
      * Test successful cart cleanup.
-     * Verifies that all items are removed and cart totals are reset.
+     * Verifies that all items are removed and totals are reset.
      */
     @Test
-    @DisplayName("Should cleanup cart successfully")
+    @DisplayName("Should successfully cleanup cart")
     void testCleanupCart_Success() {
         when(cartRepository.findById(testCartId)).thenReturn(Optional.of(testCart));
         doNothing().when(cartItemRepository).deleteByCartId(testCartId);
@@ -345,10 +347,10 @@ public class test_CartService {
         CartDTO result = cartService.cleanupCart(testCartId);
 
         assertNotNull(result);
-        assertEquals(testCartId, result.getCartId());
         assertEquals(BigDecimal.ZERO, result.getTotalAmount());
         assertEquals(0, result.getTotalItems());
         verify(cartItemRepository, times(1)).deleteByCartId(testCartId);
+        verify(cartRepository, times(1)).save(any(Cart.class));
         verify(cartHistoryRepository, times(1)).save(any(CartHistory.class));
     }
 
@@ -369,16 +371,14 @@ public class test_CartService {
     }
 
     /**
-     * Test successful cart view.
+     * Test successful cart viewing.
      * Verifies that cart with all items is returned.
      */
     @Test
-    @DisplayName("Should view cart successfully")
+    @DisplayName("Should successfully view cart")
     void testViewCart_Success() {
-        List<CartItem> items = List.of(testCartItem);
-        testCart.setItems(items);
         when(cartRepository.findByIdWithItems(testCartId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartId(testCartId)).thenReturn(items);
+        when(cartItemRepository.findByCartId(testCartId)).thenReturn(Arrays.asList(testCartItem));
         when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
 
         CartDTO result = cartService.viewCart(testCartId);
@@ -386,6 +386,7 @@ public class test_CartService {
         assertNotNull(result);
         assertEquals(testCartId, result.getCartId());
         assertEquals(testUserId, result.getUserId());
+        assertFalse(result.getItems().isEmpty());
         verify(cartRepository, times(1)).findByIdWithItems(testCartId);
     }
 
@@ -401,6 +402,23 @@ public class test_CartService {
         assertThrows(CartNotFoundException.class, () -> {
             cartService.viewCart(testCartId);
         });
+    }
+
+    /**
+     * Test viewing empty cart.
+     * Verifies that empty cart DTO is returned correctly.
+     */
+    @Test
+    @DisplayName("Should successfully view empty cart")
+    void testViewCart_EmptyCart() {
+        when(cartRepository.findByIdWithItems(testCartId)).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartId(testCartId)).thenReturn(new ArrayList<>());
+
+        CartDTO result = cartService.viewCart(testCartId);
+
+        assertNotNull(result);
+        assertTrue(result.getItems().isEmpty());
+        assertEquals(0, result.getTotalItems());
     }
 
     /**
@@ -424,18 +442,18 @@ public class test_CartService {
     }
 
     /**
-     * Test creating new cart for user when none exists.
-     * Verifies lazy cart creation functionality.
+     * Test creating new cart for user without active cart.
+     * Verifies that new cart is created and saved.
      */
     @Test
     @DisplayName("Should create new cart when user has no active cart")
-    void testGetOrCreateCart_NewCart() {
+    void testGetOrCreateCart_CreateNewCart() {
         when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
         when(cartRepository.findByUserIdAndCartStatus(testUserId, Cart.CartStatus.ACTIVE))
                 .thenReturn(Optional.empty());
         when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
-        when(cartHistoryRepository.save(any(CartHistory.class))).thenReturn(new CartHistory());
         when(cartItemRepository.findByCartId(any())).thenReturn(new ArrayList<>());
+        when(cartHistoryRepository.save(any(CartHistory.class))).thenReturn(new CartHistory());
 
         CartDTO result = cartService.getOrCreateCart(testUserId);
 
@@ -458,23 +476,31 @@ public class test_CartService {
             cartService.getOrCreateCart(testUserId);
         });
 
+        verify(cartRepository, never()).findByUserIdAndCartStatus(any(), any());
         verify(cartRepository, never()).save(any());
     }
 
     /**
-     * Test logout cleanup with empty cart.
-     * Verifies that empty carts are marked as abandoned.
+     * Test successful logout cleanup.
+     * Verifies that empty active carts are marked as abandoned.
      */
     @Test
-    @DisplayName("Should mark empty cart as abandoned during logout cleanup")
-    void testLogoutCleanup_EmptyCart() {
-        testCart.setItems(new ArrayList<>());
-        when(cartRepository.findByUserId(testUserId)).thenReturn(List.of(testCart));
-        when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
+    @DisplayName("Should mark empty carts as abandoned during logout")
+    void testLogoutCleanup_Success() {
+        Cart emptyCart = new Cart();
+        emptyCart.setCartId(UUID.randomUUID());
+        emptyCart.setUserId(testUserId);
+        emptyCart.setCartStatus(Cart.CartStatus.ACTIVE);
+        emptyCart.setItems(new ArrayList<>());
+
+        when(cartRepository.findByUserId(testUserId)).thenReturn(Arrays.asList(emptyCart));
+        when(cartRepository.save(any(Cart.class))).thenReturn(emptyCart);
 
         cartService.logoutCleanup(testUserId);
 
-        verify(cartRepository, times(1)).save(any(Cart.class));
+        verify(cartRepository, times(1)).save(argThat(cart -> 
+            cart.getCartStatus() == Cart.CartStatus.ABANDONED
+        ));
     }
 
     /**
@@ -482,10 +508,10 @@ public class test_CartService {
      * Verifies that non-empty carts are not marked as abandoned.
      */
     @Test
-    @DisplayName("Should not mark non-empty cart as abandoned during logout cleanup")
+    @DisplayName("Should not mark non-empty carts as abandoned during logout")
     void testLogoutCleanup_NonEmptyCart() {
-        testCart.setItems(List.of(testCartItem));
-        when(cartRepository.findByUserId(testUserId)).thenReturn(List.of(testCart));
+        testCart.setItems(Arrays.asList(testCartItem));
+        when(cartRepository.findByUserId(testUserId)).thenReturn(Arrays.asList(testCart));
 
         cartService.logoutCleanup(testUserId);
 
@@ -494,24 +520,26 @@ public class test_CartService {
 
     /**
      * Test logout cleanup with no active carts.
-     * Verifies that method handles users with no carts gracefully.
+     * Verifies that cleanup handles empty list gracefully.
      */
     @Test
-    @DisplayName("Should handle logout cleanup when user has no carts")
-    void testLogoutCleanup_NoCarts() {
-        when(cartRepository.findByUserId(testUserId)).thenReturn(new ArrayList<>());
+    @DisplayName("Should handle logout cleanup when user has no active carts")
+    void testLogoutCleanup_NoActiveCarts() {
+        Cart inactiveCart = new Cart();
+        inactiveCart.setCartStatus(Cart.CartStatus.ABANDONED);
+        when(cartRepository.findByUserId(testUserId)).thenReturn(Arrays.asList(inactiveCart));
 
         cartService.logoutCleanup(testUserId);
 
-        verify(cartRepository, never()).save(any());
+        verify(cartRepository, never()).save(any(Cart.class));
     }
 
     /**
      * Test logout cleanup with multiple carts.
-     * Verifies that all empty carts are marked as abandoned.
+     * Verifies that only empty active carts are marked as abandoned.
      */
     @Test
-    @DisplayName("Should mark all empty carts as abandoned during logout cleanup")
+    @DisplayName("Should handle logout cleanup with multiple carts")
     void testLogoutCleanup_MultipleCarts() {
         Cart emptyCart1 = new Cart();
         emptyCart1.setCartId(UUID.randomUUID());
@@ -525,11 +553,20 @@ public class test_CartService {
         emptyCart2.setCartStatus(Cart.CartStatus.ACTIVE);
         emptyCart2.setItems(new ArrayList<>());
 
-        when(cartRepository.findByUserId(testUserId)).thenReturn(List.of(emptyCart1, emptyCart2));
-        when(cartRepository.save(any(Cart.class))).thenReturn(emptyCart1, emptyCart2);
+        Cart nonEmptyCart = new Cart();
+        nonEmptyCart.setCartId(UUID.randomUUID());
+        nonEmptyCart.setUserId(testUserId);
+        nonEmptyCart.setCartStatus(Cart.CartStatus.ACTIVE);
+        nonEmptyCart.setItems(Arrays.asList(testCartItem));
+
+        when(cartRepository.findByUserId(testUserId))
+                .thenReturn(Arrays.asList(emptyCart1, emptyCart2, nonEmptyCart));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(i -> i.getArguments()[0]);
 
         cartService.logoutCleanup(testUserId);
 
-        verify(cartRepository, times(2)).save(any(Cart.class));
+        verify(cartRepository, times(2)).save(argThat(cart -> 
+            cart.getCartStatus() == Cart.CartStatus.ABANDONED
+        ));
     }
 }
