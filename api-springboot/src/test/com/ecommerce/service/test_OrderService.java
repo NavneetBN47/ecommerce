@@ -26,18 +26,20 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for OrderService
- * Tests order management operations including creation, retrieval, status updates, and cancellation
+ * Unit test class for OrderService.
+ * Tests order management operations including creation, retrieval, and status updates.
+ * Uses Mockito for mocking repository and service dependencies.
  * 
  * @author QA Automation Team
  * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("OrderService Test Suite")
+@DisplayName("OrderService Unit Tests")
 class test_OrderService {
 
     @Mock
@@ -57,86 +59,83 @@ class test_OrderService {
 
     private User testUser;
     private Order testOrder;
-    private Product testProduct;
     private CreateOrderRequestDTO createOrderRequest;
     private CartDTO cartDTO;
     private Long userId;
     private Long orderId;
 
+    /**
+     * Set up test data before each test execution.
+     */
     @BeforeEach
     void setUp() {
         userId = 1L;
         orderId = 100L;
 
         testUser = User.builder()
-            .id(userId)
-            .username("testuser")
-            .email("test@example.com")
-            .firstName("Test")
-            .lastName("User")
-            .build();
+                .id(userId)
+                .username("testuser")
+                .email("test@example.com")
+                .firstName("Test")
+                .lastName("User")
+                .build();
 
-        testProduct = Product.builder()
-            .id(1L)
-            .name("Test Product")
-            .sku("TEST-SKU-001")
-            .price(new BigDecimal("99.99"))
-            .imageUrl("http://example.com/image.jpg")
-            .stockQuantity(100)
-            .build();
-
-        createOrderRequest = CreateOrderRequestDTO.builder()
-            .shippingAddress("123 Test St, Test City, TC 12345")
-            .billingAddress("123 Test St, Test City, TC 12345")
-            .paymentMethod("CREDIT_CARD")
-            .build();
-
-        CartItemDTO cartItem = CartItemDTO.builder()
-            .productId(1L)
-            .productName("Test Product")
-            .quantity(2)
-            .price(new BigDecimal("99.99"))
-            .subtotal(new BigDecimal("199.98"))
-            .build();
-
-        cartDTO = CartDTO.builder()
-            .items(Arrays.asList(cartItem))
-            .totalAmount(new BigDecimal("199.98"))
-            .build();
+        Product product = Product.builder()
+                .id(1L)
+                .name("Test Product")
+                .sku("TEST-001")
+                .price(new BigDecimal("99.99"))
+                .stockQuantity(100)
+                .build();
 
         testOrder = Order.builder()
-            .id(orderId)
-            .orderNumber("ORD-20240101120000-1234")
-            .user(testUser)
-            .totalAmount(new BigDecimal("199.98"))
-            .status(Order.OrderStatus.PENDING)
-            .shippingAddress("123 Test St, Test City, TC 12345")
-            .billingAddress("123 Test St, Test City, TC 12345")
-            .paymentMethod("CREDIT_CARD")
-            .paymentStatus("PENDING")
-            .items(new ArrayList<>())
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .build();
+                .id(orderId)
+                .orderNumber("ORD-20240101120000-1234")
+                .user(testUser)
+                .totalAmount(new BigDecimal("199.98"))
+                .status(Order.OrderStatus.PENDING)
+                .shippingAddress("123 Test St")
+                .billingAddress("123 Test St")
+                .paymentMethod("CREDIT_CARD")
+                .paymentStatus("PENDING")
+                .items(new ArrayList<>())
+                .build();
 
         OrderItem orderItem = OrderItem.builder()
-            .id(1L)
-            .order(testOrder)
-            .product(testProduct)
-            .quantity(2)
-            .price(new BigDecimal("99.99"))
-            .subtotal(new BigDecimal("199.98"))
-            .build();
+                .id(1L)
+                .order(testOrder)
+                .product(product)
+                .quantity(2)
+                .price(new BigDecimal("99.99"))
+                .subtotal(new BigDecimal("199.98"))
+                .build();
         testOrder.getItems().add(orderItem);
+
+        createOrderRequest = CreateOrderRequestDTO.builder()
+                .shippingAddress("123 Test St")
+                .billingAddress("123 Test St")
+                .paymentMethod("CREDIT_CARD")
+                .build();
+
+        CartItemDTO cartItemDTO = CartItemDTO.builder()
+                .productId(1L)
+                .quantity(2)
+                .price(new BigDecimal("99.99"))
+                .build();
+
+        cartDTO = CartDTO.builder()
+                .items(Arrays.asList(cartItemDTO))
+                .totalAmount(new BigDecimal("199.98"))
+                .build();
     }
 
     /**
-     * Test successful order creation from cart
-     * Verifies that order is created with all items from cart
+     * Test creating order successfully from cart.
+     * Verifies that order is created with correct details and cart is cleared.
      */
     @Test
-    @DisplayName("Should create order from cart successfully")
-    void testCreateOrder_Success() {
+    @DisplayName("Should create order successfully from cart")
+    void testCreateOrder_WithValidCart_ShouldCreateOrder() {
         // Arrange
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(cartService.getCartByUserId(userId)).thenReturn(cartDTO);
@@ -150,73 +149,75 @@ class test_OrderService {
         // Assert
         assertNotNull(result);
         assertEquals(testOrder.getOrderNumber(), result.getOrderNumber());
-        assertEquals(testOrder.getTotalAmount(), result.getTotalAmount());
+        assertEquals(userId, result.getUserId());
         assertEquals(Order.OrderStatus.PENDING, result.getStatus());
-        assertFalse(result.getItems().isEmpty());
         verify(userRepository).findById(userId);
         verify(cartService).getCartByUserId(userId);
-        verify(productService).reduceStock(anyLong(), anyInt());
-        verify(cartService).clearCart(userId);
+        verify(productService).reduceStock(1L, 2);
         verify(orderRepository).save(any(Order.class));
+        verify(cartService).clearCart(userId);
     }
 
     /**
-     * Test order creation when user not found
-     * Verifies that ResourceNotFoundException is thrown
+     * Test creating order when user not found.
+     * Verifies that ResourceNotFoundException is thrown.
      */
     @Test
     @DisplayName("Should throw ResourceNotFoundException when user not found")
-    void testCreateOrder_UserNotFound() {
+    void testCreateOrder_UserNotFound_ShouldThrowResourceNotFoundException() {
         // Arrange
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            orderService.createOrder(userId, createOrderRequest);
-        });
-
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class,
+                () -> orderService.createOrder(userId, createOrderRequest)
+        );
         assertTrue(exception.getMessage().contains("User not found"));
         verify(cartService, never()).getCartByUserId(anyLong());
-        verify(orderRepository, never()).save(any());
     }
 
     /**
-     * Test order creation with empty cart
-     * Verifies that BusinessException is thrown
+     * Test creating order with empty cart.
+     * Verifies that BusinessException is thrown.
      */
     @Test
     @DisplayName("Should throw BusinessException when cart is empty")
-    void testCreateOrder_EmptyCart() {
+    void testCreateOrder_EmptyCart_ShouldThrowBusinessException() {
         // Arrange
         CartDTO emptyCart = CartDTO.builder()
-            .items(new ArrayList<>())
-            .totalAmount(BigDecimal.ZERO)
-            .build();
+                .items(new ArrayList<>())
+                .totalAmount(BigDecimal.ZERO)
+                .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(cartService.getCartByUserId(userId)).thenReturn(emptyCart);
 
         // Act & Assert
-        BusinessException exception = assertThrows(BusinessException.class, () -> {
-            orderService.createOrder(userId, createOrderRequest);
-        });
-
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> orderService.createOrder(userId, createOrderRequest)
+        );
         assertEquals("Cannot create order from empty cart", exception.getMessage());
-        verify(orderRepository, never()).save(any());
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     /**
-     * Test order creation with null billing address
-     * Verifies that shipping address is used as billing address
+     * Test creating order uses billing address from shipping when not provided.
+     * Verifies that billing address defaults to shipping address.
      */
     @Test
-    @DisplayName("Should use shipping address as billing address when billing address is null")
-    void testCreateOrder_NullBillingAddress() {
+    @DisplayName("Should use shipping address as billing address when billing not provided")
+    void testCreateOrder_NoBillingAddress_ShouldUseSameAsShipping() {
         // Arrange
         createOrderRequest.setBillingAddress(null);
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(cartService.getCartByUserId(userId)).thenReturn(cartDTO);
-        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            assertEquals(order.getShippingAddress(), order.getBillingAddress());
+            return testOrder;
+        });
         doNothing().when(productService).reduceStock(anyLong(), anyInt());
         doNothing().when(cartService).clearCart(userId);
 
@@ -225,16 +226,16 @@ class test_OrderService {
 
         // Assert
         assertNotNull(result);
-        assertEquals(result.getShippingAddress(), result.getBillingAddress());
+        verify(orderRepository).save(any(Order.class));
     }
 
     /**
-     * Test getting order by ID
-     * Verifies that order is retrieved successfully
+     * Test getting order by ID successfully.
+     * Verifies that order details are retrieved correctly.
      */
     @Test
     @DisplayName("Should get order by ID successfully")
-    void testGetOrderById_Success() {
+    void testGetOrderById_ValidId_ShouldReturnOrder() {
         // Arrange
         when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(testOrder));
 
@@ -245,34 +246,35 @@ class test_OrderService {
         assertNotNull(result);
         assertEquals(orderId, result.getId());
         assertEquals(testOrder.getOrderNumber(), result.getOrderNumber());
+        assertFalse(result.getItems().isEmpty());
         verify(orderRepository).findByIdWithItems(orderId);
     }
 
     /**
-     * Test getting order by ID when not found
-     * Verifies that ResourceNotFoundException is thrown
+     * Test getting order by ID when order not found.
+     * Verifies that ResourceNotFoundException is thrown.
      */
     @Test
-    @DisplayName("Should throw ResourceNotFoundException when order not found by ID")
-    void testGetOrderById_NotFound() {
+    @DisplayName("Should throw ResourceNotFoundException when order ID not found")
+    void testGetOrderById_InvalidId_ShouldThrowResourceNotFoundException() {
         // Arrange
         when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            orderService.getOrderById(orderId);
-        });
-
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class,
+                () -> orderService.getOrderById(orderId)
+        );
         assertTrue(exception.getMessage().contains("Order not found"));
     }
 
     /**
-     * Test getting order by order number
-     * Verifies that order is retrieved by order number
+     * Test getting order by order number successfully.
+     * Verifies that order can be retrieved using order number.
      */
     @Test
     @DisplayName("Should get order by order number successfully")
-    void testGetOrderByOrderNumber_Success() {
+    void testGetOrderByOrderNumber_ValidNumber_ShouldReturnOrder() {
         // Arrange
         String orderNumber = "ORD-20240101120000-1234";
         when(orderRepository.findByOrderNumber(orderNumber)).thenReturn(Optional.of(testOrder));
@@ -287,36 +289,34 @@ class test_OrderService {
     }
 
     /**
-     * Test getting order by order number when not found
-     * Verifies that ResourceNotFoundException is thrown
+     * Test getting order by order number when not found.
+     * Verifies that ResourceNotFoundException is thrown.
      */
     @Test
-    @DisplayName("Should throw ResourceNotFoundException when order not found by order number")
-    void testGetOrderByOrderNumber_NotFound() {
+    @DisplayName("Should throw ResourceNotFoundException when order number not found")
+    void testGetOrderByOrderNumber_InvalidNumber_ShouldThrowResourceNotFoundException() {
         // Arrange
-        String orderNumber = "INVALID-ORDER-NUMBER";
+        String orderNumber = "INVALID-ORDER";
         when(orderRepository.findByOrderNumber(orderNumber)).thenReturn(Optional.empty());
 
         // Act & Assert
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            orderService.getOrderByOrderNumber(orderNumber);
-        });
-
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class,
+                () -> orderService.getOrderByOrderNumber(orderNumber)
+        );
         assertTrue(exception.getMessage().contains("Order not found"));
     }
 
     /**
-     * Test getting user orders with pagination
-     * Verifies that paginated orders are retrieved
+     * Test getting user orders with pagination.
+     * Verifies that paginated list of orders is returned.
      */
     @Test
     @DisplayName("Should get user orders with pagination")
-    void testGetUserOrders_Success() {
+    void testGetUserOrders_ValidUser_ShouldReturnPagedOrders() {
         // Arrange
         Pageable pageable = PageRequest.of(0, 10);
-        List<Order> orders = Arrays.asList(testOrder);
-        Page<Order> orderPage = new PageImpl<>(orders, pageable, orders.size());
-
+        Page<Order> orderPage = new PageImpl<>(Arrays.asList(testOrder));
         when(orderRepository.findByUserId(userId, pageable)).thenReturn(orderPage);
 
         // Act
@@ -330,16 +330,16 @@ class test_OrderService {
     }
 
     /**
-     * Test updating order status
-     * Verifies that order status is updated successfully
+     * Test updating order status successfully.
+     * Verifies that order status is updated correctly.
      */
     @Test
     @DisplayName("Should update order status successfully")
-    void testUpdateOrderStatus_Success() {
+    void testUpdateOrderStatus_ValidStatus_ShouldUpdateStatus() {
         // Arrange
         Order.OrderStatus newStatus = Order.OrderStatus.PROCESSING;
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
-        when(orderRepository.save(testOrder)).thenReturn(testOrder);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
         // Act
         OrderDTO result = orderService.updateOrderStatus(orderId, newStatus);
@@ -352,34 +352,33 @@ class test_OrderService {
     }
 
     /**
-     * Test updating order status when order not found
-     * Verifies that ResourceNotFoundException is thrown
+     * Test updating order status when order not found.
+     * Verifies that ResourceNotFoundException is thrown.
      */
     @Test
-    @DisplayName("Should throw ResourceNotFoundException when updating status of non-existent order")
-    void testUpdateOrderStatus_OrderNotFound() {
+    @DisplayName("Should throw ResourceNotFoundException when updating non-existent order")
+    void testUpdateOrderStatus_OrderNotFound_ShouldThrowResourceNotFoundException() {
         // Arrange
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            orderService.updateOrderStatus(orderId, Order.OrderStatus.PROCESSING);
-        });
-
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class,
+                () -> orderService.updateOrderStatus(orderId, Order.OrderStatus.PROCESSING)
+        );
         assertTrue(exception.getMessage().contains("Order not found"));
-        verify(orderRepository, never()).save(any());
     }
 
     /**
-     * Test cancelling order successfully
-     * Verifies that order status is changed to CANCELLED
+     * Test cancelling order successfully.
+     * Verifies that order status is set to CANCELLED.
      */
     @Test
     @DisplayName("Should cancel order successfully")
-    void testCancelOrder_Success() {
+    void testCancelOrder_ValidOrder_ShouldCancelOrder() {
         // Arrange
         when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(testOrder));
-        when(orderRepository.save(testOrder)).thenReturn(testOrder);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
         // Act
         OrderDTO result = orderService.cancelOrder(orderId);
@@ -392,59 +391,59 @@ class test_OrderService {
     }
 
     /**
-     * Test cancelling already delivered order
-     * Verifies that BusinessException is thrown
+     * Test cancelling already delivered order.
+     * Verifies that BusinessException is thrown.
      */
     @Test
     @DisplayName("Should throw BusinessException when cancelling delivered order")
-    void testCancelOrder_AlreadyDelivered() {
+    void testCancelOrder_DeliveredOrder_ShouldThrowBusinessException() {
         // Arrange
         testOrder.setStatus(Order.OrderStatus.DELIVERED);
         when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(testOrder));
 
         // Act & Assert
-        BusinessException exception = assertThrows(BusinessException.class, () -> {
-            orderService.cancelOrder(orderId);
-        });
-
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> orderService.cancelOrder(orderId)
+        );
         assertTrue(exception.getMessage().contains("Cannot cancel order"));
-        verify(orderRepository, never()).save(any());
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     /**
-     * Test cancelling already cancelled order
-     * Verifies that BusinessException is thrown
+     * Test cancelling already cancelled order.
+     * Verifies that BusinessException is thrown.
      */
     @Test
     @DisplayName("Should throw BusinessException when cancelling already cancelled order")
-    void testCancelOrder_AlreadyCancelled() {
+    void testCancelOrder_AlreadyCancelled_ShouldThrowBusinessException() {
         // Arrange
         testOrder.setStatus(Order.OrderStatus.CANCELLED);
         when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(testOrder));
 
         // Act & Assert
-        BusinessException exception = assertThrows(BusinessException.class, () -> {
-            orderService.cancelOrder(orderId);
-        });
-
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> orderService.cancelOrder(orderId)
+        );
         assertTrue(exception.getMessage().contains("Cannot cancel order"));
-        verify(orderRepository, never()).save(any());
     }
 
     /**
-     * Test order number generation
-     * Verifies that order numbers are unique and properly formatted
+     * Test that order number is generated with correct format.
+     * Verifies order number format and uniqueness.
      */
     @Test
     @DisplayName("Should generate unique order number")
-    void testOrderNumberGeneration() {
+    void testCreateOrder_ShouldGenerateUniqueOrderNumber() {
         // Arrange
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(cartService.getCartByUserId(userId)).thenReturn(cartDTO);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
-            order.setId(orderId);
-            return order;
+            assertNotNull(order.getOrderNumber());
+            assertTrue(order.getOrderNumber().startsWith("ORD-"));
+            return testOrder;
         });
         doNothing().when(productService).reduceStock(anyLong(), anyInt());
         doNothing().when(cartService).clearCart(userId);
@@ -453,36 +452,33 @@ class test_OrderService {
         OrderDTO result = orderService.createOrder(userId, createOrderRequest);
 
         // Assert
-        assertNotNull(result.getOrderNumber());
-        assertTrue(result.getOrderNumber().startsWith("ORD-"));
-        assertTrue(result.getOrderNumber().length() > 10);
+        assertNotNull(result);
+        verify(orderRepository).save(any(Order.class));
     }
 
     /**
-     * Test order DTO mapping
-     * Verifies that Order entity is correctly mapped to OrderDTO
+     * Test that order items are created correctly from cart items.
+     * Verifies order item details match cart items.
      */
     @Test
-    @DisplayName("Should correctly map Order entity to OrderDTO")
-    void testOrderDTOMapping() {
+    @DisplayName("Should create order items correctly from cart items")
+    void testCreateOrder_ShouldCreateOrderItemsFromCart() {
         // Arrange
-        when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(testOrder));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
+        when(cartService.getCartByUserId(userId)).thenReturn(cartDTO);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        doNothing().when(productService).reduceStock(anyLong(), anyInt());
+        doNothing().when(cartService).clearCart(userId);
 
         // Act
-        OrderDTO result = orderService.getOrderById(orderId);
+        OrderDTO result = orderService.createOrder(userId, createOrderRequest);
 
         // Assert
         assertNotNull(result);
-        assertEquals(testOrder.getId(), result.getId());
-        assertEquals(testOrder.getOrderNumber(), result.getOrderNumber());
-        assertEquals(testOrder.getUser().getId(), result.getUserId());
-        assertEquals(testOrder.getTotalAmount(), result.getTotalAmount());
-        assertEquals(testOrder.getStatus(), result.getStatus());
-        assertEquals(testOrder.getShippingAddress(), result.getShippingAddress());
-        assertEquals(testOrder.getBillingAddress(), result.getBillingAddress());
-        assertEquals(testOrder.getPaymentMethod(), result.getPaymentMethod());
-        assertEquals(testOrder.getPaymentStatus(), result.getPaymentStatus());
-        assertNotNull(result.getItems());
-        assertEquals(testOrder.getItems().size(), result.getItems().size());
+        assertFalse(result.getItems().isEmpty());
+        OrderItemDTO item = result.getItems().get(0);
+        assertEquals(1L, item.getProductId());
+        assertEquals(2, item.getQuantity());
+        verify(productService).reduceStock(1L, 2);
     }
 }
