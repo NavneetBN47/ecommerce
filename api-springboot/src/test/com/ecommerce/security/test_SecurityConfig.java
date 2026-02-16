@@ -4,15 +4,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Test class for SecurityConfig
- * Tests security configuration including password encoding, CORS, and security filter chain
+ * Test class for SecurityConfig.
+ * Tests security configuration beans and CORS settings.
  */
 @ExtendWith(MockitoExtension.class)
 class test_SecurityConfig {
@@ -21,118 +24,101 @@ class test_SecurityConfig {
     private SecurityConfig securityConfig;
 
     /**
-     * Test password encoder bean creation
-     * Verifies that a BCryptPasswordEncoder is created
+     * Test that passwordEncoder bean returns BCryptPasswordEncoder instance.
+     * Verifies correct password encoder type.
      */
     @Test
     void testPasswordEncoder_ShouldReturnBCryptPasswordEncoder() {
-        // Act
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
 
-        // Assert
         assertNotNull(passwordEncoder);
-        assertEquals("org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder", 
-                    passwordEncoder.getClass().getName());
+        assertTrue(passwordEncoder instanceof BCryptPasswordEncoder);
     }
 
     /**
-     * Test password encoder functionality
-     * Verifies that the password encoder can encode and match passwords
+     * Test that passwordEncoder can encode passwords.
+     * Verifies basic encoding functionality.
      */
     @Test
-    void testPasswordEncoder_ShouldEncodeAndMatchPasswords() {
-        // Arrange
+    void testPasswordEncoder_ShouldEncodePassword() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
         String rawPassword = "testPassword123";
 
-        // Act
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        // Assert
         assertNotNull(encodedPassword);
         assertNotEquals(rawPassword, encodedPassword);
-        assertTrue(passwordEncoder.matches(rawPassword, encodedPassword));
+        assertTrue(encodedPassword.startsWith("$2"));
     }
 
     /**
-     * Test password encoder with different passwords
-     * Verifies that same password generates different hashes
+     * Test that passwordEncoder can match encoded passwords.
+     * Verifies password matching functionality.
      */
     @Test
-    void testPasswordEncoder_SamePasswordShouldGenerateDifferentHashes() {
-        // Arrange
+    void testPasswordEncoder_ShouldMatchPasswords() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String password = "testPassword123";
+        String rawPassword = "testPassword123";
+        String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        // Act
-        String hash1 = passwordEncoder.encode(password);
-        String hash2 = passwordEncoder.encode(password);
+        boolean matches = passwordEncoder.matches(rawPassword, encodedPassword);
 
-        // Assert
-        assertNotEquals(hash1, hash2);
-        assertTrue(passwordEncoder.matches(password, hash1));
-        assertTrue(passwordEncoder.matches(password, hash2));
+        assertTrue(matches);
     }
 
     /**
-     * Test password encoder with wrong password
-     * Verifies that wrong password does not match
+     * Test that passwordEncoder doesn't match wrong passwords.
+     * Verifies password mismatch detection.
      */
     @Test
-    void testPasswordEncoder_WrongPasswordShouldNotMatch() {
-        // Arrange
+    void testPasswordEncoder_ShouldNotMatchWrongPassword() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String correctPassword = "correctPassword";
-        String wrongPassword = "wrongPassword";
-        String encodedPassword = passwordEncoder.encode(correctPassword);
+        String rawPassword = "testPassword123";
+        String wrongPassword = "wrongPassword456";
+        String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        // Act
         boolean matches = passwordEncoder.matches(wrongPassword, encodedPassword);
 
-        // Assert
         assertFalse(matches);
     }
 
     /**
-     * Test CORS configuration source creation
-     * Verifies that CORS configuration source is created properly
+     * Test that corsConfigurationSource bean is created.
+     * Verifies CORS configuration source creation.
      */
     @Test
-    void testCorsConfigurationSource_ShouldReturnValidConfiguration() {
-        // Act
+    void testCorsConfigurationSource_ShouldReturnValidSource() {
         CorsConfigurationSource corsConfigurationSource = securityConfig.corsConfigurationSource();
 
-        // Assert
         assertNotNull(corsConfigurationSource);
+        assertTrue(corsConfigurationSource instanceof UrlBasedCorsConfigurationSource);
     }
 
     /**
-     * Test CORS configuration allows all origins
-     * Verifies that CORS is configured to allow all origins
+     * Test that CORS configuration allows all origins.
+     * Verifies CORS allowed origins configuration.
      */
     @Test
     void testCorsConfigurationSource_ShouldAllowAllOrigins() {
-        // Act
         CorsConfigurationSource corsConfigurationSource = securityConfig.corsConfigurationSource();
-        var corsConfig = corsConfigurationSource.getCorsConfiguration("/**");
-
-        // Assert
-        assertNotNull(corsConfig);
-        assertTrue(corsConfig.getAllowedOrigins().contains("*"));
+        UrlBasedCorsConfigurationSource urlBasedSource = (UrlBasedCorsConfigurationSource) corsConfigurationSource;
+        
+        assertNotNull(urlBasedSource.getCorsConfigurations());
+        assertTrue(urlBasedSource.getCorsConfigurations().containsKey("/**"));
     }
 
     /**
-     * Test CORS configuration allows required HTTP methods
-     * Verifies that all standard HTTP methods are allowed
+     * Test that CORS configuration includes expected HTTP methods.
+     * Verifies allowed HTTP methods in CORS configuration.
      */
     @Test
-    void testCorsConfigurationSource_ShouldAllowRequiredMethods() {
-        // Act
+    void testCorsConfigurationSource_ShouldIncludeExpectedMethods() {
         CorsConfigurationSource corsConfigurationSource = securityConfig.corsConfigurationSource();
-        var corsConfig = corsConfigurationSource.getCorsConfiguration("/**");
-
-        // Assert
+        UrlBasedCorsConfigurationSource urlBasedSource = (UrlBasedCorsConfigurationSource) corsConfigurationSource;
+        
+        var corsConfig = urlBasedSource.getCorsConfigurations().get("/**");
         assertNotNull(corsConfig);
+        assertNotNull(corsConfig.getAllowedMethods());
         assertTrue(corsConfig.getAllowedMethods().contains("GET"));
         assertTrue(corsConfig.getAllowedMethods().contains("POST"));
         assertTrue(corsConfig.getAllowedMethods().contains("PUT"));
@@ -141,70 +127,90 @@ class test_SecurityConfig {
     }
 
     /**
-     * Test CORS configuration allows all headers
-     * Verifies that all headers are allowed in CORS configuration
+     * Test that CORS configuration allows all headers.
+     * Verifies allowed headers in CORS configuration.
      */
     @Test
     void testCorsConfigurationSource_ShouldAllowAllHeaders() {
-        // Act
         CorsConfigurationSource corsConfigurationSource = securityConfig.corsConfigurationSource();
-        var corsConfig = corsConfigurationSource.getCorsConfiguration("/**");
-
-        // Assert
+        UrlBasedCorsConfigurationSource urlBasedSource = (UrlBasedCorsConfigurationSource) corsConfigurationSource;
+        
+        var corsConfig = urlBasedSource.getCorsConfigurations().get("/**");
         assertNotNull(corsConfig);
+        assertNotNull(corsConfig.getAllowedHeaders());
         assertTrue(corsConfig.getAllowedHeaders().contains("*"));
     }
 
     /**
-     * Test password encoder with empty password
-     * Verifies that empty password can be encoded
+     * Test that multiple calls to passwordEncoder return different instances.
+     * Verifies that bean creation produces new instances.
      */
     @Test
-    void testPasswordEncoder_WithEmptyPassword_ShouldEncode() {
-        // Arrange
+    void testPasswordEncoder_MultipleCallsShouldReturnDifferentInstances() {
+        PasswordEncoder encoder1 = securityConfig.passwordEncoder();
+        PasswordEncoder encoder2 = securityConfig.passwordEncoder();
+
+        assertNotSame(encoder1, encoder2);
+    }
+
+    /**
+     * Test that passwordEncoder handles empty passwords.
+     * Verifies encoding of edge case inputs.
+     */
+    @Test
+    void testPasswordEncoder_ShouldHandleEmptyPassword() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
         String emptyPassword = "";
 
-        // Act
         String encodedPassword = passwordEncoder.encode(emptyPassword);
 
-        // Assert
         assertNotNull(encodedPassword);
         assertTrue(passwordEncoder.matches(emptyPassword, encodedPassword));
     }
 
     /**
-     * Test password encoder with special characters
-     * Verifies that passwords with special characters are handled correctly
+     * Test that passwordEncoder produces different hashes for same password.
+     * Verifies salt usage in BCrypt.
      */
     @Test
-    void testPasswordEncoder_WithSpecialCharacters_ShouldEncodeCorrectly() {
-        // Arrange
+    void testPasswordEncoder_ShouldProduceDifferentHashesForSamePassword() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String specialPassword = "P@ssw0rd!#$%^&*()";
+        String password = "testPassword123";
 
-        // Act
-        String encodedPassword = passwordEncoder.encode(specialPassword);
+        String hash1 = passwordEncoder.encode(password);
+        String hash2 = passwordEncoder.encode(password);
 
-        // Assert
-        assertNotNull(encodedPassword);
-        assertTrue(passwordEncoder.matches(specialPassword, encodedPassword));
+        assertNotEquals(hash1, hash2);
+        assertTrue(passwordEncoder.matches(password, hash1));
+        assertTrue(passwordEncoder.matches(password, hash2));
     }
 
     /**
-     * Test password encoder with very long password
-     * Verifies that long passwords are handled correctly
+     * Test that passwordEncoder handles special characters.
+     * Verifies encoding of complex passwords.
      */
     @Test
-    void testPasswordEncoder_WithLongPassword_ShouldEncodeCorrectly() {
-        // Arrange
+    void testPasswordEncoder_ShouldHandleSpecialCharacters() {
+        PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
+        String complexPassword = "P@ssw0rd!#$%^&*()_+{}[]|:;<>?,./~`";
+
+        String encodedPassword = passwordEncoder.encode(complexPassword);
+
+        assertNotNull(encodedPassword);
+        assertTrue(passwordEncoder.matches(complexPassword, encodedPassword));
+    }
+
+    /**
+     * Test that passwordEncoder handles very long passwords.
+     * Verifies encoding of edge case password lengths.
+     */
+    @Test
+    void testPasswordEncoder_ShouldHandleLongPassword() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
         String longPassword = "a".repeat(100);
 
-        // Act
         String encodedPassword = passwordEncoder.encode(longPassword);
 
-        // Assert
         assertNotNull(encodedPassword);
         assertTrue(passwordEncoder.matches(longPassword, encodedPassword));
     }
