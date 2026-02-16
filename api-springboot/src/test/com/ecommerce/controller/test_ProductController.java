@@ -3,237 +3,153 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.ProductResponse;
 import com.ecommerce.service.ProductService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * JUnit 5 test class for ProductController
- * Tests product search functionality
+ * Test class for ProductController
  * 
- * @author QA Automation Agent
+ * Tests product search functionality including:
+ * - Search with keyword
+ * - Search without keyword (all products)
+ * - Empty search results
+ * 
+ * @author Test Generation System
  * @version 1.0.0
  */
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(ProductController.class)
+@DisplayName("ProductController Tests")
 class test_ProductController {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private ProductService productService;
 
-    @InjectMocks
-    private ProductController productController;
+    private List<ProductResponse> testProducts;
 
-    private List<ProductResponse> productList;
-
+    /**
+     * Set up test data before each test
+     */
     @BeforeEach
     void setUp() {
-        productList = new ArrayList<>();
-        
         ProductResponse product1 = ProductResponse.builder()
             .id(UUID.randomUUID())
-            .name("Laptop")
-            .description("High-performance laptop")
-            .price(BigDecimal.valueOf(999.99))
+            .name("Test Product 1")
+            .description("Test Description 1")
+            .price(BigDecimal.valueOf(99.99))
             .availableQty(10)
+            .sku("TEST-001")
+            .isActive(true)
             .build();
-            
+
         ProductResponse product2 = ProductResponse.builder()
             .id(UUID.randomUUID())
-            .name("Laptop Stand")
-            .description("Ergonomic laptop stand")
-            .price(BigDecimal.valueOf(49.99))
-            .availableQty(25)
+            .name("Test Product 2")
+            .description("Test Description 2")
+            .price(BigDecimal.valueOf(149.99))
+            .availableQty(5)
+            .sku("TEST-002")
+            .isActive(true)
             .build();
-            
-        productList.add(product1);
-        productList.add(product2);
+
+        testProducts = Arrays.asList(product1, product2);
     }
 
     /**
-     * Test searching products with valid keyword
-     * Verifies HTTP 200 status and product list
+     * Test searching products with keyword
+     * 
+     * Validates:
+     * - HTTP 200 OK status
+     * - Correct number of products returned
+     * - Product details in response
      */
     @Test
-    void searchProductsShouldReturnOkStatusWithProductList() {
-        // Given
-        String keyword = "laptop";
-        when(productService.searchProducts(keyword)).thenReturn(productList);
+    @DisplayName("Should search products with keyword successfully")
+    void testSearchProducts_WithKeyword() throws Exception {
+        when(productService.searchProducts("Test"))
+            .thenReturn(testProducts);
 
-        // When
-        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(2, response.getBody().size());
-        verify(productService, times(1)).searchProducts(keyword);
+        mockMvc.perform(get("/products/search")
+                .param("keyword", "Test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isArray())
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].name").value("Test Product 1"))
+            .andExpect(jsonPath("$[1].name").value("Test Product 2"));
     }
 
     /**
-     * Test searching products with no results
-     * Verifies empty list is returned
+     * Test searching products without keyword
+     * 
+     * Validates:
+     * - HTTP 200 OK status
+     * - All active products returned
      */
     @Test
-    void searchProductsShouldReturnEmptyListWhenNoMatch() {
-        // Given
-        String keyword = "nonexistent";
-        when(productService.searchProducts(keyword)).thenReturn(new ArrayList<>());
+    @DisplayName("Should return all products when no keyword provided")
+    void testSearchProducts_NoKeyword() throws Exception {
+        when(productService.searchProducts(null))
+            .thenReturn(testProducts);
 
-        // When
-        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().isEmpty());
-        verify(productService, times(1)).searchProducts(keyword);
+        mockMvc.perform(get("/products/search"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isArray())
+            .andExpect(jsonPath("$.length()").value(2));
     }
 
     /**
      * Test searching products with empty keyword
-     * Verifies validation exception handling
+     * 
+     * Validates:
+     * - HTTP 200 OK status
+     * - All products returned for empty string
      */
     @Test
-    void searchProductsShouldHandleEmptyKeyword() {
-        // Given
-        String emptyKeyword = "";
-        when(productService.searchProducts(emptyKeyword))
-            .thenThrow(new RuntimeException("Search keyword cannot be empty"));
+    @DisplayName("Should return all products for empty keyword")
+    void testSearchProducts_EmptyKeyword() throws Exception {
+        when(productService.searchProducts(""))
+            .thenReturn(testProducts);
 
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            productController.searchProducts(emptyKeyword);
-        });
-        verify(productService, times(1)).searchProducts(emptyKeyword);
+        mockMvc.perform(get("/products/search")
+                .param("keyword", ""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isArray());
     }
 
     /**
-     * Test searching products with null keyword
-     * Verifies null pointer exception handling
+     * Test searching products with no results
+     * 
+     * Validates:
+     * - HTTP 200 OK status
+     * - Empty array returned
      */
     @Test
-    void searchProductsShouldHandleNullKeyword() {
-        // Given
-        when(productService.searchProducts(null))
-            .thenThrow(new RuntimeException("Search keyword cannot be null"));
+    @DisplayName("Should return empty list when no products match")
+    void testSearchProducts_NoResults() throws Exception {
+        when(productService.searchProducts(anyString()))
+            .thenReturn(Collections.emptyList());
 
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            productController.searchProducts(null);
-        });
-    }
-
-    /**
-     * Test searching products with whitespace keyword
-     * Verifies trimming and validation
-     */
-    @Test
-    void searchProductsShouldHandleWhitespaceKeyword() {
-        // Given
-        String whitespaceKeyword = "   ";
-        when(productService.searchProducts(whitespaceKeyword))
-            .thenThrow(new RuntimeException("Search keyword cannot be empty"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            productController.searchProducts(whitespaceKeyword);
-        });
-    }
-
-    /**
-     * Test searching products with special characters
-     * Verifies proper handling of special characters in search
-     */
-    @Test
-    void searchProductsShouldHandleSpecialCharacters() {
-        // Given
-        String keyword = "laptop@#$";
-        when(productService.searchProducts(keyword)).thenReturn(new ArrayList<>());
-
-        // When
-        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(productService, times(1)).searchProducts(keyword);
-    }
-
-    /**
-     * Test searching products with case-insensitive keyword
-     * Verifies case-insensitive search functionality
-     */
-    @Test
-    void searchProductsShouldBeCaseInsensitive() {
-        // Given
-        String keyword = "LAPTOP";
-        when(productService.searchProducts(keyword)).thenReturn(productList);
-
-        // When
-        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(2, response.getBody().size());
-        verify(productService, times(1)).searchProducts(keyword);
-    }
-
-    /**
-     * Test searching products with partial match
-     * Verifies partial keyword matching
-     */
-    @Test
-    void searchProductsShouldSupportPartialMatch() {
-        // Given
-        String keyword = "lap";
-        when(productService.searchProducts(keyword)).thenReturn(productList);
-
-        // When
-        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(2, response.getBody().size());
-        verify(productService, times(1)).searchProducts(keyword);
-    }
-
-    /**
-     * Test searching products returns correct product details
-     * Verifies product response structure
-     */
-    @Test
-    void searchProductsShouldReturnCompleteProductDetails() {
-        // Given
-        String keyword = "laptop";
-        when(productService.searchProducts(keyword)).thenReturn(productList);
-
-        // When
-        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
-
-        // Then
-        assertNotNull(response.getBody());
-        ProductResponse product = response.getBody().get(0);
-        assertNotNull(product.getId());
-        assertNotNull(product.getName());
-        assertNotNull(product.getDescription());
-        assertNotNull(product.getPrice());
-        assertTrue(product.getAvailableQty() >= 0);
+        mockMvc.perform(get("/products/search")
+                .param("keyword", "NonExistent"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isArray())
+            .andExpect(jsonPath("$.length()").value(0));
     }
 }

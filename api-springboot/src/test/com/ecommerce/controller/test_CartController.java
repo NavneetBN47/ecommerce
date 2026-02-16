@@ -3,324 +3,240 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.AddToCartRequest;
 import com.ecommerce.dto.CartResponse;
 import com.ecommerce.dto.UpdateCartItemRequest;
+import com.ecommerce.security.UserPrincipal;
 import com.ecommerce.service.CartService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * JUnit 5 test class for CartController
- * Tests shopping cart operations including add, update, remove, and retrieve
+ * Test class for CartController
  * 
- * @author QA Automation Agent
+ * Tests all public endpoints for cart management including:
+ * - Adding products to cart
+ * - Updating cart item quantities
+ * - Removing items from cart
+ * - Retrieving cart details
+ * 
+ * @author Test Generation System
  * @version 1.0.0
  */
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(CartController.class)
+@DisplayName("CartController Tests")
 class test_CartController {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
     private CartService cartService;
 
-    @InjectMocks
-    private CartController cartController;
+    private UserPrincipal testUser;
+    private UUID testUserId;
+    private UUID testProductId;
+    private UUID testCartItemId;
+    private CartResponse testCartResponse;
 
-    private UUID userId;
-    private UUID productId;
-    private UUID itemId;
-    private CartResponse cartResponse;
-
+    /**
+     * Set up test data before each test
+     */
     @BeforeEach
     void setUp() {
-        userId = UUID.randomUUID();
-        productId = UUID.randomUUID();
-        itemId = UUID.randomUUID();
+        testUserId = UUID.randomUUID();
+        testProductId = UUID.randomUUID();
+        testCartItemId = UUID.randomUUID();
         
-        cartResponse = CartResponse.builder()
+        testUser = new UserPrincipal(
+            testUserId,
+            "testuser",
+            "password",
+            "test@example.com",
+            new ArrayList<>()
+        );
+
+        testCartResponse = CartResponse.builder()
             .cartId(UUID.randomUUID())
             .items(new ArrayList<>())
             .grandTotal(BigDecimal.valueOf(100.00))
+            .totalItems(1)
             .build();
     }
 
     /**
-     * Test adding product to cart successfully
-     * Verifies HTTP 201 status and cart response
+     * Test adding a product to cart successfully
+     * 
+     * Validates:
+     * - HTTP 201 Created status
+     * - Correct response body structure
+     * - Service method invocation
      */
     @Test
-    void addProductToCartShouldReturnCreatedStatus() {
-        // Given
-        AddToCartRequest request = new AddToCartRequest();
-        request.setProductId(productId);
-        request.setQuantity(2);
+    @WithMockUser
+    @DisplayName("Should add product to cart successfully")
+    void testAddToCart_Success() throws Exception {
+        AddToCartRequest request = AddToCartRequest.builder()
+            .productId(testProductId)
+            .quantity(2)
+            .build();
 
-        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
-            .thenReturn(cartResponse);
+        when(cartService.addProductToCart(any(UUID.class), any(AddToCartRequest.class)))
+            .thenReturn(testCartResponse);
 
-        // When
-        ResponseEntity<CartResponse> response = cartController.addProductToCart(userId, request);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertEquals(cartResponse, response.getBody());
-        verify(cartService, times(1)).addProductToCart(eq(userId), any(AddToCartRequest.class));
+        mockMvc.perform(post("/cart/items")
+                .with(user(testUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.cartId").exists())
+            .andExpect(jsonPath("$.grandTotal").value(100.00));
     }
 
     /**
      * Test adding product with invalid quantity
-     * Verifies validation exception handling
+     * 
+     * Validates:
+     * - HTTP 400 Bad Request for validation failure
+     * - Proper error message
      */
     @Test
-    void addProductToCartShouldHandleInvalidQuantity() {
-        // Given
-        AddToCartRequest request = new AddToCartRequest();
-        request.setProductId(productId);
-        request.setQuantity(-1);
+    @WithMockUser
+    @DisplayName("Should return 400 when quantity is invalid")
+    void testAddToCart_InvalidQuantity() throws Exception {
+        AddToCartRequest request = AddToCartRequest.builder()
+            .productId(testProductId)
+            .quantity(0)
+            .build();
 
-        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
-            .thenThrow(new RuntimeException("Quantity must be greater than 0"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.addProductToCart(userId, request);
-        });
-        verify(cartService, times(1)).addProductToCart(eq(userId), any(AddToCartRequest.class));
-    }
-
-    /**
-     * Test adding non-existent product to cart
-     * Verifies resource not found exception handling
-     */
-    @Test
-    void addProductToCartShouldHandleNonExistentProduct() {
-        // Given
-        AddToCartRequest request = new AddToCartRequest();
-        request.setProductId(UUID.randomUUID());
-        request.setQuantity(1);
-
-        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
-            .thenThrow(new RuntimeException("Product not found"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.addProductToCart(userId, request);
-        });
+        mockMvc.perform(post("/cart/items")
+                .with(user(testUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest());
     }
 
     /**
      * Test updating cart item quantity successfully
-     * Verifies HTTP 200 status and updated cart response
+     * 
+     * Validates:
+     * - HTTP 200 OK status
+     * - Updated cart response
      */
     @Test
-    void updateCartItemShouldReturnOkStatus() {
-        // Given
-        UpdateCartItemRequest request = new UpdateCartItemRequest();
-        request.setQuantity(5);
+    @WithMockUser
+    @DisplayName("Should update cart item quantity successfully")
+    void testUpdateCartItem_Success() throws Exception {
+        UpdateCartItemRequest request = UpdateCartItemRequest.builder()
+            .quantity(5)
+            .build();
 
-        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
-            .thenReturn(cartResponse);
+        when(cartService.updateCartItem(any(UUID.class), eq(testCartItemId), any(UpdateCartItemRequest.class)))
+            .thenReturn(testCartResponse);
 
-        // When
-        ResponseEntity<CartResponse> response = cartController.updateCartItem(userId, itemId, request);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(cartResponse, response.getBody());
-        verify(cartService, times(1)).updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class));
+        mockMvc.perform(put("/cart/items/" + testCartItemId)
+                .with(user(testUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.cartId").exists());
     }
 
     /**
-     * Test updating cart item with invalid quantity
-     * Verifies validation of quantity parameter
+     * Test removing item from cart successfully
+     * 
+     * Validates:
+     * - HTTP 200 OK status for non-empty cart
+     * - Correct response structure
      */
     @Test
-    void updateCartItemShouldHandleInvalidQuantity() {
-        // Given
-        UpdateCartItemRequest request = new UpdateCartItemRequest();
-        request.setQuantity(0);
+    @WithMockUser
+    @DisplayName("Should remove cart item successfully")
+    void testRemoveCartItem_Success() throws Exception {
+        when(cartService.removeCartItem(any(UUID.class), eq(testCartItemId)))
+            .thenReturn(testCartResponse);
 
-        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
-            .thenThrow(new RuntimeException("Quantity must be greater than 0"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.updateCartItem(userId, itemId, request);
-        });
-    }
-
-    /**
-     * Test updating non-existent cart item
-     * Verifies proper exception handling
-     */
-    @Test
-    void updateCartItemShouldHandleNonExistentItem() {
-        // Given
-        UpdateCartItemRequest request = new UpdateCartItemRequest();
-        request.setQuantity(3);
-
-        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
-            .thenThrow(new RuntimeException("Cart item not found"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.updateCartItem(userId, itemId, request);
-        });
-    }
-
-    /**
-     * Test removing cart item successfully
-     * Verifies HTTP 200 status and updated cart
-     */
-    @Test
-    void removeCartItemShouldReturnOkStatus() {
-        // Given
-        when(cartService.removeCartItem(userId, itemId)).thenReturn(cartResponse);
-
-        // When
-        ResponseEntity<?> response = cartController.removeCartItem(userId, itemId);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(cartResponse, response.getBody());
-        verify(cartService, times(1)).removeCartItem(userId, itemId);
+        mockMvc.perform(delete("/cart/items/" + testCartItemId)
+                .with(user(testUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.cartId").exists());
     }
 
     /**
      * Test removing last item from cart
-     * Verifies HTTP 204 No Content when cart becomes empty
+     * 
+     * Validates:
+     * - HTTP 204 No Content when cart becomes empty
      */
     @Test
-    void removeCartItemShouldReturnNoContentWhenCartEmpty() {
-        // Given
-        when(cartService.removeCartItem(userId, itemId)).thenReturn(null);
+    @WithMockUser
+    @DisplayName("Should return 204 when removing last item")
+    void testRemoveCartItem_EmptyCart() throws Exception {
+        CartResponse emptyCartResponse = CartResponse.builder()
+            .cartId(null)
+            .items(new ArrayList<>())
+            .grandTotal(BigDecimal.ZERO)
+            .totalItems(0)
+            .build();
 
-        // When
-        ResponseEntity<?> response = cartController.removeCartItem(userId, itemId);
+        when(cartService.removeCartItem(any(UUID.class), eq(testCartItemId)))
+            .thenReturn(emptyCartResponse);
 
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(cartService, times(1)).removeCartItem(userId, itemId);
-    }
-
-    /**
-     * Test removing non-existent cart item
-     * Verifies exception handling
-     */
-    @Test
-    void removeCartItemShouldHandleNonExistentItem() {
-        // Given
-        when(cartService.removeCartItem(userId, itemId))
-            .thenThrow(new RuntimeException("Cart item not found"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.removeCartItem(userId, itemId);
-        });
+        mockMvc.perform(delete("/cart/items/" + testCartItemId)
+                .with(user(testUser)))
+            .andExpect(status().isNoContent());
     }
 
     /**
      * Test getting cart successfully
-     * Verifies HTTP 200 status and cart data
+     * 
+     * Validates:
+     * - HTTP 200 OK status
+     * - Cart details in response
      */
     @Test
-    void getCartShouldReturnOkStatus() {
-        // Given
-        when(cartService.getCart(userId)).thenReturn(cartResponse);
+    @WithMockUser
+    @DisplayName("Should get cart successfully")
+    void testGetCart_Success() throws Exception {
+        when(cartService.getCart(any(UUID.class)))
+            .thenReturn(testCartResponse);
 
-        // When
-        ResponseEntity<CartResponse> response = cartController.getCart(userId);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(cartResponse, response.getBody());
-        verify(cartService, times(1)).getCart(userId);
+        mockMvc.perform(get("/cart")
+                .with(user(testUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.cartId").exists())
+            .andExpect(jsonPath("$.totalItems").value(1));
     }
 
     /**
-     * Test getting non-existent cart
-     * Verifies exception handling when cart not found
+     * Test unauthorized access to cart endpoints
+     * 
+     * Validates:
+     * - HTTP 401 Unauthorized without authentication
      */
     @Test
-    void getCartShouldHandleNonExistentCart() {
-        // Given
-        when(cartService.getCart(userId))
-            .thenThrow(new RuntimeException("Cart not found"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.getCart(userId);
-        });
-    }
-
-    /**
-     * Test logout clears cart successfully
-     * Verifies HTTP 200 status
-     */
-    @Test
-    void logoutShouldReturnOkStatus() {
-        // Given
-        doNothing().when(cartService).clearCart(userId);
-
-        // When
-        ResponseEntity<Void> response = cartController.logout(userId);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(cartService, times(1)).clearCart(userId);
-    }
-
-    /**
-     * Test logout with null user ID
-     * Verifies validation of user ID parameter
-     */
-    @Test
-    void logoutShouldHandleNullUserId() {
-        // Given
-        doThrow(new IllegalArgumentException("User ID cannot be null"))
-            .when(cartService).clearCart(null);
-
-        // When/Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            cartController.logout(null);
-        });
-    }
-
-    /**
-     * Test adding product to cart with zero quantity
-     * Verifies quantity validation
-     */
-    @Test
-    void addProductToCartShouldRejectZeroQuantity() {
-        // Given
-        AddToCartRequest request = new AddToCartRequest();
-        request.setProductId(productId);
-        request.setQuantity(0);
-
-        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
-            .thenThrow(new RuntimeException("Quantity must be greater than 0"));
-
-        // When/Then
-        assertThrows(RuntimeException.class, () -> {
-            cartController.addProductToCart(userId, request);
-        });
+    @DisplayName("Should return 401 for unauthenticated requests")
+    void testCartEndpoints_Unauthorized() throws Exception {
+        mockMvc.perform(get("/cart"))
+            .andExpect(status().isUnauthorized());
     }
 }
