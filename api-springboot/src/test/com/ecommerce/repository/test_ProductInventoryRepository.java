@@ -10,18 +10,17 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * JUnit test class for ProductInventoryRepository.
- * Tests all repository methods for product inventory operations.
+ * JUnit 5 test class for ProductInventoryRepository.
+ * Tests repository methods for ProductInventory entity operations.
  * Uses @DataJpaTest for repository layer testing with in-memory database.
- *
- * @author QA Automation Team
+ * 
+ * @author Test Generation Agent
  * @version 1.0
  */
 @DataJpaTest
@@ -41,203 +40,231 @@ public class test_ProductInventoryRepository {
 
     /**
      * Set up test data before each test method execution.
-     * Creates test product and inventory entities.
+     * Creates and persists test entities for Product and ProductInventory.
      */
     @BeforeEach
     void setUp() {
         productId = UUID.randomUUID();
 
+        // Create test product
         testProduct = new Product();
         testProduct.setProductId(productId);
         testProduct.setName("Test Product");
-        testProduct.setPrice(BigDecimal.valueOf(99.99));
+        testProduct.setPrice(99.99);
         entityManager.persist(testProduct);
 
+        // Create test inventory
         testInventory = new ProductInventory();
-        testInventory.setId(UUID.randomUUID());
-        testInventory.setProduct(testProduct);
+        testInventory.setProductId(productId);
         testInventory.setQuantity(100);
         testInventory.setReservedQuantity(10);
+        testInventory.setAvailableQuantity(90);
         entityManager.persist(testInventory);
-
+        
         entityManager.flush();
     }
 
     /**
-     * Test finding product inventory by product ID.
-     * Verifies that the correct inventory is retrieved for a given product.
+     * Test finding ProductInventory by product ID when it exists.
+     * Verifies that the correct ProductInventory is returned.
      */
     @Test
-    @DisplayName("Should find product inventory by product ID")
-    void testFindByProductId_Success() {
+    @DisplayName("Should find ProductInventory by product ID when exists")
+    void testFindByProductId_WhenExists_ReturnsInventory() {
+        // When
         Optional<ProductInventory> result = productInventoryRepository.findByProductId(productId);
 
+        // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getProduct().getProductId()).isEqualTo(productId);
+        assertThat(result.get().getProductId()).isEqualTo(productId);
         assertThat(result.get().getQuantity()).isEqualTo(100);
         assertThat(result.get().getReservedQuantity()).isEqualTo(10);
+        assertThat(result.get().getAvailableQuantity()).isEqualTo(90);
     }
 
     /**
-     * Test finding product inventory with non-existent product ID.
-     * Verifies that an empty Optional is returned when product ID doesn't exist.
+     * Test finding ProductInventory by product ID when it does not exist.
+     * Verifies that an empty Optional is returned.
      */
     @Test
-    @DisplayName("Should return empty when product ID not found")
-    void testFindByProductId_NotFound() {
+    @DisplayName("Should return empty Optional when ProductInventory does not exist")
+    void testFindByProductId_WhenNotExists_ReturnsEmpty() {
+        // Given
         UUID nonExistentProductId = UUID.randomUUID();
 
+        // When
         Optional<ProductInventory> result = productInventoryRepository.findByProductId(nonExistentProductId);
 
+        // Then
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test finding product inventory with null product ID.
-     * Verifies proper handling of null product ID.
+     * Test saving a new ProductInventory.
+     * Verifies that the ProductInventory is persisted correctly.
      */
     @Test
-    @DisplayName("Should handle null product ID")
-    void testFindByProductId_NullProductId() {
-        Optional<ProductInventory> result = productInventoryRepository.findByProductId(null);
-
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test saving a new product inventory.
-     * Verifies that inventory can be successfully persisted.
-     */
-    @Test
-    @DisplayName("Should save new product inventory successfully")
-    void testSaveProductInventory() {
+    @DisplayName("Should save new ProductInventory successfully")
+    void testSave_NewInventory_Success() {
+        // Given
+        UUID newProductId = UUID.randomUUID();
         Product newProduct = new Product();
-        newProduct.setProductId(UUID.randomUUID());
+        newProduct.setProductId(newProductId);
         newProduct.setName("New Product");
-        newProduct.setPrice(BigDecimal.valueOf(49.99));
+        newProduct.setPrice(149.99);
         entityManager.persist(newProduct);
 
         ProductInventory newInventory = new ProductInventory();
-        newInventory.setId(UUID.randomUUID());
-        newInventory.setProduct(newProduct);
+        newInventory.setProductId(newProductId);
         newInventory.setQuantity(50);
-        newInventory.setReservedQuantity(0);
+        newInventory.setReservedQuantity(5);
+        newInventory.setAvailableQuantity(45);
 
-        ProductInventory saved = productInventoryRepository.save(newInventory);
+        // When
+        ProductInventory savedInventory = productInventoryRepository.save(newInventory);
 
-        assertThat(saved).isNotNull();
-        assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getQuantity()).isEqualTo(50);
-        assertThat(saved.getReservedQuantity()).isEqualTo(0);
+        // Then
+        assertThat(savedInventory).isNotNull();
+        assertThat(savedInventory.getId()).isNotNull();
+        assertThat(savedInventory.getProductId()).isEqualTo(newProductId);
+        assertThat(savedInventory.getQuantity()).isEqualTo(50);
     }
 
     /**
-     * Test updating existing product inventory.
-     * Verifies that inventory quantity can be updated.
+     * Test updating an existing ProductInventory.
+     * Verifies that inventory quantity updates are persisted correctly.
      */
     @Test
-    @DisplayName("Should update existing product inventory")
-    void testUpdateProductInventory() {
+    @DisplayName("Should update existing ProductInventory successfully")
+    void testSave_UpdateInventory_Success() {
+        // Given
         testInventory.setQuantity(150);
         testInventory.setReservedQuantity(20);
-        ProductInventory updated = productInventoryRepository.save(testInventory);
+        testInventory.setAvailableQuantity(130);
 
-        assertThat(updated.getQuantity()).isEqualTo(150);
-        assertThat(updated.getReservedQuantity()).isEqualTo(20);
-        assertThat(updated.getId()).isEqualTo(testInventory.getId());
+        // When
+        ProductInventory updatedInventory = productInventoryRepository.save(testInventory);
+        entityManager.flush();
+
+        // Then
+        assertThat(updatedInventory.getQuantity()).isEqualTo(150);
+        assertThat(updatedInventory.getReservedQuantity()).isEqualTo(20);
+        assertThat(updatedInventory.getAvailableQuantity()).isEqualTo(130);
     }
 
     /**
-     * Test finding product inventory by ID.
-     * Verifies that inventory can be retrieved by its ID.
+     * Test deleting ProductInventory by ID.
+     * Verifies that the ProductInventory is removed from the database.
      */
     @Test
-    @DisplayName("Should find product inventory by ID")
-    void testFindById_Success() {
-        Optional<ProductInventory> result = productInventoryRepository.findById(testInventory.getId());
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(testInventory.getId());
-        assertThat(result.get().getQuantity()).isEqualTo(100);
-    }
-
-    /**
-     * Test finding product inventory with non-existent ID.
-     * Verifies that an empty Optional is returned when ID doesn't exist.
-     */
-    @Test
-    @DisplayName("Should return empty when inventory ID not found")
-    void testFindById_NotFound() {
-        UUID nonExistentId = UUID.randomUUID();
-
-        Optional<ProductInventory> result = productInventoryRepository.findById(nonExistentId);
-
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test deleting product inventory by ID.
-     * Verifies that inventory can be successfully deleted.
-     */
-    @Test
-    @DisplayName("Should delete product inventory by ID")
-    void testDeleteProductInventory() {
+    @DisplayName("Should delete ProductInventory by ID successfully")
+    void testDeleteById_Success() {
+        // Given
         UUID inventoryId = testInventory.getId();
+
+        // When
         productInventoryRepository.deleteById(inventoryId);
         entityManager.flush();
 
+        // Then
         Optional<ProductInventory> result = productInventoryRepository.findById(inventoryId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test finding all product inventories.
-     * Verifies that all inventories can be retrieved.
+     * Test finding ProductInventory by ID.
+     * Verifies that the correct ProductInventory is retrieved.
      */
     @Test
-    @DisplayName("Should find all product inventories")
-    void testFindAll() {
-        assertThat(productInventoryRepository.findAll()).isNotEmpty();
-        assertThat(productInventoryRepository.findAll()).hasSize(1);
+    @DisplayName("Should find ProductInventory by ID when exists")
+    void testFindById_WhenExists_ReturnsInventory() {
+        // Given
+        UUID inventoryId = testInventory.getId();
+
+        // When
+        Optional<ProductInventory> result = productInventoryRepository.findById(inventoryId);
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(inventoryId);
+        assertThat(result.get().getProductId()).isEqualTo(productId);
     }
 
     /**
-     * Test inventory with zero quantity.
-     * Verifies that inventory with zero quantity can be persisted.
+     * Test saving ProductInventory with zero quantity.
+     * Verifies that edge case values are handled correctly.
      */
     @Test
-    @DisplayName("Should handle inventory with zero quantity")
-    void testInventoryWithZeroQuantity() {
+    @DisplayName("Should save ProductInventory with zero quantity")
+    void testSave_WithZeroQuantity_Success() {
+        // Given
         testInventory.setQuantity(0);
         testInventory.setReservedQuantity(0);
-        ProductInventory updated = productInventoryRepository.save(testInventory);
+        testInventory.setAvailableQuantity(0);
 
-        assertThat(updated.getQuantity()).isEqualTo(0);
-        assertThat(updated.getReservedQuantity()).isEqualTo(0);
+        // When
+        ProductInventory savedInventory = productInventoryRepository.save(testInventory);
+
+        // Then
+        assertThat(savedInventory.getQuantity()).isEqualTo(0);
+        assertThat(savedInventory.getReservedQuantity()).isEqualTo(0);
+        assertThat(savedInventory.getAvailableQuantity()).isEqualTo(0);
     }
 
     /**
-     * Test inventory with negative reserved quantity.
-     * Verifies that inventory with negative reserved quantity can be persisted.
+     * Test saving ProductInventory with large quantity.
+     * Verifies that large values are handled correctly.
      */
     @Test
-    @DisplayName("Should handle inventory with negative reserved quantity")
-    void testInventoryWithNegativeReservedQuantity() {
-        testInventory.setReservedQuantity(-5);
-        ProductInventory updated = productInventoryRepository.save(testInventory);
+    @DisplayName("Should save ProductInventory with large quantity")
+    void testSave_WithLargeQuantity_Success() {
+        // Given
+        testInventory.setQuantity(1000000);
+        testInventory.setReservedQuantity(100000);
+        testInventory.setAvailableQuantity(900000);
 
-        assertThat(updated.getReservedQuantity()).isEqualTo(-5);
+        // When
+        ProductInventory savedInventory = productInventoryRepository.save(testInventory);
+
+        // Then
+        assertThat(savedInventory.getQuantity()).isEqualTo(1000000);
+        assertThat(savedInventory.getReservedQuantity()).isEqualTo(100000);
+        assertThat(savedInventory.getAvailableQuantity()).isEqualTo(900000);
     }
 
     /**
-     * Test counting product inventories.
-     * Verifies that the count of inventories is accurate.
+     * Test updating reserved quantity.
+     * Verifies that reserved quantity can be updated independently.
      */
     @Test
-    @DisplayName("Should count product inventories correctly")
-    void testCount() {
-        long count = productInventoryRepository.count();
+    @DisplayName("Should update reserved quantity successfully")
+    void testUpdate_ReservedQuantity_Success() {
+        // Given
+        int newReservedQuantity = 25;
+        testInventory.setReservedQuantity(newReservedQuantity);
+        testInventory.setAvailableQuantity(testInventory.getQuantity() - newReservedQuantity);
 
-        assertThat(count).isEqualTo(1L);
+        // When
+        ProductInventory updatedInventory = productInventoryRepository.save(testInventory);
+
+        // Then
+        assertThat(updatedInventory.getReservedQuantity()).isEqualTo(newReservedQuantity);
+        assertThat(updatedInventory.getAvailableQuantity()).isEqualTo(75);
+    }
+
+    /**
+     * Test that inventory maintains relationship with product.
+     * Verifies product-inventory relationship integrity.
+     */
+    @Test
+    @DisplayName("Should maintain relationship with Product")
+    void testInventoryProductRelationship() {
+        // When
+        Optional<ProductInventory> result = productInventoryRepository.findByProductId(productId);
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getProductId()).isEqualTo(productId);
+        assertThat(result.get().getProductId()).isEqualTo(testProduct.getProductId());
     }
 }

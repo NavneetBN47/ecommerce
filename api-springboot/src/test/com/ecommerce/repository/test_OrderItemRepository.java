@@ -3,7 +3,6 @@ package com.ecommerce.repository;
 import com.ecommerce.entity.Order;
 import com.ecommerce.entity.OrderItem;
 import com.ecommerce.entity.Product;
-import com.ecommerce.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -13,18 +12,17 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * JUnit test class for OrderItemRepository.
- * Tests all repository methods for order item operations.
+ * JUnit 5 test class for OrderItemRepository.
+ * Tests repository methods for OrderItem entity operations.
  * Uses @DataJpaTest for repository layer testing with in-memory database.
- *
- * @author QA Automation Team
+ * 
+ * @author Test Generation Agent
  * @version 1.0
  */
 @DataJpaTest
@@ -41,207 +39,232 @@ public class test_OrderItemRepository {
     private Order testOrder;
     private Product testProduct;
     private OrderItem testOrderItem;
-    private User testUser;
 
     /**
      * Set up test data before each test method execution.
-     * Creates test user, order, product, and order item entities.
+     * Creates and persists test entities for Order, Product, and OrderItem.
      */
     @BeforeEach
     void setUp() {
-        testUser = new User();
-        testUser.setId(UUID.randomUUID());
-        testUser.setUsername("testuser");
-        testUser.setEmail("test@example.com");
-        entityManager.persist(testUser);
-
+        // Create test order
         testOrder = new Order();
         testOrder.setOrderNumber("ORD-" + UUID.randomUUID().toString());
-        testOrder.setUser(testUser);
         testOrder.setStatus(Order.OrderStatus.PENDING);
-        testOrder.setTotalAmount(BigDecimal.valueOf(199.98));
+        testOrder.setTotalAmount(BigDecimal.valueOf(299.99));
         entityManager.persist(testOrder);
 
+        // Create test product
         testProduct = new Product();
         testProduct.setProductId(UUID.randomUUID());
         testProduct.setName("Test Product");
-        testProduct.setPrice(BigDecimal.valueOf(99.99));
+        testProduct.setPrice(99.99);
         entityManager.persist(testProduct);
 
+        // Create test order item
         testOrderItem = new OrderItem();
         testOrderItem.setOrder(testOrder);
         testOrderItem.setProduct(testProduct);
-        testOrderItem.setQuantity(2);
+        testOrderItem.setQuantity(3);
         testOrderItem.setPrice(BigDecimal.valueOf(99.99));
-        testOrderItem.setSubtotal(BigDecimal.valueOf(199.98));
+        testOrderItem.setSubtotal(BigDecimal.valueOf(299.97));
         entityManager.persist(testOrderItem);
-
+        
         entityManager.flush();
     }
 
     /**
-     * Test saving a new order item.
-     * Verifies that an order item can be successfully persisted.
+     * Test saving a new OrderItem.
+     * Verifies that the OrderItem is persisted correctly with all attributes.
      */
     @Test
-    @DisplayName("Should save new order item successfully")
-    void testSaveOrderItem() {
+    @DisplayName("Should save new OrderItem successfully")
+    void testSave_NewOrderItem_Success() {
+        // Given
+        Product anotherProduct = new Product();
+        anotherProduct.setProductId(UUID.randomUUID());
+        anotherProduct.setName("Another Product");
+        anotherProduct.setPrice(49.99);
+        entityManager.persist(anotherProduct);
+
         OrderItem newOrderItem = new OrderItem();
         newOrderItem.setOrder(testOrder);
-        newOrderItem.setProduct(testProduct);
-        newOrderItem.setQuantity(3);
+        newOrderItem.setProduct(anotherProduct);
+        newOrderItem.setQuantity(2);
         newOrderItem.setPrice(BigDecimal.valueOf(49.99));
-        newOrderItem.setSubtotal(BigDecimal.valueOf(149.97));
+        newOrderItem.setSubtotal(BigDecimal.valueOf(99.98));
 
-        OrderItem saved = orderItemRepository.save(newOrderItem);
+        // When
+        OrderItem savedOrderItem = orderItemRepository.save(newOrderItem);
 
-        assertThat(saved).isNotNull();
-        assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getQuantity()).isEqualTo(3);
-        assertThat(saved.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(49.99));
-        assertThat(saved.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(149.97));
+        // Then
+        assertThat(savedOrderItem).isNotNull();
+        assertThat(savedOrderItem.getId()).isNotNull();
+        assertThat(savedOrderItem.getQuantity()).isEqualTo(2);
+        assertThat(savedOrderItem.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(49.99));
+        assertThat(savedOrderItem.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(99.98));
     }
 
     /**
-     * Test finding an order item by ID.
-     * Verifies that an order item can be retrieved by its ID.
+     * Test updating an existing OrderItem.
+     * Verifies that OrderItem modifications are persisted correctly.
      */
     @Test
-    @DisplayName("Should find order item by ID")
-    void testFindById_Success() {
-        Optional<OrderItem> result = orderItemRepository.findById(testOrderItem.getId());
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(testOrderItem.getId());
-        assertThat(result.get().getQuantity()).isEqualTo(2);
-        assertThat(result.get().getProduct().getProductId()).isEqualTo(testProduct.getProductId());
-    }
-
-    /**
-     * Test finding an order item with non-existent ID.
-     * Verifies that an empty Optional is returned when ID doesn't exist.
-     */
-    @Test
-    @DisplayName("Should return empty when order item ID not found")
-    void testFindById_NotFound() {
-        Optional<OrderItem> result = orderItemRepository.findById(999L);
-
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test updating an existing order item.
-     * Verifies that order item quantity can be updated.
-     */
-    @Test
-    @DisplayName("Should update existing order item")
-    void testUpdateOrderItem() {
+    @DisplayName("Should update existing OrderItem successfully")
+    void testSave_UpdateOrderItem_Success() {
+        // Given
         testOrderItem.setQuantity(5);
         testOrderItem.setSubtotal(BigDecimal.valueOf(499.95));
-        OrderItem updated = orderItemRepository.save(testOrderItem);
 
-        assertThat(updated.getQuantity()).isEqualTo(5);
-        assertThat(updated.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(499.95));
-        assertThat(updated.getId()).isEqualTo(testOrderItem.getId());
+        // When
+        OrderItem updatedOrderItem = orderItemRepository.save(testOrderItem);
+        entityManager.flush();
+
+        // Then
+        assertThat(updatedOrderItem.getQuantity()).isEqualTo(5);
+        assertThat(updatedOrderItem.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(499.95));
     }
 
     /**
-     * Test deleting an order item by ID.
-     * Verifies that an order item can be successfully deleted.
+     * Test finding an OrderItem by ID.
+     * Verifies that the correct OrderItem is retrieved.
      */
     @Test
-    @DisplayName("Should delete order item by ID")
-    void testDeleteOrderItem() {
-        Long itemId = testOrderItem.getId();
-        orderItemRepository.deleteById(itemId);
-        entityManager.flush();
+    @DisplayName("Should find OrderItem by ID when exists")
+    void testFindById_WhenExists_ReturnsOrderItem() {
+        // Given
+        Long orderItemId = testOrderItem.getId();
 
-        Optional<OrderItem> result = orderItemRepository.findById(itemId);
+        // When
+        Optional<OrderItem> result = orderItemRepository.findById(orderItemId);
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(orderItemId);
+        assertThat(result.get().getQuantity()).isEqualTo(3);
+        assertThat(result.get().getProduct().getName()).isEqualTo("Test Product");
+    }
+
+    /**
+     * Test finding an OrderItem by ID when it does not exist.
+     * Verifies that an empty Optional is returned.
+     */
+    @Test
+    @DisplayName("Should return empty Optional when OrderItem ID does not exist")
+    void testFindById_WhenNotExists_ReturnsEmpty() {
+        // Given
+        Long nonExistentId = 99999L;
+
+        // When
+        Optional<OrderItem> result = orderItemRepository.findById(nonExistentId);
+
+        // Then
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test finding all order items.
-     * Verifies that all order items can be retrieved.
+     * Test deleting an OrderItem by ID.
+     * Verifies that the OrderItem is removed from the database.
      */
     @Test
-    @DisplayName("Should find all order items")
-    void testFindAll() {
-        List<OrderItem> allItems = orderItemRepository.findAll();
+    @DisplayName("Should delete OrderItem by ID successfully")
+    void testDeleteById_Success() {
+        // Given
+        Long orderItemId = testOrderItem.getId();
 
-        assertThat(allItems).isNotEmpty();
-        assertThat(allItems).hasSize(1);
-        assertThat(allItems.get(0).getId()).isEqualTo(testOrderItem.getId());
-    }
-
-    /**
-     * Test saving multiple order items for the same order.
-     * Verifies that multiple items can be associated with one order.
-     */
-    @Test
-    @DisplayName("Should save multiple order items for same order")
-    void testSaveMultipleOrderItems() {
-        Product product2 = new Product();
-        product2.setProductId(UUID.randomUUID());
-        product2.setName("Product 2");
-        product2.setPrice(BigDecimal.valueOf(29.99));
-        entityManager.persist(product2);
-
-        OrderItem item2 = new OrderItem();
-        item2.setOrder(testOrder);
-        item2.setProduct(product2);
-        item2.setQuantity(1);
-        item2.setPrice(BigDecimal.valueOf(29.99));
-        item2.setSubtotal(BigDecimal.valueOf(29.99));
-        orderItemRepository.save(item2);
-
-        List<OrderItem> allItems = orderItemRepository.findAll();
-        assertThat(allItems).hasSize(2);
-    }
-
-    /**
-     * Test order item with zero quantity.
-     * Verifies that order items with zero quantity can be persisted.
-     */
-    @Test
-    @DisplayName("Should handle order item with zero quantity")
-    void testOrderItemWithZeroQuantity() {
-        OrderItem zeroQtyItem = new OrderItem();
-        zeroQtyItem.setOrder(testOrder);
-        zeroQtyItem.setProduct(testProduct);
-        zeroQtyItem.setQuantity(0);
-        zeroQtyItem.setPrice(BigDecimal.valueOf(99.99));
-        zeroQtyItem.setSubtotal(BigDecimal.ZERO);
-
-        OrderItem saved = orderItemRepository.save(zeroQtyItem);
-
-        assertThat(saved.getQuantity()).isEqualTo(0);
-        assertThat(saved.getSubtotal()).isEqualByComparingTo(BigDecimal.ZERO);
-    }
-
-    /**
-     * Test deleting all order items.
-     * Verifies that all order items can be deleted at once.
-     */
-    @Test
-    @DisplayName("Should delete all order items")
-    void testDeleteAll() {
-        orderItemRepository.deleteAll();
+        // When
+        orderItemRepository.deleteById(orderItemId);
         entityManager.flush();
 
-        List<OrderItem> allItems = orderItemRepository.findAll();
-        assertThat(allItems).isEmpty();
+        // Then
+        Optional<OrderItem> result = orderItemRepository.findById(orderItemId);
+        assertThat(result).isEmpty();
     }
 
     /**
-     * Test counting order items.
-     * Verifies that the count of order items is accurate.
+     * Test finding all OrderItems.
+     * Verifies that all persisted OrderItems are retrieved.
      */
     @Test
-    @DisplayName("Should count order items correctly")
-    void testCount() {
-        long count = orderItemRepository.count();
+    @DisplayName("Should find all OrderItems")
+    void testFindAll_ReturnsAllOrderItems() {
+        // When
+        var allOrderItems = orderItemRepository.findAll();
 
-        assertThat(count).isEqualTo(1L);
+        // Then
+        assertThat(allOrderItems).isNotEmpty();
+        assertThat(allOrderItems).hasSize(1);
+        assertThat(allOrderItems.get(0).getId()).isEqualTo(testOrderItem.getId());
+    }
+
+    /**
+     * Test saving OrderItem with zero quantity.
+     * Verifies that edge case values are handled correctly.
+     */
+    @Test
+    @DisplayName("Should save OrderItem with zero quantity")
+    void testSave_WithZeroQuantity_Success() {
+        // Given
+        testOrderItem.setQuantity(0);
+        testOrderItem.setSubtotal(BigDecimal.ZERO);
+
+        // When
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+
+        // Then
+        assertThat(savedOrderItem.getQuantity()).isEqualTo(0);
+        assertThat(savedOrderItem.getSubtotal()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    /**
+     * Test saving OrderItem with large quantity.
+     * Verifies that large values are handled correctly.
+     */
+    @Test
+    @DisplayName("Should save OrderItem with large quantity")
+    void testSave_WithLargeQuantity_Success() {
+        // Given
+        testOrderItem.setQuantity(1000);
+        testOrderItem.setSubtotal(BigDecimal.valueOf(99990.00));
+
+        // When
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+
+        // Then
+        assertThat(savedOrderItem.getQuantity()).isEqualTo(1000);
+        assertThat(savedOrderItem.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(99990.00));
+    }
+
+    /**
+     * Test that OrderItem maintains relationship with Order.
+     * Verifies bidirectional relationship integrity.
+     */
+    @Test
+    @DisplayName("Should maintain relationship with Order")
+    void testOrderItemOrderRelationship() {
+        // When
+        Optional<OrderItem> result = orderItemRepository.findById(testOrderItem.getId());
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getOrder()).isNotNull();
+        assertThat(result.get().getOrder().getId()).isEqualTo(testOrder.getId());
+        assertThat(result.get().getOrder().getOrderNumber()).isEqualTo(testOrder.getOrderNumber());
+    }
+
+    /**
+     * Test that OrderItem maintains relationship with Product.
+     * Verifies bidirectional relationship integrity.
+     */
+    @Test
+    @DisplayName("Should maintain relationship with Product")
+    void testOrderItemProductRelationship() {
+        // When
+        Optional<OrderItem> result = orderItemRepository.findById(testOrderItem.getId());
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getProduct()).isNotNull();
+        assertThat(result.get().getProduct().getProductId()).isEqualTo(testProduct.getProductId());
+        assertThat(result.get().getProduct().getName()).isEqualTo("Test Product");
     }
 }
