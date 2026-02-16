@@ -18,8 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test class for AuthController
- * Tests authentication operations including registration, login, and logout
+ * JUnit test class for AuthController.
+ * Tests authentication operations including registration, login, and logout.
  */
 @ExtendWith(MockitoExtension.class)
 class test_AuthController {
@@ -63,8 +63,8 @@ class test_AuthController {
     }
 
     /**
-     * Test successful user registration
-     * Verifies that a new user can be registered successfully
+     * Test successful user registration.
+     * Verifies that a new user can be registered and returns CREATED status.
      */
     @Test
     void testRegister_Success() {
@@ -81,21 +81,20 @@ class test_AuthController {
     }
 
     /**
-     * Test registration with null registration DTO
-     * Verifies proper handling of null input
+     * Test registration with null registration DTO.
+     * Verifies proper handling of null input.
      */
     @Test
     void testRegister_NullRegistrationDTO() {
         when(userService.registerUser(null)).thenThrow(new IllegalArgumentException("Registration data cannot be null"));
 
-        assertThrows(IllegalArgumentException.class, () -> {
-            authController.register(null);
-        });
+        assertThrows(IllegalArgumentException.class, () -> authController.register(null));
+        verify(userService, times(1)).registerUser(null);
     }
 
     /**
-     * Test successful user login
-     * Verifies that a user can login successfully with valid credentials
+     * Test successful user login.
+     * Verifies that a user can login with valid credentials.
      */
     @Test
     void testLogin_Success() {
@@ -108,40 +107,38 @@ class test_AuthController {
         assertNotNull(response.getBody());
         assertEquals("Login successful", response.getBody().getMessage());
         assertEquals(loginResponseDTO, response.getBody().getData());
+        assertEquals("jwt-token", response.getBody().getData().getToken());
         verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
-     * Test login with invalid credentials
-     * Verifies proper error handling for invalid credentials
+     * Test login with invalid credentials.
+     * Verifies proper exception handling for authentication failures.
      */
     @Test
     void testLogin_InvalidCredentials() {
         when(authService.login(any(LoginRequestDTO.class)))
             .thenThrow(new RuntimeException("Invalid credentials"));
 
-        assertThrows(RuntimeException.class, () -> {
-            authController.login(loginRequestDTO);
-        });
+        assertThrows(RuntimeException.class, () -> authController.login(loginRequestDTO));
         verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
-     * Test login with null login request
-     * Verifies proper handling of null input
+     * Test login with null login request.
+     * Verifies proper handling of null input.
      */
     @Test
     void testLogin_NullLoginRequest() {
         when(authService.login(null)).thenThrow(new IllegalArgumentException("Login request cannot be null"));
 
-        assertThrows(IllegalArgumentException.class, () -> {
-            authController.login(null);
-        });
+        assertThrows(IllegalArgumentException.class, () -> authController.login(null));
+        verify(authService, times(1)).login(null);
     }
 
     /**
-     * Test successful user logout
-     * Verifies that a user can logout successfully
+     * Test successful user logout.
+     * Verifies that a user can logout and cart is cleaned up.
      */
     @Test
     void testLogout_Success() {
@@ -157,29 +154,27 @@ class test_AuthController {
         assertEquals("Logout successful", response.getBody().getMessage());
         assertNull(response.getBody().getData());
         verify(authService, times(1)).logout(userId);
+        verify(authentication, times(1)).getName();
     }
 
     /**
-     * Test logout with invalid user ID
-     * Verifies proper error handling for invalid user ID
+     * Test logout with invalid user ID.
+     * Verifies proper exception handling for invalid user.
      */
     @Test
     void testLogout_InvalidUserId() {
         when(authentication.getName()).thenReturn("invalid");
 
-        assertThrows(NumberFormatException.class, () -> {
-            authController.logout(authentication);
-        });
+        assertThrows(NumberFormatException.class, () -> authController.logout(authentication));
+        verify(authentication, times(1)).getName();
     }
 
     /**
-     * Test logout with null authentication
-     * Verifies proper handling of null authentication
+     * Test logout when authentication is null.
+     * Verifies proper handling of null authentication.
      */
     @Test
     void testLogout_NullAuthentication() {
-        assertThrows(NullPointerException.class, () -> {
-            authController.logout(null);
-        });
+        assertThrows(NullPointerException.class, () -> authController.logout(null));
     }
 }

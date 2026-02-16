@@ -15,12 +15,11 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test class for LogoutController
- * Tests logout operations and cart clearing functionality
+ * JUnit test class for LogoutController.
+ * Tests logout operations and cart cleanup functionality.
  */
 @ExtendWith(MockitoExtension.class)
 class test_LogoutController {
@@ -39,8 +38,8 @@ class test_LogoutController {
     }
 
     /**
-     * Test successful logout
-     * Verifies that user can logout successfully and cart is cleared
+     * Test successful logout operation.
+     * Verifies that user can logout and cart is cleared successfully.
      */
     @Test
     void testLogout_Success() {
@@ -57,54 +56,48 @@ class test_LogoutController {
     }
 
     /**
-     * Test logout with null user ID
-     * Verifies proper handling of null user ID
+     * Test logout with null user ID.
+     * Verifies proper handling of null user ID.
      */
     @Test
     void testLogout_NullUserId() {
         doThrow(new IllegalArgumentException("User ID cannot be null"))
             .when(cartService).clearCart(null);
 
-        assertThrows(IllegalArgumentException.class, () -> {
-            logoutController.logout(null);
-        });
+        assertThrows(IllegalArgumentException.class, () -> logoutController.logout(null));
         verify(cartService, times(1)).clearCart(null);
     }
 
     /**
-     * Test logout when cart service throws exception
-     * Verifies proper error handling when cart clearing fails
+     * Test logout when cart service throws exception.
+     * Verifies proper exception propagation.
      */
     @Test
     void testLogout_ServiceException() {
-        doThrow(new RuntimeException("Cart service error"))
+        doThrow(new RuntimeException("Database error"))
             .when(cartService).clearCart(any(UUID.class));
 
-        assertThrows(RuntimeException.class, () -> {
-            logoutController.logout(userId);
-        });
+        assertThrows(RuntimeException.class, () -> logoutController.logout(userId));
         verify(cartService, times(1)).clearCart(eq(userId));
     }
 
     /**
-     * Test logout with invalid UUID format
-     * Verifies that valid UUID is properly processed
+     * Test logout with invalid UUID format.
+     * Verifies handling of malformed user IDs.
      */
     @Test
-    void testLogout_ValidUUID() {
-        UUID validUserId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        doNothing().when(cartService).clearCart(any(UUID.class));
+    void testLogout_InvalidUUID() {
+        UUID invalidUserId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        doThrow(new IllegalArgumentException("Invalid user ID"))
+            .when(cartService).clearCart(eq(invalidUserId));
 
-        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(validUserId);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(cartService, times(1)).clearCart(eq(validUserId));
+        assertThrows(IllegalArgumentException.class, () -> logoutController.logout(invalidUserId));
+        verify(cartService, times(1)).clearCart(eq(invalidUserId));
     }
 
     /**
-     * Test multiple logout calls for same user
-     * Verifies idempotency of logout operation
+     * Test multiple logout calls for same user.
+     * Verifies idempotent behavior of logout operation.
      */
     @Test
     void testLogout_MultipleCallsSameUser() {
