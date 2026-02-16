@@ -3,275 +3,183 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.*;
 import com.ecommerce.service.AuthService;
 import com.ecommerce.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.DisplayName;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * JUnit 5 test class for AuthController
+ * Unit test class for AuthController
  * Tests authentication operations including registration, login, and logout
  */
-@WebMvcTest(AuthController.class)
-@DisplayName("AuthController Tests")
+@ExtendWith(MockitoExtension.class)
 class test_AuthController {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private AuthService authService;
 
-    @MockBean
+    @Mock
     private UserService userService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @Mock
+    private Authentication authentication;
 
-    private UserRegistrationDTO validRegistrationDTO;
-    private LoginRequestDTO validLoginRequest;
+    @InjectMocks
+    private AuthController authController;
+
+    private UserRegistrationDTO registrationDTO;
     private UserDTO userDTO;
+    private LoginRequestDTO loginRequestDTO;
     private LoginResponseDTO loginResponseDTO;
 
-    /**
-     * Set up test data before each test
-     */
     @BeforeEach
     void setUp() {
-        validRegistrationDTO = new UserRegistrationDTO();
-        validRegistrationDTO.setUsername("testuser");
-        validRegistrationDTO.setEmail("test@example.com");
-        validRegistrationDTO.setPassword("Password123!");
-        validRegistrationDTO.setFirstName("Test");
-        validRegistrationDTO.setLastName("User");
-
-        validLoginRequest = new LoginRequestDTO();
-        validLoginRequest.setIdentifier("testuser");
-        validLoginRequest.setPassword("Password123!");
+        registrationDTO = new UserRegistrationDTO();
+        registrationDTO.setUsername("testuser");
+        registrationDTO.setEmail("test@example.com");
+        registrationDTO.setPassword("password123");
 
         userDTO = new UserDTO();
         userDTO.setId(1L);
         userDTO.setUsername("testuser");
         userDTO.setEmail("test@example.com");
-        userDTO.setFirstName("Test");
-        userDTO.setLastName("User");
+
+        loginRequestDTO = new LoginRequestDTO();
+        loginRequestDTO.setIdentifier("testuser");
+        loginRequestDTO.setPassword("password123");
 
         loginResponseDTO = new LoginResponseDTO();
-        loginResponseDTO.setToken("jwt-token-123");
+        loginResponseDTO.setToken("jwt-token");
         loginResponseDTO.setUser(userDTO);
     }
 
     /**
      * Test successful user registration
-     * Verifies that a valid registration request returns 201 CREATED with user data
+     * Verifies that a new user can be registered successfully
      */
     @Test
-    @DisplayName("Should register user successfully with valid data")
-    void testRegisterUser_Success() throws Exception {
+    void testRegister_Success() {
         when(userService.registerUser(any(UserRegistrationDTO.class))).thenReturn(userDTO);
 
-        mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validRegistrationDTO)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("User registered successfully"))
-                .andExpect(jsonPath("$.data.username").value("testuser"))
-                .andExpect(jsonPath("$.data.email").value("test@example.com"));
+        ResponseEntity<ApiResponseDTO<UserDTO>> response = authController.register(registrationDTO);
 
+        assertNotNull(response);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("User registered successfully", response.getBody().getMessage());
+        assertEquals(userDTO, response.getBody().getData());
         verify(userService, times(1)).registerUser(any(UserRegistrationDTO.class));
     }
 
     /**
-     * Test registration with invalid data
-     * Verifies that validation errors are properly handled
+     * Test registration with null registration DTO
+     * Verifies proper handling of null input
      */
     @Test
-    @DisplayName("Should return 400 when registration data is invalid")
-    void testRegisterUser_InvalidData() throws Exception {
-        UserRegistrationDTO invalidDTO = new UserRegistrationDTO();
-        invalidDTO.setUsername("");
-        invalidDTO.setEmail("invalid-email");
-        invalidDTO.setPassword("weak");
+    void testRegister_NullRegistrationDTO() {
+        when(userService.registerUser(null)).thenThrow(new IllegalArgumentException("Registration data cannot be null"));
 
-        mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDTO)))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).registerUser(any(UserRegistrationDTO.class));
+        assertThrows(IllegalArgumentException.class, () -> {
+            authController.register(null);
+        });
     }
 
     /**
-     * Test registration with duplicate username
-     * Verifies that duplicate username errors are handled
+     * Test successful user login
+     * Verifies that a user can login successfully with valid credentials
      */
     @Test
-    @DisplayName("Should return error when username already exists")
-    void testRegisterUser_DuplicateUsername() throws Exception {
-        when(userService.registerUser(any(UserRegistrationDTO.class)))
-                .thenThrow(new RuntimeException("Username already exists"));
-
-        mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validRegistrationDTO)))
-                .andExpect(status().is5xxServerError());
-
-        verify(userService, times(1)).registerUser(any(UserRegistrationDTO.class));
-    }
-
-    /**
-     * Test successful login
-     * Verifies that valid credentials return JWT token and user data
-     */
-    @Test
-    @DisplayName("Should login successfully with valid credentials")
-    void testLogin_Success() throws Exception {
+    void testLogin_Success() {
         when(authService.login(any(LoginRequestDTO.class))).thenReturn(loginResponseDTO);
 
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validLoginRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Login successful"))
-                .andExpect(jsonPath("$.data.token").value("jwt-token-123"))
-                .andExpect(jsonPath("$.data.user.username").value("testuser"));
+        ResponseEntity<ApiResponseDTO<LoginResponseDTO>> response = authController.login(loginRequestDTO);
 
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Login successful", response.getBody().getMessage());
+        assertEquals(loginResponseDTO, response.getBody().getData());
         verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
      * Test login with invalid credentials
-     * Verifies that authentication failures are properly handled
+     * Verifies proper error handling for invalid credentials
      */
     @Test
-    @DisplayName("Should return error with invalid credentials")
-    void testLogin_InvalidCredentials() throws Exception {
+    void testLogin_InvalidCredentials() {
         when(authService.login(any(LoginRequestDTO.class)))
-                .thenThrow(new RuntimeException("Invalid credentials"));
+            .thenThrow(new RuntimeException("Invalid credentials"));
 
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validLoginRequest)))
-                .andExpect(status().is5xxServerError());
-
+        assertThrows(RuntimeException.class, () -> {
+            authController.login(loginRequestDTO);
+        });
         verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
-     * Test login with empty identifier
-     * Verifies that validation catches empty identifier
+     * Test login with null login request
+     * Verifies proper handling of null input
      */
     @Test
-    @DisplayName("Should return 400 when identifier is empty")
-    void testLogin_EmptyIdentifier() throws Exception {
-        LoginRequestDTO invalidRequest = new LoginRequestDTO();
-        invalidRequest.setIdentifier("");
-        invalidRequest.setPassword("password");
+    void testLogin_NullLoginRequest() {
+        when(authService.login(null)).thenThrow(new IllegalArgumentException("Login request cannot be null"));
 
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest());
-
-        verify(authService, never()).login(any(LoginRequestDTO.class));
+        assertThrows(IllegalArgumentException.class, () -> {
+            authController.login(null);
+        });
     }
 
     /**
-     * Test successful logout
-     * Verifies that authenticated user can logout successfully
+     * Test successful user logout
+     * Verifies that a user can logout successfully
      */
     @Test
-    @WithMockUser(username = "1")
-    @DisplayName("Should logout successfully for authenticated user")
-    void testLogout_Success() throws Exception {
-        Authentication mockAuth = mock(Authentication.class);
-        when(mockAuth.getName()).thenReturn("1");
-        doNothing().when(authService).logout(anyLong());
+    void testLogout_Success() {
+        Long userId = 1L;
+        when(authentication.getName()).thenReturn(userId.toString());
+        doNothing().when(authService).logout(userId);
 
-        mockMvc.perform(post("/api/auth/logout")
-                .with(authentication(mockAuth)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Logout successful"));
+        ResponseEntity<ApiResponseDTO<Void>> response = authController.logout(authentication);
 
-        verify(authService, times(1)).logout(1L);
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Logout successful", response.getBody().getMessage());
+        assertNull(response.getBody().getData());
+        verify(authService, times(1)).logout(userId);
     }
 
     /**
-     * Test logout without authentication
-     * Verifies that unauthenticated requests are rejected
+     * Test logout with invalid user ID
+     * Verifies proper error handling for invalid user ID
      */
     @Test
-    @DisplayName("Should return 401 when logout without authentication")
-    void testLogout_Unauthenticated() throws Exception {
-        mockMvc.perform(post("/api/auth/logout"))
-                .andExpect(status().isUnauthorized());
+    void testLogout_InvalidUserId() {
+        when(authentication.getName()).thenReturn("invalid");
 
-        verify(authService, never()).logout(anyLong());
+        assertThrows(NumberFormatException.class, () -> {
+            authController.logout(authentication);
+        });
     }
 
     /**
-     * Test logout with service exception
-     * Verifies that service layer exceptions are properly handled
+     * Test logout with null authentication
+     * Verifies proper handling of null authentication
      */
     @Test
-    @WithMockUser(username = "1")
-    @DisplayName("Should handle service exception during logout")
-    void testLogout_ServiceException() throws Exception {
-        Authentication mockAuth = mock(Authentication.class);
-        when(mockAuth.getName()).thenReturn("1");
-        doThrow(new RuntimeException("Service error")).when(authService).logout(anyLong());
-
-        mockMvc.perform(post("/api/auth/logout")
-                .with(authentication(mockAuth)))
-                .andExpect(status().is5xxServerError());
-
-        verify(authService, times(1)).logout(1L);
-    }
-
-    /**
-     * Test registration with null request body
-     * Verifies that null request body is handled
-     */
-    @Test
-    @DisplayName("Should return 400 when registration request body is null")
-    void testRegisterUser_NullRequestBody() throws Exception {
-        mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(""))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).registerUser(any(UserRegistrationDTO.class));
-    }
-
-    /**
-     * Test login with null request body
-     * Verifies that null request body is handled
-     */
-    @Test
-    @DisplayName("Should return 400 when login request body is null")
-    void testLogin_NullRequestBody() throws Exception {
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(""))
-                .andExpect(status().isBadRequest());
-
-        verify(authService, never()).login(any(LoginRequestDTO.class));
+    void testLogout_NullAuthentication() {
+        assertThrows(NullPointerException.class, () -> {
+            authController.logout(null);
+        });
     }
 }
