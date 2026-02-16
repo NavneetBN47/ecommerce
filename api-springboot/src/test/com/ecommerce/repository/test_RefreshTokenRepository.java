@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -16,9 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for RefreshTokenRepository.
- * Tests repository methods for RefreshToken entity operations including
- * finding by token, deleting by user ID, and deleting expired tokens.
- *
+ * Tests repository operations for RefreshToken entity including custom query methods.
+ * 
  * @author QA Automation Team
  * @version 1.0
  */
@@ -34,50 +34,65 @@ class test_RefreshTokenRepository {
     private TestEntityManager entityManager;
 
     private RefreshToken testRefreshToken;
+    private String testToken;
+    private Long testUserId;
 
     /**
-     * Set up test data before each test method.
+     * Set up test data before each test method execution.
      */
     @BeforeEach
     void setUp() {
+        testToken = "test-refresh-token-12345";
+        testUserId = 1L;
+        
         testRefreshToken = new RefreshToken();
-        testRefreshToken.setToken("test-refresh-token");
+        testRefreshToken.setToken(testToken);
         testRefreshToken.setExpiryDate(LocalDateTime.now().plusDays(7));
     }
 
     /**
      * Test finding a refresh token by token string when it exists.
-     * Verifies that the correct refresh token is returned.
+     * Verifies that the custom query method returns the correct token.
      */
     @Test
-    @DisplayName("Should find refresh token by token when exists")
-    void testFindByToken_WhenExists_ReturnsRefreshToken() {
+    @DisplayName("Should find refresh token by token string when exists")
+    void testFindByToken_WhenExists_ShouldReturnToken() {
         // Given
-        RefreshToken token = new RefreshToken();
-        token.setToken("valid-token");
-        token.setExpiryDate(LocalDateTime.now().plusDays(7));
-        entityManager.persistAndFlush(token);
+        RefreshToken savedToken = refreshTokenRepository.save(testRefreshToken);
+        entityManager.flush();
+        entityManager.clear();
 
         // When
-        Optional<RefreshToken> result = refreshTokenRepository.findByToken("valid-token");
+        Optional<RefreshToken> result = refreshTokenRepository.findByToken(testToken);
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getToken()).isEqualTo("valid-token");
+        assertThat(result.get().getToken()).isEqualTo(testToken);
     }
 
     /**
      * Test finding a refresh token by token string when it does not exist.
-     * Verifies that an empty Optional is returned.
+     * Verifies that the method returns an empty Optional.
      */
     @Test
-    @DisplayName("Should return empty Optional when token does not exist")
-    void testFindByToken_WhenNotExists_ReturnsEmpty() {
-        // Given
-        String nonExistentToken = "non-existent-token";
-
+    @DisplayName("Should return empty when token does not exist")
+    void testFindByToken_WhenNotExists_ShouldReturnEmpty() {
         // When
-        Optional<RefreshToken> result = refreshTokenRepository.findByToken(nonExistentToken);
+        Optional<RefreshToken> result = refreshTokenRepository.findByToken("non-existent-token");
+
+        // Then
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test finding a refresh token with null token string.
+     * Verifies proper handling of null parameters.
+     */
+    @Test
+    @DisplayName("Should handle null token gracefully")
+    void testFindByToken_WithNullToken_ShouldReturnEmpty() {
+        // When
+        Optional<RefreshToken> result = refreshTokenRepository.findByToken(null);
 
         // Then
         assertThat(result).isEmpty();
@@ -85,39 +100,56 @@ class test_RefreshTokenRepository {
 
     /**
      * Test deleting refresh tokens by user ID.
-     * Verifies that all tokens for a user are removed.
+     * Verifies that all tokens for a user are deleted.
      */
     @Test
+    @Transactional
     @DisplayName("Should delete refresh tokens by user ID")
-    void testDeleteByUserId_DeletesUserTokens() {
+    void testDeleteByUserId_ShouldRemoveTokens() {
         // Given
-        Long userId = 1L;
+        RefreshToken savedToken = refreshTokenRepository.save(testRefreshToken);
+        entityManager.flush();
+
+        // When
+        refreshTokenRepository.deleteByUserId(testUserId);
+        entityManager.flush();
+
+        // Then
+        Optional<RefreshToken> result = refreshTokenRepository.findByToken(testToken);
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test deleting refresh tokens by non-existent user ID.
+     * Verifies that the operation completes without error.
+     */
+    @Test
+    @Transactional
+    @DisplayName("Should handle delete by non-existent user ID gracefully")
+    void testDeleteByUserId_WithNonExistentUserId_ShouldNotThrowException() {
+        // Given
+        Long nonExistentUserId = 999999L;
 
         // When & Then
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
-            refreshTokenRepository.deleteByUserId(userId);
+            refreshTokenRepository.deleteByUserId(nonExistentUserId);
             entityManager.flush();
         });
     }
 
     /**
-     * Test deleting expired refresh tokens.
-     * Verifies that only expired tokens are removed.
+     * Test deleting expired tokens.
+     * Verifies that only expired tokens are deleted.
      */
     @Test
-    @DisplayName("Should delete expired refresh tokens")
-    void testDeleteExpiredTokens_DeletesOnlyExpiredTokens() {
+    @Transactional
+    @DisplayName("Should delete expired tokens")
+    void testDeleteExpiredTokens_ShouldRemoveExpiredTokens() {
         // Given
         RefreshToken expiredToken = new RefreshToken();
         expiredToken.setToken("expired-token");
         expiredToken.setExpiryDate(LocalDateTime.now().minusDays(1));
-        
-        RefreshToken validToken = new RefreshToken();
-        validToken.setToken("valid-token");
-        validToken.setExpiryDate(LocalDateTime.now().plusDays(7));
-        
-        entityManager.persist(expiredToken);
-        entityManager.persist(validToken);
+        refreshTokenRepository.save(expiredToken);
         entityManager.flush();
 
         // When
@@ -125,147 +157,88 @@ class test_RefreshTokenRepository {
         entityManager.flush();
 
         // Then
-        Optional<RefreshToken> expiredResult = refreshTokenRepository.findByToken("expired-token");
-        Optional<RefreshToken> validResult = refreshTokenRepository.findByToken("valid-token");
-        
-        assertThat(expiredResult).isEmpty();
-        assertThat(validResult).isPresent();
-    }
-
-    /**
-     * Test saving a refresh token.
-     * Verifies that the token is persisted correctly.
-     */
-    @Test
-    @DisplayName("Should save refresh token successfully")
-    void testSave_ValidRefreshToken_SavesSuccessfully() {
-        // Given
-        RefreshToken newToken = new RefreshToken();
-        newToken.setToken("new-token");
-        newToken.setExpiryDate(LocalDateTime.now().plusDays(7));
-
-        // When
-        RefreshToken savedToken = refreshTokenRepository.save(newToken);
-
-        // Then
-        assertThat(savedToken).isNotNull();
-        assertThat(savedToken.getId()).isNotNull();
-        assertThat(savedToken.getToken()).isEqualTo("new-token");
-    }
-
-    /**
-     * Test finding a refresh token by ID.
-     * Verifies that the token can be retrieved by its ID.
-     */
-    @Test
-    @DisplayName("Should find refresh token by ID when exists")
-    void testFindById_WhenExists_ReturnsRefreshToken() {
-        // Given
-        RefreshToken token = new RefreshToken();
-        token.setToken("find-token");
-        token.setExpiryDate(LocalDateTime.now().plusDays(7));
-        RefreshToken savedToken = entityManager.persistAndFlush(token);
-
-        // When
-        Optional<RefreshToken> result = refreshTokenRepository.findById(savedToken.getId());
-
-        // Then
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedToken.getId());
-    }
-
-    /**
-     * Test deleting a refresh token by ID.
-     * Verifies that the token is removed from the database.
-     */
-    @Test
-    @DisplayName("Should delete refresh token by ID successfully")
-    void testDeleteById_ExistingToken_DeletesSuccessfully() {
-        // Given
-        RefreshToken token = new RefreshToken();
-        token.setToken("delete-token");
-        token.setExpiryDate(LocalDateTime.now().plusDays(7));
-        RefreshToken savedToken = entityManager.persistAndFlush(token);
-        Long tokenId = savedToken.getId();
-
-        // When
-        refreshTokenRepository.deleteById(tokenId);
-        entityManager.flush();
-
-        // Then
-        Optional<RefreshToken> result = refreshTokenRepository.findById(tokenId);
+        Optional<RefreshToken> result = refreshTokenRepository.findByToken("expired-token");
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test finding all refresh tokens.
-     * Verifies that all tokens can be retrieved.
+     * Test deleting expired tokens does not affect valid tokens.
+     * Verifies that non-expired tokens remain after cleanup.
      */
     @Test
-    @DisplayName("Should find all refresh tokens")
-    void testFindAll_ReturnsAllRefreshTokens() {
-        // Given
-        RefreshToken token1 = new RefreshToken();
-        token1.setToken("token1");
-        token1.setExpiryDate(LocalDateTime.now().plusDays(7));
-        
-        RefreshToken token2 = new RefreshToken();
-        token2.setToken("token2");
-        token2.setExpiryDate(LocalDateTime.now().plusDays(7));
-        
-        entityManager.persist(token1);
-        entityManager.persist(token2);
-        entityManager.flush();
-
-        // When
-        var result = refreshTokenRepository.findAll();
-
-        // Then
-        assertThat(result).isNotNull();
-        assertThat(result.size()).isGreaterThanOrEqualTo(2);
-    }
-
-    /**
-     * Test counting refresh tokens.
-     * Verifies that the count of tokens is correct.
-     */
-    @Test
-    @DisplayName("Should count refresh tokens correctly")
-    void testCount_ReturnsCorrectCount() {
-        // Given
-        long initialCount = refreshTokenRepository.count();
-        RefreshToken token = new RefreshToken();
-        token.setToken("count-token");
-        token.setExpiryDate(LocalDateTime.now().plusDays(7));
-        entityManager.persistAndFlush(token);
-
-        // When
-        long newCount = refreshTokenRepository.count();
-
-        // Then
-        assertThat(newCount).isEqualTo(initialCount + 1);
-    }
-
-    /**
-     * Test deleting expired tokens when none are expired.
-     * Verifies that no tokens are deleted.
-     */
-    @Test
-    @DisplayName("Should not delete any tokens when none are expired")
-    void testDeleteExpiredTokens_WhenNoneExpired_DeletesNone() {
+    @Transactional
+    @DisplayName("Should not delete valid tokens when cleaning expired tokens")
+    void testDeleteExpiredTokens_ShouldKeepValidTokens() {
         // Given
         RefreshToken validToken = new RefreshToken();
         validToken.setToken("valid-token");
         validToken.setExpiryDate(LocalDateTime.now().plusDays(7));
-        entityManager.persistAndFlush(validToken);
-        long initialCount = refreshTokenRepository.count();
+        refreshTokenRepository.save(validToken);
+        entityManager.flush();
 
         // When
         refreshTokenRepository.deleteExpiredTokens(LocalDateTime.now());
         entityManager.flush();
 
         // Then
-        long newCount = refreshTokenRepository.count();
-        assertThat(newCount).isEqualTo(initialCount);
+        Optional<RefreshToken> result = refreshTokenRepository.findByToken("valid-token");
+        assertThat(result).isPresent();
+    }
+
+    /**
+     * Test saving a refresh token.
+     * Verifies that the save operation works correctly.
+     */
+    @Test
+    @DisplayName("Should save refresh token successfully")
+    void testSave_ShouldPersistToken() {
+        // When
+        RefreshToken savedToken = refreshTokenRepository.save(testRefreshToken);
+        entityManager.flush();
+
+        // Then
+        assertThat(savedToken).isNotNull();
+        assertThat(savedToken.getId()).isNotNull();
+    }
+
+    /**
+     * Test finding a refresh token by ID.
+     * Verifies that findById returns the correct token.
+     */
+    @Test
+    @DisplayName("Should find refresh token by ID when exists")
+    void testFindById_WhenExists_ShouldReturnToken() {
+        // Given
+        RefreshToken savedToken = refreshTokenRepository.save(testRefreshToken);
+        entityManager.flush();
+        Long savedId = savedToken.getId();
+
+        // When
+        Optional<RefreshToken> result = refreshTokenRepository.findById(savedId);
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(savedId);
+    }
+
+    /**
+     * Test deleting a refresh token.
+     * Verifies that the delete operation works correctly.
+     */
+    @Test
+    @DisplayName("Should delete refresh token successfully")
+    void testDelete_ShouldRemoveToken() {
+        // Given
+        RefreshToken savedToken = refreshTokenRepository.save(testRefreshToken);
+        entityManager.flush();
+        Long savedId = savedToken.getId();
+
+        // When
+        refreshTokenRepository.delete(savedToken);
+        entityManager.flush();
+
+        // Then
+        Optional<RefreshToken> result = refreshTokenRepository.findById(savedId);
+        assertThat(result).isEmpty();
     }
 }

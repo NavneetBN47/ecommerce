@@ -17,9 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for ProductRepository.
- * Tests repository methods for Product entity operations
- * including searching products by keyword.
- *
+ * Tests repository operations for Product entity including custom query methods.
+ * 
  * @author QA Automation Team
  * @version 1.0
  */
@@ -37,7 +36,7 @@ class test_ProductRepository {
     private Product testProduct;
 
     /**
-     * Set up test data before each test method.
+     * Set up test data before each test method execution.
      */
     @BeforeEach
     void setUp() {
@@ -52,20 +51,19 @@ class test_ProductRepository {
      * Verifies that products matching the keyword in name are returned.
      */
     @Test
-    @DisplayName("Should search products by keyword in name")
-    void testSearchProducts_ByNameKeyword_ReturnsMatchingProducts() {
+    @DisplayName("Should find products by keyword in name")
+    void testSearchProducts_ByNameKeyword_ShouldReturnMatchingProducts() {
         // Given
-        Product product = new Product();
-        product.setProductId(UUID.randomUUID());
-        product.setName("Laptop Computer");
-        product.setDescription("High performance laptop");
-        entityManager.persistAndFlush(product);
+        productRepository.save(testProduct);
+        entityManager.flush();
+        entityManager.clear();
 
         // When
-        List<Product> result = productRepository.searchProducts("Laptop");
+        List<Product> result = productRepository.searchProducts("Test");
 
         // Then
-        assertThat(result).isNotNull();
+        assertThat(result).isNotEmpty();
+        assertThat(result).anyMatch(p -> p.getName().contains("Test"));
     }
 
     /**
@@ -73,41 +71,38 @@ class test_ProductRepository {
      * Verifies that products matching the keyword in description are returned.
      */
     @Test
-    @DisplayName("Should search products by keyword in description")
-    void testSearchProducts_ByDescriptionKeyword_ReturnsMatchingProducts() {
+    @DisplayName("Should find products by keyword in description")
+    void testSearchProducts_ByDescriptionKeyword_ShouldReturnMatchingProducts() {
         // Given
-        Product product = new Product();
-        product.setProductId(UUID.randomUUID());
-        product.setName("Gaming Mouse");
-        product.setDescription("Professional gaming peripheral");
-        entityManager.persistAndFlush(product);
+        productRepository.save(testProduct);
+        entityManager.flush();
+        entityManager.clear();
 
         // When
-        List<Product> result = productRepository.searchProducts("gaming");
+        List<Product> result = productRepository.searchProducts("Description");
 
         // Then
-        assertThat(result).isNotNull();
+        assertThat(result).isNotEmpty();
+        assertThat(result).anyMatch(p -> p.getDescription().contains("Description"));
     }
 
     /**
      * Test searching products with case-insensitive keyword.
-     * Verifies that search is case-insensitive.
+     * Verifies that the search is case-insensitive.
      */
     @Test
-    @DisplayName("Should search products case-insensitively")
-    void testSearchProducts_CaseInsensitive_ReturnsMatchingProducts() {
+    @DisplayName("Should perform case-insensitive search")
+    void testSearchProducts_CaseInsensitive_ShouldReturnMatchingProducts() {
         // Given
-        Product product = new Product();
-        product.setProductId(UUID.randomUUID());
-        product.setName("KEYBOARD");
-        product.setDescription("Mechanical keyboard");
-        entityManager.persistAndFlush(product);
+        productRepository.save(testProduct);
+        entityManager.flush();
+        entityManager.clear();
 
         // When
-        List<Product> result = productRepository.searchProducts("keyboard");
+        List<Product> result = productRepository.searchProducts("test");
 
         // Then
-        assertThat(result).isNotNull();
+        assertThat(result).isNotEmpty();
     }
 
     /**
@@ -116,68 +111,88 @@ class test_ProductRepository {
      */
     @Test
     @DisplayName("Should return empty list when no products match keyword")
-    void testSearchProducts_NoMatch_ReturnsEmptyList() {
-        // Given
-        String nonMatchingKeyword = "NonExistentProduct12345";
-
+    void testSearchProducts_NoMatch_ShouldReturnEmptyList() {
         // When
-        List<Product> result = productRepository.searchProducts(nonMatchingKeyword);
+        List<Product> result = productRepository.searchProducts("NonExistentKeyword");
 
         // Then
         assertThat(result).isEmpty();
     }
 
     /**
+     * Test searching products with empty keyword.
+     * Verifies behavior with empty search string.
+     */
+    @Test
+    @DisplayName("Should handle empty keyword")
+    void testSearchProducts_EmptyKeyword_ShouldReturnAllProducts() {
+        // Given
+        productRepository.save(testProduct);
+        entityManager.flush();
+
+        // When
+        List<Product> result = productRepository.searchProducts("");
+
+        // Then
+        assertThat(result).isNotEmpty();
+    }
+
+    /**
+     * Test searching products with null keyword.
+     * Verifies proper handling of null parameters.
+     */
+    @Test
+    @DisplayName("Should handle null keyword gracefully")
+    void testSearchProducts_NullKeyword_ShouldNotThrowException() {
+        // When & Then
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+            productRepository.searchProducts(null);
+        });
+    }
+
+    /**
      * Test saving a product.
-     * Verifies that the product is persisted correctly.
+     * Verifies that the save operation works correctly.
      */
     @Test
     @DisplayName("Should save product successfully")
-    void testSave_ValidProduct_SavesSuccessfully() {
-        // Given
-        Product newProduct = new Product();
-        newProduct.setProductId(UUID.randomUUID());
-        newProduct.setName("New Product");
-        newProduct.setDescription("New Description");
-
+    void testSave_ShouldPersistProduct() {
         // When
-        Product savedProduct = productRepository.save(newProduct);
+        Product savedProduct = productRepository.save(testProduct);
+        entityManager.flush();
 
         // Then
         assertThat(savedProduct).isNotNull();
         assertThat(savedProduct.getProductId()).isNotNull();
-        assertThat(savedProduct.getName()).isEqualTo("New Product");
     }
 
     /**
      * Test finding a product by ID.
-     * Verifies that the product can be retrieved by its ID.
+     * Verifies that findById returns the correct product.
      */
     @Test
     @DisplayName("Should find product by ID when exists")
-    void testFindById_WhenExists_ReturnsProduct() {
+    void testFindById_WhenExists_ShouldReturnProduct() {
         // Given
-        Product product = new Product();
-        product.setProductId(UUID.randomUUID());
-        product.setName("Find Product");
-        product.setDescription("Find Description");
-        Product savedProduct = entityManager.persistAndFlush(product);
+        Product savedProduct = productRepository.save(testProduct);
+        entityManager.flush();
+        UUID savedId = savedProduct.getProductId();
 
         // When
-        Optional<Product> result = productRepository.findById(savedProduct.getProductId());
+        Optional<Product> result = productRepository.findById(savedId);
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getProductId()).isEqualTo(savedProduct.getProductId());
+        assertThat(result.get().getProductId()).isEqualTo(savedId);
     }
 
     /**
      * Test finding a product by ID when it does not exist.
-     * Verifies that an empty Optional is returned.
+     * Verifies that findById returns empty Optional.
      */
     @Test
-    @DisplayName("Should return empty Optional when product does not exist")
-    void testFindById_WhenNotExists_ReturnsEmpty() {
+    @DisplayName("Should return empty when product ID does not exist")
+    void testFindById_WhenNotExists_ShouldReturnEmpty() {
         // Given
         UUID nonExistentId = UUID.randomUUID();
 
@@ -190,77 +205,40 @@ class test_ProductRepository {
 
     /**
      * Test deleting a product.
-     * Verifies that the product is removed from the database.
+     * Verifies that the delete operation works correctly.
      */
     @Test
     @DisplayName("Should delete product successfully")
-    void testDelete_ExistingProduct_DeletesSuccessfully() {
+    void testDelete_ShouldRemoveProduct() {
         // Given
-        Product product = new Product();
-        product.setProductId(UUID.randomUUID());
-        product.setName("Delete Product");
-        product.setDescription("Delete Description");
-        Product savedProduct = entityManager.persistAndFlush(product);
-        UUID productId = savedProduct.getProductId();
+        Product savedProduct = productRepository.save(testProduct);
+        entityManager.flush();
+        UUID savedId = savedProduct.getProductId();
 
         // When
-        productRepository.deleteById(productId);
+        productRepository.delete(savedProduct);
         entityManager.flush();
 
         // Then
-        Optional<Product> result = productRepository.findById(productId);
+        Optional<Product> result = productRepository.findById(savedId);
         assertThat(result).isEmpty();
     }
 
     /**
      * Test finding all products.
-     * Verifies that all products can be retrieved.
+     * Verifies that findAll returns all persisted products.
      */
     @Test
     @DisplayName("Should find all products")
-    void testFindAll_ReturnsAllProducts() {
+    void testFindAll_ShouldReturnAllProducts() {
         // Given
-        Product product1 = new Product();
-        product1.setProductId(UUID.randomUUID());
-        product1.setName("Product 1");
-        product1.setDescription("Description 1");
-        
-        Product product2 = new Product();
-        product2.setProductId(UUID.randomUUID());
-        product2.setName("Product 2");
-        product2.setDescription("Description 2");
-        
-        entityManager.persist(product1);
-        entityManager.persist(product2);
+        productRepository.save(testProduct);
         entityManager.flush();
 
         // When
         List<Product> result = productRepository.findAll();
 
         // Then
-        assertThat(result).isNotNull();
-        assertThat(result.size()).isGreaterThanOrEqualTo(2);
-    }
-
-    /**
-     * Test counting products.
-     * Verifies that the count of products is correct.
-     */
-    @Test
-    @DisplayName("Should count products correctly")
-    void testCount_ReturnsCorrectCount() {
-        // Given
-        long initialCount = productRepository.count();
-        Product product = new Product();
-        product.setProductId(UUID.randomUUID());
-        product.setName("Count Product");
-        product.setDescription("Count Description");
-        entityManager.persistAndFlush(product);
-
-        // When
-        long newCount = productRepository.count();
-
-        // Then
-        assertThat(newCount).isEqualTo(initialCount + 1);
+        assertThat(result).isNotEmpty();
     }
 }

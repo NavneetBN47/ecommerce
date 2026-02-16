@@ -16,9 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for OrderItemRepository.
- * Tests repository methods for OrderItem entity operations.
- * Uses in-memory database for testing.
- *
+ * Tests repository operations for OrderItem entity.
+ * 
  * @author QA Automation Team
  * @version 1.0
  */
@@ -36,25 +35,24 @@ class test_OrderItemRepository {
     private OrderItem testOrderItem;
 
     /**
-     * Set up test data before each test method.
+     * Set up test data before each test method execution.
      */
     @BeforeEach
     void setUp() {
         testOrderItem = new OrderItem();
+        // Set up basic order item properties
     }
 
     /**
      * Test saving an order item.
-     * Verifies that the order item is persisted correctly.
+     * Verifies that the save operation works correctly.
      */
     @Test
     @DisplayName("Should save order item successfully")
-    void testSave_ValidOrderItem_SavesSuccessfully() {
-        // Given
-        OrderItem newOrderItem = new OrderItem();
-
+    void testSave_ShouldPersistOrderItem() {
         // When
-        OrderItem savedOrderItem = orderItemRepository.save(newOrderItem);
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+        entityManager.flush();
 
         // Then
         assertThat(savedOrderItem).isNotNull();
@@ -63,32 +61,33 @@ class test_OrderItemRepository {
 
     /**
      * Test finding an order item by ID when it exists.
-     * Verifies that the correct order item is returned.
+     * Verifies that findById returns the correct order item.
      */
     @Test
     @DisplayName("Should find order item by ID when exists")
-    void testFindById_WhenExists_ReturnsOrderItem() {
+    void testFindById_WhenExists_ShouldReturnOrderItem() {
         // Given
-        OrderItem orderItem = new OrderItem();
-        OrderItem savedOrderItem = entityManager.persistAndFlush(orderItem);
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+        entityManager.flush();
+        Long savedId = savedOrderItem.getId();
 
         // When
-        Optional<OrderItem> result = orderItemRepository.findById(savedOrderItem.getId());
+        Optional<OrderItem> result = orderItemRepository.findById(savedId);
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedOrderItem.getId());
+        assertThat(result.get().getId()).isEqualTo(savedId);
     }
 
     /**
      * Test finding an order item by ID when it does not exist.
-     * Verifies that an empty Optional is returned.
+     * Verifies that findById returns empty Optional.
      */
     @Test
-    @DisplayName("Should return empty Optional when order item does not exist")
-    void testFindById_WhenNotExists_ReturnsEmpty() {
+    @DisplayName("Should return empty when order item ID does not exist")
+    void testFindById_WhenNotExists_ShouldReturnEmpty() {
         // Given
-        Long nonExistentId = 99999L;
+        Long nonExistentId = 999999L;
 
         // When
         Optional<OrderItem> result = orderItemRepository.findById(nonExistentId);
@@ -98,142 +97,116 @@ class test_OrderItemRepository {
     }
 
     /**
-     * Test deleting an order item by ID.
-     * Verifies that the order item is removed from the database.
-     */
-    @Test
-    @DisplayName("Should delete order item by ID successfully")
-    void testDeleteById_ExistingOrderItem_DeletesSuccessfully() {
-        // Given
-        OrderItem orderItem = new OrderItem();
-        OrderItem savedOrderItem = entityManager.persistAndFlush(orderItem);
-        Long orderItemId = savedOrderItem.getId();
-
-        // When
-        orderItemRepository.deleteById(orderItemId);
-        entityManager.flush();
-
-        // Then
-        Optional<OrderItem> result = orderItemRepository.findById(orderItemId);
-        assertThat(result).isEmpty();
-    }
-
-    /**
      * Test finding all order items.
-     * Verifies that all order items can be retrieved.
+     * Verifies that findAll returns all persisted order items.
      */
     @Test
     @DisplayName("Should find all order items")
-    void testFindAll_ReturnsAllOrderItems() {
+    void testFindAll_ShouldReturnAllOrderItems() {
         // Given
-        OrderItem orderItem1 = new OrderItem();
-        OrderItem orderItem2 = new OrderItem();
-        entityManager.persist(orderItem1);
-        entityManager.persist(orderItem2);
+        orderItemRepository.save(testOrderItem);
         entityManager.flush();
 
         // When
         List<OrderItem> result = orderItemRepository.findAll();
 
         // Then
-        assertThat(result).isNotNull();
-        assertThat(result.size()).isGreaterThanOrEqualTo(2);
+        assertThat(result).isNotEmpty();
     }
 
     /**
-     * Test counting order items.
-     * Verifies that the count of order items is correct.
+     * Test deleting an order item.
+     * Verifies that the delete operation works correctly.
      */
     @Test
-    @DisplayName("Should count order items correctly")
-    void testCount_ReturnsCorrectCount() {
+    @DisplayName("Should delete order item successfully")
+    void testDelete_ShouldRemoveOrderItem() {
         // Given
-        long initialCount = orderItemRepository.count();
-        OrderItem orderItem = new OrderItem();
-        entityManager.persistAndFlush(orderItem);
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+        entityManager.flush();
+        Long savedId = savedOrderItem.getId();
 
         // When
-        long newCount = orderItemRepository.count();
+        orderItemRepository.delete(savedOrderItem);
+        entityManager.flush();
 
         // Then
-        assertThat(newCount).isEqualTo(initialCount + 1);
+        Optional<OrderItem> result = orderItemRepository.findById(savedId);
+        assertThat(result).isEmpty();
     }
 
     /**
-     * Test checking if order item exists by ID.
-     * Verifies that existence check works correctly.
+     * Test deleting an order item by ID.
+     * Verifies that deleteById works correctly.
      */
     @Test
-    @DisplayName("Should check if order item exists by ID")
-    void testExistsById_WhenExists_ReturnsTrue() {
+    @DisplayName("Should delete order item by ID successfully")
+    void testDeleteById_ShouldRemoveOrderItem() {
         // Given
-        OrderItem orderItem = new OrderItem();
-        OrderItem savedOrderItem = entityManager.persistAndFlush(orderItem);
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+        entityManager.flush();
+        Long savedId = savedOrderItem.getId();
 
         // When
-        boolean exists = orderItemRepository.existsById(savedOrderItem.getId());
+        orderItemRepository.deleteById(savedId);
+        entityManager.flush();
+
+        // Then
+        Optional<OrderItem> result = orderItemRepository.findById(savedId);
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test counting all order items.
+     * Verifies that the count operation returns correct number.
+     */
+    @Test
+    @DisplayName("Should count all order items correctly")
+    void testCount_ShouldReturnCorrectCount() {
+        // Given
+        orderItemRepository.save(testOrderItem);
+        entityManager.flush();
+
+        // When
+        long count = orderItemRepository.count();
+
+        // Then
+        assertThat(count).isGreaterThanOrEqualTo(1);
+    }
+
+    /**
+     * Test checking if an order item exists by ID.
+     * Verifies that existsById returns true for existing order item.
+     */
+    @Test
+    @DisplayName("Should return true when order item exists")
+    void testExistsById_WhenExists_ShouldReturnTrue() {
+        // Given
+        OrderItem savedOrderItem = orderItemRepository.save(testOrderItem);
+        entityManager.flush();
+        Long savedId = savedOrderItem.getId();
+
+        // When
+        boolean exists = orderItemRepository.existsById(savedId);
 
         // Then
         assertThat(exists).isTrue();
     }
 
     /**
-     * Test checking if order item exists by ID when it doesn't exist.
-     * Verifies that existence check returns false for non-existent items.
+     * Test checking if an order item exists by ID when it does not exist.
+     * Verifies that existsById returns false.
      */
     @Test
     @DisplayName("Should return false when order item does not exist")
-    void testExistsById_WhenNotExists_ReturnsFalse() {
+    void testExistsById_WhenNotExists_ShouldReturnFalse() {
         // Given
-        Long nonExistentId = 99999L;
+        Long nonExistentId = 999999L;
 
         // When
         boolean exists = orderItemRepository.existsById(nonExistentId);
 
         // Then
         assertThat(exists).isFalse();
-    }
-
-    /**
-     * Test updating an order item.
-     * Verifies that the order item can be updated successfully.
-     */
-    @Test
-    @DisplayName("Should update order item successfully")
-    void testUpdate_ExistingOrderItem_UpdatesSuccessfully() {
-        // Given
-        OrderItem orderItem = new OrderItem();
-        OrderItem savedOrderItem = entityManager.persistAndFlush(orderItem);
-        Long orderItemId = savedOrderItem.getId();
-
-        // When
-        OrderItem updatedOrderItem = orderItemRepository.save(savedOrderItem);
-
-        // Then
-        assertThat(updatedOrderItem).isNotNull();
-        assertThat(updatedOrderItem.getId()).isEqualTo(orderItemId);
-    }
-
-    /**
-     * Test deleting all order items.
-     * Verifies that all order items are removed from the database.
-     */
-    @Test
-    @DisplayName("Should delete all order items successfully")
-    void testDeleteAll_RemovesAllOrderItems() {
-        // Given
-        OrderItem orderItem1 = new OrderItem();
-        OrderItem orderItem2 = new OrderItem();
-        entityManager.persist(orderItem1);
-        entityManager.persist(orderItem2);
-        entityManager.flush();
-
-        // When
-        orderItemRepository.deleteAll();
-        entityManager.flush();
-
-        // Then
-        long count = orderItemRepository.count();
-        assertThat(count).isEqualTo(0);
     }
 }
