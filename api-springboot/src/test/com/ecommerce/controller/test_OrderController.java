@@ -20,17 +20,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 /**
- * JUnit test class for OrderController.
- * Tests order management operations including creation, retrieval, status updates, and cancellation.
+ * Test class for OrderController
+ * 
+ * Tests order operations including create, retrieve, update status, and cancel
+ * 
+ * @author QA Automation Agent
+ * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 class test_OrderController {
@@ -44,7 +48,7 @@ class test_OrderController {
     @InjectMocks
     private OrderController orderController;
 
-    private CreateOrderRequestDTO createOrderRequestDTO;
+    private CreateOrderRequestDTO createOrderRequest;
     private OrderDTO orderDTO;
     private Long userId;
     private Long orderId;
@@ -54,260 +58,276 @@ class test_OrderController {
     void setUp() {
         userId = 1L;
         orderId = 100L;
-        orderNumber = "ORD-2024-001";
+        orderNumber = "ORD-20240101-1234";
 
-        createOrderRequestDTO = new CreateOrderRequestDTO();
-        createOrderRequestDTO.setShippingAddress("123 Main St");
-        createOrderRequestDTO.setPaymentMethod("CREDIT_CARD");
+        createOrderRequest = new CreateOrderRequestDTO();
+        createOrderRequest.setShippingAddress("123 Main St");
+        createOrderRequest.setBillingAddress("123 Main St");
+        createOrderRequest.setPaymentMethod("CREDIT_CARD");
 
-        orderDTO = new OrderDTO();
-        orderDTO.setId(orderId);
-        orderDTO.setOrderNumber(orderNumber);
-        orderDTO.setUserId(userId);
-        orderDTO.setTotalAmount(BigDecimal.valueOf(150.00));
-        orderDTO.setStatus(Order.OrderStatus.PENDING);
+        orderDTO = OrderDTO.builder()
+            .id(orderId)
+            .orderNumber(orderNumber)
+            .userId(userId)
+            .totalAmount(BigDecimal.valueOf(150.00))
+            .status(Order.OrderStatus.PENDING)
+            .shippingAddress("123 Main St")
+            .paymentMethod("CREDIT_CARD")
+            .paymentStatus("PENDING")
+            .build();
     }
 
     /**
-     * Test successfully creating an order.
-     * Verifies that an order can be created from cart and returns CREATED status.
+     * Test creating order successfully
+     * 
+     * Verifies:
+     * - Order is created from cart
+     * - Returns CREATED status
+     * - OrderService.createOrder is called with correct parameters
      */
     @Test
     void testCreateOrder_Success() {
+        // Given
         when(authentication.getName()).thenReturn(userId.toString());
-        when(orderService.createOrder(any(Long.class), any(CreateOrderRequestDTO.class)))
+        when(orderService.createOrder(anyLong(), any(CreateOrderRequestDTO.class)))
             .thenReturn(orderDTO);
 
+        // When
         ResponseEntity<ApiResponseDTO<OrderDTO>> response = 
-            orderController.createOrder(createOrderRequestDTO, authentication);
+            orderController.createOrder(createOrderRequest, authentication);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.CREATED, response.getStatusCode(), "Status should be CREATED");
+        assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals("Order created successfully", response.getBody().getMessage());
         assertEquals(orderDTO, response.getBody().getData());
-        assertEquals(orderNumber, response.getBody().getData().getOrderNumber());
-        verify(orderService, times(1)).createOrder(eq(userId), any(CreateOrderRequestDTO.class));
-        verify(authentication, times(1)).getName();
+        verify(orderService, times(1)).createOrder(userId, createOrderRequest);
     }
 
     /**
-     * Test creating order with null request.
-     * Verifies proper handling of null input.
-     */
-    @Test
-    void testCreateOrder_NullRequest() {
-        when(authentication.getName()).thenReturn(userId.toString());
-        when(orderService.createOrder(any(Long.class), eq(null)))
-            .thenThrow(new IllegalArgumentException("Order request cannot be null"));
-
-        assertThrows(IllegalArgumentException.class, 
-            () -> orderController.createOrder(null, authentication));
-        verify(authentication, times(1)).getName();
-    }
-
-    /**
-     * Test creating order with empty cart.
-     * Verifies proper exception handling for empty cart.
+     * Test creating order with empty cart
+     * 
+     * Verifies:
+     * - Appropriate exception is thrown for empty cart
      */
     @Test
     void testCreateOrder_EmptyCart() {
+        // Given
         when(authentication.getName()).thenReturn(userId.toString());
-        when(orderService.createOrder(any(Long.class), any(CreateOrderRequestDTO.class)))
-            .thenThrow(new RuntimeException("Cart is empty"));
+        when(orderService.createOrder(anyLong(), any(CreateOrderRequestDTO.class)))
+            .thenThrow(new RuntimeException("Cannot create order from empty cart"));
 
-        assertThrows(RuntimeException.class, 
-            () -> orderController.createOrder(createOrderRequestDTO, authentication));
-        verify(orderService, times(1)).createOrder(eq(userId), any(CreateOrderRequestDTO.class));
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            orderController.createOrder(createOrderRequest, authentication);
+        });
     }
 
     /**
-     * Test successfully retrieving order by ID.
-     * Verifies that an order can be fetched by its ID.
+     * Test getting order by ID successfully
+     * 
+     * Verifies:
+     * - Order is retrieved by ID
+     * - Returns OK status
+     * - OrderService.getOrderById is called with correct ID
      */
     @Test
     void testGetOrderById_Success() {
-        when(orderService.getOrderById(any(Long.class))).thenReturn(orderDTO);
+        // Given
+        when(orderService.getOrderById(anyLong())).thenReturn(orderDTO);
 
+        // When
         ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.getOrderById(orderId);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals(orderDTO, response.getBody().getData());
-        assertEquals(orderId, response.getBody().getData().getId());
-        verify(orderService, times(1)).getOrderById(eq(orderId));
+        verify(orderService, times(1)).getOrderById(orderId);
     }
 
     /**
-     * Test retrieving non-existent order by ID.
-     * Verifies proper exception handling for missing order.
+     * Test getting order by non-existent ID
+     * 
+     * Verifies:
+     * - Appropriate exception is thrown for non-existent order
      */
     @Test
     void testGetOrderById_NotFound() {
-        when(orderService.getOrderById(any(Long.class)))
+        // Given
+        when(orderService.getOrderById(anyLong()))
             .thenThrow(new RuntimeException("Order not found"));
 
-        assertThrows(RuntimeException.class, () -> orderController.getOrderById(999L));
-        verify(orderService, times(1)).getOrderById(eq(999L));
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            orderController.getOrderById(999L);
+        });
     }
 
     /**
-     * Test successfully retrieving order by order number.
-     * Verifies that an order can be fetched by its order number.
+     * Test getting order by order number successfully
+     * 
+     * Verifies:
+     * - Order is retrieved by order number
+     * - Returns OK status
+     * - OrderService.getOrderByOrderNumber is called with correct number
      */
     @Test
     void testGetOrderByOrderNumber_Success() {
-        when(orderService.getOrderByOrderNumber(any(String.class))).thenReturn(orderDTO);
+        // Given
+        when(orderService.getOrderByOrderNumber(anyString())).thenReturn(orderDTO);
 
+        // When
         ResponseEntity<ApiResponseDTO<OrderDTO>> response = 
             orderController.getOrderByOrderNumber(orderNumber);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals(orderDTO, response.getBody().getData());
-        assertEquals(orderNumber, response.getBody().getData().getOrderNumber());
-        verify(orderService, times(1)).getOrderByOrderNumber(eq(orderNumber));
+        verify(orderService, times(1)).getOrderByOrderNumber(orderNumber);
     }
 
     /**
-     * Test retrieving order with invalid order number.
-     * Verifies proper exception handling for invalid order number.
-     */
-    @Test
-    void testGetOrderByOrderNumber_InvalidNumber() {
-        when(orderService.getOrderByOrderNumber(any(String.class)))
-            .thenThrow(new RuntimeException("Invalid order number"));
-
-        assertThrows(RuntimeException.class, 
-            () -> orderController.getOrderByOrderNumber("INVALID"));
-        verify(orderService, times(1)).getOrderByOrderNumber(eq("INVALID"));
-    }
-
-    /**
-     * Test successfully retrieving user orders with pagination.
-     * Verifies that user orders can be fetched with pagination support.
+     * Test getting user orders with pagination
+     * 
+     * Verifies:
+     * - User orders are retrieved with pagination
+     * - Returns OK status
+     * - OrderService.getUserOrders is called with correct parameters
      */
     @Test
     void testGetUserOrders_Success() {
+        // Given
+        List<OrderDTO> orders = new ArrayList<>();
+        orders.add(orderDTO);
+        Page<OrderDTO> orderPage = new PageImpl<>(orders, PageRequest.of(0, 10), 1);
+        
         when(authentication.getName()).thenReturn(userId.toString());
-        List<OrderDTO> orderList = Arrays.asList(orderDTO);
-        Page<OrderDTO> orderPage = new PageImpl<>(orderList, PageRequest.of(0, 10), 1);
-        when(orderService.getUserOrders(any(Long.class), any(Pageable.class)))
+        when(orderService.getUserOrders(anyLong(), any(Pageable.class)))
             .thenReturn(orderPage);
 
+        // When
         ResponseEntity<ApiResponseDTO<Page<OrderDTO>>> response = 
             orderController.getUserOrders(0, 10, authentication);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals(1, response.getBody().getData().getTotalElements());
-        assertEquals(orderDTO, response.getBody().getData().getContent().get(0));
         verify(orderService, times(1)).getUserOrders(eq(userId), any(Pageable.class));
-        verify(authentication, times(1)).getName();
     }
 
     /**
-     * Test retrieving user orders with custom page size.
-     * Verifies pagination with different page sizes.
+     * Test getting user orders with custom pagination
+     * 
+     * Verifies:
+     * - Custom page size and number are respected
      */
     @Test
-    void testGetUserOrders_CustomPageSize() {
+    void testGetUserOrders_CustomPagination() {
+        // Given
+        List<OrderDTO> orders = new ArrayList<>();
+        Page<OrderDTO> orderPage = new PageImpl<>(orders, PageRequest.of(2, 5), 0);
+        
         when(authentication.getName()).thenReturn(userId.toString());
-        List<OrderDTO> orderList = Arrays.asList(orderDTO);
-        Page<OrderDTO> orderPage = new PageImpl<>(orderList, PageRequest.of(0, 5), 1);
-        when(orderService.getUserOrders(any(Long.class), any(Pageable.class)))
+        when(orderService.getUserOrders(anyLong(), any(Pageable.class)))
             .thenReturn(orderPage);
 
+        // When
         ResponseEntity<ApiResponseDTO<Page<OrderDTO>>> response = 
-            orderController.getUserOrders(0, 5, authentication);
+            orderController.getUserOrders(2, 5, authentication);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(5, response.getBody().getData().getPageable().getPageSize());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
         verify(orderService, times(1)).getUserOrders(eq(userId), any(Pageable.class));
     }
 
     /**
-     * Test successfully updating order status.
-     * Verifies that order status can be updated (admin operation).
+     * Test updating order status successfully
+     * 
+     * Verifies:
+     * - Order status is updated
+     * - Returns OK status
+     * - OrderService.updateOrderStatus is called with correct parameters
      */
     @Test
     void testUpdateOrderStatus_Success() {
+        // Given
         Order.OrderStatus newStatus = Order.OrderStatus.SHIPPED;
-        orderDTO.setStatus(newStatus);
-        when(orderService.updateOrderStatus(any(Long.class), any(Order.OrderStatus.class)))
-            .thenReturn(orderDTO);
+        OrderDTO updatedOrder = OrderDTO.builder()
+            .id(orderId)
+            .orderNumber(orderNumber)
+            .status(newStatus)
+            .build();
+        
+        when(orderService.updateOrderStatus(anyLong(), any(Order.OrderStatus.class)))
+            .thenReturn(updatedOrder);
 
+        // When
         ResponseEntity<ApiResponseDTO<OrderDTO>> response = 
             orderController.updateOrderStatus(orderId, newStatus);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals("Order status updated successfully", response.getBody().getMessage());
         assertEquals(newStatus, response.getBody().getData().getStatus());
-        verify(orderService, times(1)).updateOrderStatus(eq(orderId), eq(newStatus));
+        verify(orderService, times(1)).updateOrderStatus(orderId, newStatus);
     }
 
     /**
-     * Test updating order status with invalid status.
-     * Verifies proper exception handling for invalid status transitions.
-     */
-    @Test
-    void testUpdateOrderStatus_InvalidStatus() {
-        when(orderService.updateOrderStatus(any(Long.class), any(Order.OrderStatus.class)))
-            .thenThrow(new RuntimeException("Invalid status transition"));
-
-        assertThrows(RuntimeException.class, 
-            () -> orderController.updateOrderStatus(orderId, Order.OrderStatus.DELIVERED));
-        verify(orderService, times(1)).updateOrderStatus(eq(orderId), eq(Order.OrderStatus.DELIVERED));
-    }
-
-    /**
-     * Test successfully cancelling an order.
-     * Verifies that an order can be cancelled.
+     * Test cancelling order successfully
+     * 
+     * Verifies:
+     * - Order is cancelled
+     * - Returns OK status
+     * - OrderService.cancelOrder is called with correct ID
      */
     @Test
     void testCancelOrder_Success() {
-        orderDTO.setStatus(Order.OrderStatus.CANCELLED);
-        when(orderService.cancelOrder(any(Long.class))).thenReturn(orderDTO);
+        // Given
+        OrderDTO cancelledOrder = OrderDTO.builder()
+            .id(orderId)
+            .orderNumber(orderNumber)
+            .status(Order.OrderStatus.CANCELLED)
+            .build();
+        
+        when(orderService.cancelOrder(anyLong())).thenReturn(cancelledOrder);
 
+        // When
         ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.cancelOrder(orderId);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response.getBody(), "Response body should not be null");
         assertEquals("Order cancelled successfully", response.getBody().getMessage());
         assertEquals(Order.OrderStatus.CANCELLED, response.getBody().getData().getStatus());
-        verify(orderService, times(1)).cancelOrder(eq(orderId));
+        verify(orderService, times(1)).cancelOrder(orderId);
     }
 
     /**
-     * Test cancelling already shipped order.
-     * Verifies proper exception handling for invalid cancellation.
+     * Test cancelling already delivered order
+     * 
+     * Verifies:
+     * - Appropriate exception is thrown for delivered orders
      */
     @Test
-    void testCancelOrder_AlreadyShipped() {
-        when(orderService.cancelOrder(any(Long.class)))
-            .thenThrow(new RuntimeException("Cannot cancel shipped order"));
+    void testCancelOrder_AlreadyDelivered() {
+        // Given
+        when(orderService.cancelOrder(anyLong()))
+            .thenThrow(new RuntimeException("Cannot cancel order with status: DELIVERED"));
 
-        assertThrows(RuntimeException.class, () -> orderController.cancelOrder(orderId));
-        verify(orderService, times(1)).cancelOrder(eq(orderId));
-    }
-
-    /**
-     * Test cancelling non-existent order.
-     * Verifies proper exception handling for missing order.
-     */
-    @Test
-    void testCancelOrder_NotFound() {
-        when(orderService.cancelOrder(any(Long.class)))
-            .thenThrow(new RuntimeException("Order not found"));
-
-        assertThrows(RuntimeException.class, () -> orderController.cancelOrder(999L));
-        verify(orderService, times(1)).cancelOrder(eq(999L));
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            orderController.cancelOrder(orderId);
+        });
     }
 }

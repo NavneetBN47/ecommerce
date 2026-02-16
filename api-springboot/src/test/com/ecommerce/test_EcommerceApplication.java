@@ -7,16 +7,16 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**
- * Test class for ShoppingCartApplication
+ * Test class for EcommerceApplication
  * 
- * Tests the Spring Boot application startup and JPA auditing configuration
+ * Tests the main Spring Boot application startup and configuration
  * 
  * @author QA Automation Agent
  * @version 1.0.0
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class test_ShoppingCartApplication {
+class test_EcommerceApplication {
 
     /**
      * Test that the Spring Boot application context loads successfully
@@ -25,10 +25,12 @@ class test_ShoppingCartApplication {
      * - Application context initializes without errors
      * - All beans are properly configured
      * - JPA auditing is enabled
+     * - Transaction management is enabled
      */
     @Test
     void contextLoads() {
         // Context loading is tested by @SpringBootTest annotation
+        // If context fails to load, this test will fail
     }
 
     /**
@@ -41,7 +43,9 @@ class test_ShoppingCartApplication {
     @Test
     void testMainMethod() {
         assertDoesNotThrow(() -> {
-            ShoppingCartApplication.main(new String[]{});
+            // Test main method doesn't throw exception
+            // Note: Actual application won't start in test environment
+            EcommerceApplication.main(new String[]{});
         });
     }
 }

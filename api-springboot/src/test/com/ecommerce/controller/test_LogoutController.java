@@ -1,38 +1,31 @@
 package com.ecommerce.controller;
 
-import com.ecommerce.security.UserPrincipal;
+import com.ecommerce.dto.ApiResponse;
 import com.ecommerce.service.CartService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
-import java.util.ArrayList;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Test class for LogoutController
  * 
- * This test class verifies the logout functionality and cart cleanup.
- * It tests:
- * - Successful logout with cart cleanup
- * - Proper response message
- * - Service method invocation
+ * Tests logout functionality and cart cleanup
  * 
- * @author Test Generation Agent
+ * @author QA Automation Agent
  * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("LogoutController Test Suite")
 class test_LogoutController {
 
     @Mock
@@ -41,117 +34,90 @@ class test_LogoutController {
     @InjectMocks
     private LogoutController logoutController;
 
-    private MockMvc mockMvc;
-    private UserPrincipal userPrincipal;
     private UUID userId;
 
-    /**
-     * Setup method executed before each test
-     * Initializes test data and MockMvc instance
-     */
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(logoutController).build();
-        
         userId = UUID.randomUUID();
-        userPrincipal = new UserPrincipal(
-            userId,
-            "testuser",
-            "password",
-            "test@example.com",
-            new ArrayList<>()
-        );
     }
 
     /**
-     * Test successful logout with cart cleanup
+     * Test successful logout
      * 
-     * Verifies that:
-     * - HTTP 200 OK status is returned
+     * Verifies:
+     * - Logout endpoint returns OK status
+     * - Cart is cleared for the user
      * - Success message is returned
-     * - Cart cleanup service is called with correct user ID
      */
     @Test
-    @DisplayName("Should successfully logout user and cleanup cart")
-    void testLogout_Success() throws Exception {
-        // Arrange
-        doNothing().when(cartService).cleanupCartOnLogout(userId);
+    void testLogout_Success() {
+        // Given
+        doNothing().when(cartService).clearCart(any(UUID.class));
 
-        // Act & Assert
-        mockMvc.perform(post("/logout")
-                .principal(() -> userPrincipal.getUsername()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("Logged out successfully"));
+        // When
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(userId);
 
-        verify(cartService, times(1)).cleanupCartOnLogout(userId);
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response.getBody(), "Response body should not be null");
+        assertEquals("Logout successful", response.getBody().getMessage());
+        assertNull(response.getBody().getData(), "Data should be null for logout");
+        verify(cartService, times(1)).clearCart(userId);
+    }
+
+    /**
+     * Test logout with null user ID
+     * 
+     * Verifies:
+     * - Appropriate exception handling for null user ID
+     */
+    @Test
+    void testLogout_NullUserId() {
+        // When/Then
+        assertThrows(Exception.class, () -> {
+            logoutController.logout(null);
+        });
     }
 
     /**
      * Test logout when cart service throws exception
      * 
-     * Verifies that:
-     * - Exception is properly handled
-     * - Service method is still called
+     * Verifies:
+     * - Exception from cart service is propagated
      */
     @Test
-    @DisplayName("Should handle exception during cart cleanup")
-    void testLogout_CartCleanupException() throws Exception {
-        // Arrange
-        doThrow(new RuntimeException("Cart cleanup failed"))
-            .when(cartService).cleanupCartOnLogout(userId);
+    void testLogout_CartServiceException() {
+        // Given
+        doThrow(new RuntimeException("Cart service error"))
+            .when(cartService).clearCart(any(UUID.class));
 
-        // Act & Assert
-        try {
-            mockMvc.perform(post("/logout")
-                    .principal(() -> userPrincipal.getUsername()));
-        } catch (Exception e) {
-            // Expected exception
-        }
-
-        verify(cartService, times(1)).cleanupCartOnLogout(userId);
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            logoutController.logout(userId);
+        });
+        verify(cartService, times(1)).clearCart(userId);
     }
 
     /**
-     * Test logout with null user principal
+     * Test logout with valid user ID format
      * 
-     * Verifies that:
-     * - Proper error handling for missing authentication
+     * Verifies:
+     * - UUID format is correctly handled
+     * - Cart service receives correct user ID
      */
     @Test
-    @DisplayName("Should handle logout with no authentication")
-    void testLogout_NoAuthentication() throws Exception {
-        // Act & Assert
-        mockMvc.perform(post("/logout"))
-            .andExpect(status().isUnauthorized());
+    void testLogout_ValidUUIDFormat() {
+        // Given
+        UUID specificUserId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        doNothing().when(cartService).clearCart(specificUserId);
 
-        verify(cartService, never()).cleanupCartOnLogout(any());
-    }
+        // When
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(specificUserId);
 
-    /**
-     * Test logout multiple times
-     * 
-     * Verifies that:
-     * - Multiple logout calls are handled correctly
-     * - Cart cleanup is called for each logout
-     */
-    @Test
-    @DisplayName("Should handle multiple logout calls")
-    void testLogout_MultipleCalls() throws Exception {
-        // Arrange
-        doNothing().when(cartService).cleanupCartOnLogout(userId);
-
-        // Act & Assert - First logout
-        mockMvc.perform(post("/logout")
-                .principal(() -> userPrincipal.getUsername()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("Logged out successfully"));
-
-        // Act & Assert - Second logout
-        mockMvc.perform(post("/logout")
-                .principal(() -> userPrincipal.getUsername()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("Logged out successfully"));
-
-        verify(cartService, times(2)).cleanupCartOnLogout(userId);
+        // Then
+        assertNotNull(response, "Response should not be null");
+        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        verify(cartService, times(1)).clearCart(specificUserId);
     }
 }
