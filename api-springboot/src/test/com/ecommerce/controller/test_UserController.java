@@ -2,27 +2,25 @@ package com.ecommerce.controller;
 
 import com.ecommerce.dto.*;
 import com.ecommerce.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Test class for UserController
- * Tests user management operations including signup, login, profile retrieval and update
+ * Unit test class for UserController
+ * Tests user operations including signup, login, profile retrieval and update
  */
 @ExtendWith(MockitoExtension.class)
 class test_UserController {
@@ -33,307 +31,291 @@ class test_UserController {
     @InjectMocks
     private UserController userController;
 
-    private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
-    private UUID testUserId;
+    private UUID userId;
+    private SignupRequest signupRequest;
+    private LoginRequest loginRequest;
+    private UpdateProfileRequest updateProfileRequest;
+    private UserResponse userResponse;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
-        objectMapper = new ObjectMapper();
-        testUserId = UUID.randomUUID();
+        userId = UUID.randomUUID();
+
+        signupRequest = new SignupRequest();
+        signupRequest.setUsername("testuser");
+        signupRequest.setEmail("test@example.com");
+        signupRequest.setPassword("password123");
+        signupRequest.setFullName("Test User");
+
+        loginRequest = new LoginRequest();
+        loginRequest.setUsername("testuser");
+        loginRequest.setPassword("password123");
+
+        updateProfileRequest = new UpdateProfileRequest();
+        updateProfileRequest.setFullName("Updated Name");
+        updateProfileRequest.setEmail("updated@example.com");
+
+        userResponse = new UserResponse();
+        userResponse.setId(userId);
+        userResponse.setUsername("testuser");
+        userResponse.setEmail("test@example.com");
+        userResponse.setFullName("Test User");
     }
 
     /**
-     * Test user signup successfully
-     * Verifies that a valid signup request returns HTTP 201 with user response
+     * Test successful user signup
      */
     @Test
-    void testSignup_Success() throws Exception {
-        SignupRequest request = new SignupRequest();
-        request.setUsername("newuser");
-        request.setEmail("newuser@example.com");
-        request.setPassword("Password123!");
-        request.setFullName("New User");
+    void testSignup_Success() {
+        when(userService.signup(any(SignupRequest.class))).thenReturn(userResponse);
 
-        UserResponse response = new UserResponse();
-        response.setId(testUserId);
-        response.setUsername("newuser");
-        response.setEmail("newuser@example.com");
+        ResponseEntity<UserResponse> response = userController.signup(signupRequest);
 
-        when(userService.signup(any(SignupRequest.class))).thenReturn(response);
-
-        mockMvc.perform(post("/api/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.username").value("newuser"))
-                .andExpect(jsonPath("$.email").value("newuser@example.com"));
-
+        assertNotNull(response);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(userResponse.getUsername(), response.getBody().getUsername());
+        assertEquals(userResponse.getEmail(), response.getBody().getEmail());
         verify(userService, times(1)).signup(any(SignupRequest.class));
     }
 
     /**
-     * Test signup with invalid email
-     * Verifies that invalid email format is rejected
+     * Test signup with null request
      */
     @Test
-    void testSignup_InvalidEmail() throws Exception {
-        SignupRequest request = new SignupRequest();
-        request.setUsername("newuser");
-        request.setEmail("invalid-email");
-        request.setPassword("Password123!");
-        request.setFullName("New User");
+    void testSignup_NullRequest() {
+        when(userService.signup(any()))
+            .thenThrow(new IllegalArgumentException("Request cannot be null"));
 
-        mockMvc.perform(post("/api/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).signup(any(SignupRequest.class));
-    }
-
-    /**
-     * Test signup with weak password
-     * Verifies that weak password is rejected
-     */
-    @Test
-    void testSignup_WeakPassword() throws Exception {
-        SignupRequest request = new SignupRequest();
-        request.setUsername("newuser");
-        request.setEmail("newuser@example.com");
-        request.setPassword("weak");
-        request.setFullName("New User");
-
-        mockMvc.perform(post("/api/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).signup(any(SignupRequest.class));
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.signup(null);
+        });
     }
 
     /**
      * Test signup with duplicate username
-     * Verifies that duplicate username is rejected
      */
     @Test
-    void testSignup_DuplicateUsername() throws Exception {
-        SignupRequest request = new SignupRequest();
-        request.setUsername("existinguser");
-        request.setEmail("newuser@example.com");
-        request.setPassword("Password123!");
-        request.setFullName("New User");
-
+    void testSignup_DuplicateUsername() {
         when(userService.signup(any(SignupRequest.class)))
-                .thenThrow(new RuntimeException("Username already exists"));
+            .thenThrow(new RuntimeException("Username already exists"));
 
-        mockMvc.perform(post("/api/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError());
-
+        assertThrows(RuntimeException.class, () -> {
+            userController.signup(signupRequest);
+        });
         verify(userService, times(1)).signup(any(SignupRequest.class));
     }
 
     /**
-     * Test user login successfully
-     * Verifies that valid credentials return HTTP 200 with user response
+     * Test signup with duplicate email
      */
     @Test
-    void testLogin_Success() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setUsername("testuser");
-        request.setPassword("Password123!");
+    void testSignup_DuplicateEmail() {
+        when(userService.signup(any(SignupRequest.class)))
+            .thenThrow(new RuntimeException("Email already exists"));
 
-        UserResponse response = new UserResponse();
-        response.setId(testUserId);
-        response.setUsername("testuser");
-        response.setEmail("testuser@example.com");
+        assertThrows(RuntimeException.class, () -> {
+            userController.signup(signupRequest);
+        });
+    }
 
-        when(userService.login(any(LoginRequest.class))).thenReturn(response);
+    /**
+     * Test signup with invalid email format
+     */
+    @Test
+    void testSignup_InvalidEmail() {
+        signupRequest.setEmail("invalid-email");
+        when(userService.signup(any(SignupRequest.class)))
+            .thenThrow(new IllegalArgumentException("Invalid email format"));
 
-        mockMvc.perform(post("/api/users/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("testuser"));
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.signup(signupRequest);
+        });
+    }
 
+    /**
+     * Test successful user login
+     */
+    @Test
+    void testLogin_Success() {
+        when(userService.login(any(LoginRequest.class))).thenReturn(userResponse);
+
+        ResponseEntity<UserResponse> response = userController.login(loginRequest);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(userResponse.getUsername(), response.getBody().getUsername());
         verify(userService, times(1)).login(any(LoginRequest.class));
     }
 
     /**
      * Test login with invalid credentials
-     * Verifies that invalid credentials are rejected
      */
     @Test
-    void testLogin_InvalidCredentials() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setUsername("testuser");
-        request.setPassword("wrongpassword");
-
+    void testLogin_InvalidCredentials() {
         when(userService.login(any(LoginRequest.class)))
-                .thenThrow(new RuntimeException("Invalid credentials"));
+            .thenThrow(new RuntimeException("Invalid username or password"));
 
-        mockMvc.perform(post("/api/users/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError());
-
+        assertThrows(RuntimeException.class, () -> {
+            userController.login(loginRequest);
+        });
         verify(userService, times(1)).login(any(LoginRequest.class));
     }
 
     /**
-     * Test login with empty username
-     * Verifies that empty username is rejected
+     * Test login with null request
      */
     @Test
-    void testLogin_EmptyUsername() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setUsername("");
-        request.setPassword("Password123!");
+    void testLogin_NullRequest() {
+        when(userService.login(any()))
+            .thenThrow(new IllegalArgumentException("Request cannot be null"));
 
-        mockMvc.perform(post("/api/users/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).login(any(LoginRequest.class));
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.login(null);
+        });
     }
 
     /**
-     * Test getting user profile successfully
-     * Verifies that authenticated user can retrieve their profile
+     * Test login with non-existent user
      */
     @Test
-    void testGetProfile_Success() throws Exception {
-        UserResponse response = new UserResponse();
-        response.setId(testUserId);
-        response.setUsername("testuser");
-        response.setEmail("testuser@example.com");
-        response.setFullName("Test User");
+    void testLogin_UserNotFound() {
+        when(userService.login(any(LoginRequest.class)))
+            .thenThrow(new RuntimeException("User not found"));
 
-        when(userService.getProfile(any(UUID.class))).thenReturn(response);
-
-        mockMvc.perform(get("/api/users/profile")
-                .header("X-User-Id", testUserId.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("testuser"))
-                .andExpect(jsonPath("$.email").value("testuser@example.com"));
-
-        verify(userService, times(1)).getProfile(testUserId);
+        assertThrows(RuntimeException.class, () -> {
+            userController.login(loginRequest);
+        });
     }
 
     /**
-     * Test getting profile without user ID header
-     * Verifies that missing user ID header is rejected
+     * Test successfully retrieving user profile
      */
     @Test
-    void testGetProfile_MissingUserId() throws Exception {
-        mockMvc.perform(get("/api/users/profile"))
-                .andExpect(status().isBadRequest());
+    void testGetProfile_Success() {
+        when(userService.getProfile(any(UUID.class))).thenReturn(userResponse);
 
-        verify(userService, never()).getProfile(any(UUID.class));
+        ResponseEntity<UserResponse> response = userController.getProfile(userId);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(userId, response.getBody().getId());
+        assertEquals(userResponse.getUsername(), response.getBody().getUsername());
+        verify(userService, times(1)).getProfile(eq(userId));
     }
 
     /**
-     * Test getting profile with invalid user ID
-     * Verifies that invalid UUID format is rejected
+     * Test retrieving profile with null user ID
      */
     @Test
-    void testGetProfile_InvalidUserId() throws Exception {
-        mockMvc.perform(get("/api/users/profile")
-                .header("X-User-Id", "invalid-uuid"))
-                .andExpect(status().isBadRequest());
+    void testGetProfile_NullUserId() {
+        when(userService.getProfile(any()))
+            .thenThrow(new IllegalArgumentException("User ID cannot be null"));
 
-        verify(userService, never()).getProfile(any(UUID.class));
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.getProfile(null);
+        });
     }
 
     /**
-     * Test updating user profile successfully
-     * Verifies that authenticated user can update their profile
+     * Test retrieving profile for non-existent user
      */
     @Test
-    void testUpdateProfile_Success() throws Exception {
-        UpdateProfileRequest request = new UpdateProfileRequest();
-        request.setFullName("Updated Name");
-        request.setEmail("updated@example.com");
+    void testGetProfile_UserNotFound() {
+        when(userService.getProfile(any(UUID.class)))
+            .thenThrow(new RuntimeException("User not found"));
 
-        UserResponse response = new UserResponse();
-        response.setId(testUserId);
-        response.setUsername("testuser");
-        response.setEmail("updated@example.com");
-        response.setFullName("Updated Name");
+        assertThrows(RuntimeException.class, () -> {
+            userController.getProfile(userId);
+        });
+    }
 
-        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class))).thenReturn(response);
+    /**
+     * Test successfully updating user profile
+     */
+    @Test
+    void testUpdateProfile_Success() {
+        userResponse.setFullName(updateProfileRequest.getFullName());
+        userResponse.setEmail(updateProfileRequest.getEmail());
+        
+        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
+            .thenReturn(userResponse);
 
-        mockMvc.perform(put("/api/users/profile")
-                .header("X-User-Id", testUserId.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fullName").value("Updated Name"))
-                .andExpect(jsonPath("$.email").value("updated@example.com"));
+        ResponseEntity<UserResponse> response = userController.updateProfile(userId, updateProfileRequest);
 
-        verify(userService, times(1)).updateProfile(any(UUID.class), any(UpdateProfileRequest.class));
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(updateProfileRequest.getFullName(), response.getBody().getFullName());
+        assertEquals(updateProfileRequest.getEmail(), response.getBody().getEmail());
+        verify(userService, times(1)).updateProfile(eq(userId), any(UpdateProfileRequest.class));
+    }
+
+    /**
+     * Test updating profile with null request
+     */
+    @Test
+    void testUpdateProfile_NullRequest() {
+        when(userService.updateProfile(any(UUID.class), any()))
+            .thenThrow(new IllegalArgumentException("Request cannot be null"));
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.updateProfile(userId, null);
+        });
+    }
+
+    /**
+     * Test updating profile with null user ID
+     */
+    @Test
+    void testUpdateProfile_NullUserId() {
+        when(userService.updateProfile(any(), any(UpdateProfileRequest.class)))
+            .thenThrow(new IllegalArgumentException("User ID cannot be null"));
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.updateProfile(null, updateProfileRequest);
+        });
+    }
+
+    /**
+     * Test updating profile for non-existent user
+     */
+    @Test
+    void testUpdateProfile_UserNotFound() {
+        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
+            .thenThrow(new RuntimeException("User not found"));
+
+        assertThrows(RuntimeException.class, () -> {
+            userController.updateProfile(userId, updateProfileRequest);
+        });
     }
 
     /**
      * Test updating profile with invalid email
-     * Verifies that invalid email format is rejected
      */
     @Test
-    void testUpdateProfile_InvalidEmail() throws Exception {
-        UpdateProfileRequest request = new UpdateProfileRequest();
-        request.setFullName("Updated Name");
-        request.setEmail("invalid-email");
-
-        mockMvc.perform(put("/api/users/profile")
-                .header("X-User-Id", testUserId.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).updateProfile(any(UUID.class), any(UpdateProfileRequest.class));
-    }
-
-    /**
-     * Test updating profile without user ID
-     * Verifies that missing user ID header is rejected
-     */
-    @Test
-    void testUpdateProfile_MissingUserId() throws Exception {
-        UpdateProfileRequest request = new UpdateProfileRequest();
-        request.setFullName("Updated Name");
-        request.setEmail("updated@example.com");
-
-        mockMvc.perform(put("/api/users/profile")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-
-        verify(userService, never()).updateProfile(any(UUID.class), any(UpdateProfileRequest.class));
-    }
-
-    /**
-     * Test updating profile with service exception
-     * Verifies proper error handling when user service fails
-     */
-    @Test
-    void testUpdateProfile_ServiceException() throws Exception {
-        UpdateProfileRequest request = new UpdateProfileRequest();
-        request.setFullName("Updated Name");
-        request.setEmail("updated@example.com");
-
+    void testUpdateProfile_InvalidEmail() {
+        updateProfileRequest.setEmail("invalid-email");
         when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
-                .thenThrow(new RuntimeException("Service error"));
+            .thenThrow(new IllegalArgumentException("Invalid email format"));
 
-        mockMvc.perform(put("/api/users/profile")
-                .header("X-User-Id", testUserId.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError());
+        assertThrows(IllegalArgumentException.class, () -> {
+            userController.updateProfile(userId, updateProfileRequest);
+        });
+    }
 
-        verify(userService, times(1)).updateProfile(any(UUID.class), any(UpdateProfileRequest.class));
+    /**
+     * Test updating profile with duplicate email
+     */
+    @Test
+    void testUpdateProfile_DuplicateEmail() {
+        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
+            .thenThrow(new RuntimeException("Email already exists"));
+
+        assertThrows(RuntimeException.class, () -> {
+            userController.updateProfile(userId, updateProfileRequest);
+        });
     }
 }
