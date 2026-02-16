@@ -16,16 +16,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for CategoryRepository.
- * Tests repository methods for Category entity operations including hierarchical queries.
+ * Tests all public methods including custom query methods.
  * Uses @DataJpaTest for repository layer testing with in-memory database.
- * 
- * @author Test Generation Agent
- * @version 1.0
  */
 @DataJpaTest
 @ActiveProfiles("test")
 @DisplayName("CategoryRepository Tests")
-public class test_CategoryRepository {
+class test_CategoryRepository {
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -33,56 +30,42 @@ public class test_CategoryRepository {
     @Autowired
     private TestEntityManager entityManager;
 
-    private Category rootCategory;
-    private Category subCategory1;
-    private Category subCategory2;
+    private Category parentCategory;
+    private Category childCategory;
     private Category inactiveCategory;
 
     /**
      * Set up test data before each test method execution.
-     * Creates and persists test categories with hierarchical structure.
      */
     @BeforeEach
     void setUp() {
-        // Create root category
-        rootCategory = new Category();
-        rootCategory.setName("Electronics");
-        rootCategory.setDescription("Electronic items");
-        rootCategory.setIsActive(true);
-        entityManager.persist(rootCategory);
-
-        // Create sub-categories
-        subCategory1 = new Category();
-        subCategory1.setName("Laptops");
-        subCategory1.setDescription("Laptop computers");
-        subCategory1.setIsActive(true);
-        subCategory1.setParentCategory(rootCategory);
-        entityManager.persist(subCategory1);
-
-        subCategory2 = new Category();
-        subCategory2.setName("Smartphones");
-        subCategory2.setDescription("Mobile phones");
-        subCategory2.setIsActive(true);
-        subCategory2.setParentCategory(rootCategory);
-        entityManager.persist(subCategory2);
-
-        // Create inactive category
-        inactiveCategory = new Category();
-        inactiveCategory.setName("Discontinued");
-        inactiveCategory.setDescription("Discontinued items");
-        inactiveCategory.setIsActive(false);
-        entityManager.persist(inactiveCategory);
+        parentCategory = new Category();
+        parentCategory.setName("Electronics");
+        parentCategory.setDescription("Electronic items");
+        parentCategory.setActive(true);
         
-        entityManager.flush();
+        childCategory = new Category();
+        childCategory.setName("Laptops");
+        childCategory.setDescription("Laptop computers");
+        childCategory.setActive(true);
+        
+        inactiveCategory = new Category();
+        inactiveCategory.setName("Obsolete");
+        inactiveCategory.setDescription("Obsolete items");
+        inactiveCategory.setActive(false);
     }
 
     /**
-     * Test finding a Category by name when it exists.
-     * Verifies that the correct Category is returned.
+     * Test finding category by name when category exists.
+     * Verifies that the correct category is returned.
      */
     @Test
-    @DisplayName("Should find Category by name when exists")
-    void testFindByName_WhenExists_ReturnsCategory() {
+    @DisplayName("Should find category by name when exists")
+    void testFindByName_WhenExists() {
+        // Given
+        entityManager.persist(parentCategory);
+        entityManager.flush();
+
         // When
         Optional<Category> result = categoryRepository.findByName("Electronics");
 
@@ -93,12 +76,12 @@ public class test_CategoryRepository {
     }
 
     /**
-     * Test finding a Category by name when it does not exist.
+     * Test finding category by name when category does not exist.
      * Verifies that an empty Optional is returned.
      */
     @Test
-    @DisplayName("Should return empty Optional when Category name does not exist")
-    void testFindByName_WhenNotExists_ReturnsEmpty() {
+    @DisplayName("Should return empty Optional when category not found by name")
+    void testFindByName_WhenNotExists() {
         // When
         Optional<Category> result = categoryRepository.findByName("NonExistent");
 
@@ -112,16 +95,21 @@ public class test_CategoryRepository {
      */
     @Test
     @DisplayName("Should find all active categories")
-    void testFindAllActive_ReturnsOnlyActiveCategories() {
+    void testFindAllActive() {
+        // Given
+        entityManager.persist(parentCategory);
+        entityManager.persist(childCategory);
+        entityManager.persist(inactiveCategory);
+        entityManager.flush();
+
         // When
         List<Category> result = categoryRepository.findAllActive();
 
         // Then
-        assertThat(result).isNotEmpty();
-        assertThat(result).hasSize(3); // root + 2 subcategories
-        assertThat(result).allMatch(Category::getIsActive);
+        assertThat(result).hasSize(2);
+        assertThat(result).allMatch(Category::isActive);
         assertThat(result).extracting(Category::getName)
-            .containsExactlyInAnyOrder("Electronics", "Laptops", "Smartphones");
+            .containsExactlyInAnyOrder("Electronics", "Laptops");
     }
 
     /**
@@ -130,11 +118,9 @@ public class test_CategoryRepository {
      */
     @Test
     @DisplayName("Should return empty list when no active categories exist")
-    void testFindAllActive_WhenNoneActive_ReturnsEmpty() {
-        // Given - deactivate all categories
-        rootCategory.setIsActive(false);
-        subCategory1.setIsActive(false);
-        subCategory2.setIsActive(false);
+    void testFindAllActive_WhenNoneExist() {
+        // Given
+        entityManager.persist(inactiveCategory);
         entityManager.flush();
 
         // When
@@ -146,20 +132,24 @@ public class test_CategoryRepository {
 
     /**
      * Test finding all root categories (categories without parent).
-     * Verifies that only active root categories are returned.
+     * Verifies that only root active categories are returned.
      */
     @Test
     @DisplayName("Should find all root categories")
-    void testFindAllRootCategories_ReturnsRootCategories() {
+    void testFindAllRootCategories() {
+        // Given
+        Category savedParent = entityManager.persist(parentCategory);
+        childCategory.setParentCategory(savedParent);
+        entityManager.persist(childCategory);
+        entityManager.flush();
+
         // When
         List<Category> result = categoryRepository.findAllRootCategories();
 
         // Then
-        assertThat(result).isNotEmpty();
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getName()).isEqualTo("Electronics");
         assertThat(result.get(0).getParentCategory()).isNull();
-        assertThat(result.get(0).getIsActive()).isTrue();
     }
 
     /**
@@ -168,9 +158,15 @@ public class test_CategoryRepository {
      */
     @Test
     @DisplayName("Should return empty list when no root categories exist")
-    void testFindAllRootCategories_WhenNoneExist_ReturnsEmpty() {
-        // Given - deactivate root category
-        rootCategory.setIsActive(false);
+    void testFindAllRootCategories_WhenNoneExist() {
+        // Given
+        Category savedParent = entityManager.persist(parentCategory);
+        childCategory.setParentCategory(savedParent);
+        entityManager.persist(childCategory);
+        
+        // Make parent inactive
+        savedParent.setActive(false);
+        entityManager.persist(savedParent);
         entityManager.flush();
 
         // When
@@ -182,20 +178,32 @@ public class test_CategoryRepository {
 
     /**
      * Test finding subcategories by parent ID.
-     * Verifies that all active subcategories of a parent are returned.
+     * Verifies that only active child categories of the specified parent are returned.
      */
     @Test
     @DisplayName("Should find subcategories by parent ID")
-    void testFindSubCategories_ReturnsSubCategories() {
+    void testFindSubCategories() {
+        // Given
+        Category savedParent = entityManager.persist(parentCategory);
+        childCategory.setParentCategory(savedParent);
+        entityManager.persist(childCategory);
+        
+        Category anotherChild = new Category();
+        anotherChild.setName("Smartphones");
+        anotherChild.setDescription("Mobile phones");
+        anotherChild.setActive(true);
+        anotherChild.setParentCategory(savedParent);
+        entityManager.persist(anotherChild);
+        entityManager.flush();
+
         // When
-        List<Category> result = categoryRepository.findSubCategories(rootCategory.getCategoryId());
+        List<Category> result = categoryRepository.findSubCategories(savedParent.getCategoryId());
 
         // Then
-        assertThat(result).isNotEmpty();
         assertThat(result).hasSize(2);
         assertThat(result).extracting(Category::getName)
             .containsExactlyInAnyOrder("Laptops", "Smartphones");
-        assertThat(result).allMatch(cat -> cat.getParentCategory().getCategoryId().equals(rootCategory.getCategoryId()));
+        assertThat(result).allMatch(cat -> cat.getParentCategory().getCategoryId().equals(savedParent.getCategoryId()));
     }
 
     /**
@@ -204,119 +212,140 @@ public class test_CategoryRepository {
      */
     @Test
     @DisplayName("Should return empty list when parent has no subcategories")
-    void testFindSubCategories_WhenNoChildren_ReturnsEmpty() {
-        // When
-        List<Category> result = categoryRepository.findSubCategories(subCategory1.getCategoryId());
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test finding subcategories with non-existent parent ID.
-     * Verifies that an empty list is returned.
-     */
-    @Test
-    @DisplayName("Should return empty list when parent ID does not exist")
-    void testFindSubCategories_WhenParentNotExists_ReturnsEmpty() {
-        // When
-        List<Category> result = categoryRepository.findSubCategories(99999L);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test saving a new Category.
-     * Verifies that the Category is persisted correctly.
-     */
-    @Test
-    @DisplayName("Should save new Category successfully")
-    void testSave_NewCategory_Success() {
+    void testFindSubCategories_WhenNoChildren() {
         // Given
-        Category newCategory = new Category();
-        newCategory.setName("Tablets");
-        newCategory.setDescription("Tablet devices");
-        newCategory.setIsActive(true);
-        newCategory.setParentCategory(rootCategory);
+        Category savedParent = entityManager.persist(parentCategory);
+        entityManager.flush();
 
         // When
-        Category savedCategory = categoryRepository.save(newCategory);
+        List<Category> result = categoryRepository.findSubCategories(savedParent.getCategoryId());
+
+        // Then
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test finding subcategories excludes inactive children.
+     * Verifies that only active subcategories are returned.
+     */
+    @Test
+    @DisplayName("Should exclude inactive subcategories")
+    void testFindSubCategories_ExcludesInactive() {
+        // Given
+        Category savedParent = entityManager.persist(parentCategory);
+        childCategory.setParentCategory(savedParent);
+        entityManager.persist(childCategory);
+        
+        Category inactiveChild = new Category();
+        inactiveChild.setName("Obsolete Laptops");
+        inactiveChild.setDescription("Old laptops");
+        inactiveChild.setActive(false);
+        inactiveChild.setParentCategory(savedParent);
+        entityManager.persist(inactiveChild);
+        entityManager.flush();
+
+        // When
+        List<Category> result = categoryRepository.findSubCategories(savedParent.getCategoryId());
+
+        // Then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getName()).isEqualTo("Laptops");
+    }
+
+    /**
+     * Test saving a new category.
+     * Verifies that the category is persisted with generated ID.
+     */
+    @Test
+    @DisplayName("Should save new category successfully")
+    void testSave_NewCategory() {
+        // When
+        Category savedCategory = categoryRepository.save(parentCategory);
 
         // Then
         assertThat(savedCategory).isNotNull();
         assertThat(savedCategory.getCategoryId()).isNotNull();
-        assertThat(savedCategory.getName()).isEqualTo("Tablets");
-        assertThat(savedCategory.getParentCategory().getCategoryId()).isEqualTo(rootCategory.getCategoryId());
+        assertThat(savedCategory.getName()).isEqualTo("Electronics");
     }
 
     /**
-     * Test updating an existing Category.
-     * Verifies that Category modifications are persisted correctly.
+     * Test updating an existing category.
+     * Verifies that changes are persisted correctly.
      */
     @Test
-    @DisplayName("Should update existing Category successfully")
-    void testSave_UpdateCategory_Success() {
+    @DisplayName("Should update existing category successfully")
+    void testSave_UpdateCategory() {
         // Given
-        rootCategory.setDescription("Updated description");
+        Category savedCategory = entityManager.persist(parentCategory);
+        entityManager.flush();
+        Long savedId = savedCategory.getCategoryId();
 
         // When
-        Category updatedCategory = categoryRepository.save(rootCategory);
-        entityManager.flush();
+        savedCategory.setDescription("Updated description");
+        Category updatedCategory = categoryRepository.save(savedCategory);
 
         // Then
+        assertThat(updatedCategory.getCategoryId()).isEqualTo(savedId);
         assertThat(updatedCategory.getDescription()).isEqualTo("Updated description");
-        assertThat(updatedCategory.getCategoryId()).isEqualTo(rootCategory.getCategoryId());
     }
 
     /**
-     * Test deleting a Category by ID.
-     * Verifies that the Category is removed from the database.
+     * Test finding category by ID.
+     * Verifies that the correct category is retrieved.
      */
     @Test
-    @DisplayName("Should delete Category by ID successfully")
-    void testDeleteById_Success() {
+    @DisplayName("Should find category by ID when exists")
+    void testFindById_WhenExists() {
         // Given
-        Long categoryId = inactiveCategory.getCategoryId();
+        Category savedCategory = entityManager.persist(parentCategory);
+        entityManager.flush();
 
         // When
-        categoryRepository.deleteById(categoryId);
+        Optional<Category> result = categoryRepository.findById(savedCategory.getCategoryId());
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getCategoryId()).isEqualTo(savedCategory.getCategoryId());
+    }
+
+    /**
+     * Test deleting a category by ID.
+     * Verifies that the category is removed from the database.
+     */
+    @Test
+    @DisplayName("Should delete category by ID successfully")
+    void testDeleteById() {
+        // Given
+        Category savedCategory = entityManager.persist(parentCategory);
+        entityManager.flush();
+        Long savedId = savedCategory.getCategoryId();
+
+        // When
+        categoryRepository.deleteById(savedId);
         entityManager.flush();
 
         // Then
-        Optional<Category> result = categoryRepository.findById(categoryId);
+        Optional<Category> result = categoryRepository.findById(savedId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test finding a Category by ID.
-     * Verifies that the correct Category is retrieved.
+     * Test finding all categories.
+     * Verifies that all persisted categories are retrieved.
      */
     @Test
-    @DisplayName("Should find Category by ID when exists")
-    void testFindById_WhenExists_ReturnsCategory() {
+    @DisplayName("Should find all categories")
+    void testFindAll() {
+        // Given
+        entityManager.persist(parentCategory);
+        entityManager.persist(childCategory);
+        entityManager.persist(inactiveCategory);
+        entityManager.flush();
+
         // When
-        Optional<Category> result = categoryRepository.findById(rootCategory.getCategoryId());
+        List<Category> allCategories = categoryRepository.findAll();
 
         // Then
-        assertThat(result).isPresent();
-        assertThat(result.get().getCategoryId()).isEqualTo(rootCategory.getCategoryId());
-        assertThat(result.get().getName()).isEqualTo("Electronics");
-    }
-
-    /**
-     * Test that inactive categories are excluded from active queries.
-     * Verifies filtering logic for active status.
-     */
-    @Test
-    @DisplayName("Should exclude inactive categories from active queries")
-    void testActiveQueriesExcludeInactiveCategories() {
-        // When
-        List<Category> activeCategories = categoryRepository.findAllActive();
-        List<Category> rootCategories = categoryRepository.findAllRootCategories();
-
-        // Then
-        assertThat(activeCategories).doesNotContain(inactiveCategory);
-        assertThat(rootCategories).doesNotContain(inactiveCategory);
+        assertThat(allCategories).hasSize(3);
     }
 }

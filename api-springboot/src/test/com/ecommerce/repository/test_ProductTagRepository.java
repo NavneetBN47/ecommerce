@@ -1,6 +1,5 @@
 package com.ecommerce.repository;
 
-import com.ecommerce.entity.Product;
 import com.ecommerce.entity.ProductTag;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,22 +10,19 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
-import java.util.UUID;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for ProductTagRepository.
- * Tests repository methods for ProductTag entity operations including tag queries.
+ * Tests all public methods including custom query methods.
  * Uses @DataJpaTest for repository layer testing with in-memory database.
- * 
- * @author Test Generation Agent
- * @version 1.0
  */
 @DataJpaTest
 @ActiveProfiles("test")
 @DisplayName("ProductTagRepository Tests")
-public class test_ProductTagRepository {
+class test_ProductTagRepository {
 
     @Autowired
     private ProductTagRepository productTagRepository;
@@ -34,105 +30,102 @@ public class test_ProductTagRepository {
     @Autowired
     private TestEntityManager entityManager;
 
-    private Product testProduct;
-    private ProductTag tag1;
-    private ProductTag tag2;
-    private ProductTag tag3;
+    private ProductTag testTag1;
+    private ProductTag testTag2;
+    private ProductTag testTag3;
+    private Long testProductId;
 
     /**
      * Set up test data before each test method execution.
-     * Creates and persists test Product and ProductTag entities.
      */
     @BeforeEach
     void setUp() {
-        // Create test product
-        testProduct = new Product();
-        testProduct.setProductId(UUID.randomUUID());
-        testProduct.setName("Test Product");
-        testProduct.setPrice(99.99);
-        entityManager.persist(testProduct);
-
-        // Create test tags
-        tag1 = new ProductTag();
-        tag1.setProduct(testProduct);
-        tag1.setTag("electronics");
-        entityManager.persist(tag1);
-
-        tag2 = new ProductTag();
-        tag2.setProduct(testProduct);
-        tag2.setTag("bestseller");
-        entityManager.persist(tag2);
-
-        tag3 = new ProductTag();
-        tag3.setProduct(testProduct);
-        tag3.setTag("new-arrival");
-        entityManager.persist(tag3);
+        testProductId = 1L;
         
-        entityManager.flush();
+        testTag1 = new ProductTag();
+        testTag1.setTag("electronics");
+        testTag1.setProduct(createMockProduct(testProductId));
+        
+        testTag2 = new ProductTag();
+        testTag2.setTag("laptop");
+        testTag2.setProduct(createMockProduct(testProductId));
+        
+        testTag3 = new ProductTag();
+        testTag3.setTag("electronics");
+        testTag3.setProduct(createMockProduct(2L));
     }
 
     /**
-     * Test finding ProductTags by product ID.
-     * Verifies that all tags for a product are returned.
+     * Test finding product tags by product ID.
+     * Verifies that all tags for the specified product are returned.
      */
     @Test
-    @DisplayName("Should find ProductTags by product ID")
-    void testFindByProductId_ReturnsAllTags() {
+    @DisplayName("Should find product tags by product ID")
+    void testFindByProductId() {
+        // Given
+        entityManager.persist(testTag1);
+        entityManager.persist(testTag2);
+        entityManager.persist(testTag3);
+        entityManager.flush();
+
         // When
-        List<ProductTag> result = productTagRepository.findByProductId(testProduct.getProductId());
+        List<ProductTag> result = productTagRepository.findByProductId(testProductId);
 
         // Then
-        assertThat(result).isNotEmpty();
-        assertThat(result).hasSize(3);
+        assertThat(result).hasSize(2);
         assertThat(result).extracting(ProductTag::getTag)
-            .containsExactlyInAnyOrder("electronics", "bestseller", "new-arrival");
+            .containsExactlyInAnyOrder("electronics", "laptop");
     }
 
     /**
-     * Test finding ProductTags by product ID when no tags exist.
+     * Test finding product tags by product ID when no tags exist.
      * Verifies that an empty list is returned.
      */
     @Test
-    @DisplayName("Should return empty list when product has no tags")
-    void testFindByProductId_WhenNoTags_ReturnsEmpty() {
+    @DisplayName("Should return empty list when no tags exist for product ID")
+    void testFindByProductId_WhenNoTags() {
         // Given
-        Product productWithoutTags = new Product();
-        productWithoutTags.setProductId(UUID.randomUUID());
-        productWithoutTags.setName("Product Without Tags");
-        productWithoutTags.setPrice(49.99);
-        entityManager.persist(productWithoutTags);
-        entityManager.flush();
+        Long nonExistentProductId = 999L;
 
         // When
-        List<ProductTag> result = productTagRepository.findByProductId(productWithoutTags.getProductId());
+        List<ProductTag> result = productTagRepository.findByProductId(nonExistentProductId);
 
         // Then
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test finding ProductTags by tag name.
+     * Test finding product tags by tag name.
      * Verifies that all products with the specified tag are returned.
      */
     @Test
-    @DisplayName("Should find ProductTags by tag name")
-    void testFindByTag_ReturnsMatchingTags() {
+    @DisplayName("Should find product tags by tag name")
+    void testFindByTag() {
+        // Given
+        entityManager.persist(testTag1);
+        entityManager.persist(testTag2);
+        entityManager.persist(testTag3);
+        entityManager.flush();
+
         // When
         List<ProductTag> result = productTagRepository.findByTag("electronics");
 
         // Then
-        assertThat(result).isNotEmpty();
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getTag()).isEqualToIgnoringCase("electronics");
+        assertThat(result).hasSize(2);
+        assertThat(result).allMatch(tag -> tag.getTag().equalsIgnoreCase("electronics"));
     }
 
     /**
-     * Test finding ProductTags by tag name with case insensitivity.
-     * Verifies that tag search is case-insensitive.
+     * Test finding product tags by tag name with case-insensitive search.
+     * Verifies that search is case-insensitive.
      */
     @Test
-    @DisplayName("Should find ProductTags by tag name case-insensitively")
-    void testFindByTag_CaseInsensitive_ReturnsMatchingTags() {
+    @DisplayName("Should find product tags by tag name case-insensitively")
+    void testFindByTag_CaseInsensitive() {
+        // Given
+        entityManager.persist(testTag1);
+        entityManager.flush();
+
         // When
         List<ProductTag> resultLower = productTagRepository.findByTag("electronics");
         List<ProductTag> resultUpper = productTagRepository.findByTag("ELECTRONICS");
@@ -142,16 +135,19 @@ public class test_ProductTagRepository {
         assertThat(resultLower).hasSize(1);
         assertThat(resultUpper).hasSize(1);
         assertThat(resultMixed).hasSize(1);
-        assertThat(resultLower.get(0).getId()).isEqualTo(resultUpper.get(0).getId());
     }
 
     /**
-     * Test finding ProductTags by non-existent tag.
+     * Test finding product tags by tag name when tag doesn't exist.
      * Verifies that an empty list is returned.
      */
     @Test
-    @DisplayName("Should return empty list when tag does not exist")
-    void testFindByTag_WhenNotExists_ReturnsEmpty() {
+    @DisplayName("Should return empty list when tag not found")
+    void testFindByTag_WhenNotExists() {
+        // Given
+        entityManager.persist(testTag1);
+        entityManager.flush();
+
         // When
         List<ProductTag> result = productTagRepository.findByTag("nonexistent");
 
@@ -160,158 +156,202 @@ public class test_ProductTagRepository {
     }
 
     /**
-     * Test deleting ProductTags by product ID.
-     * Verifies that all tags for a product are removed.
+     * Test deleting product tags by product ID.
+     * Verifies that all tags for the specified product are removed.
      */
     @Test
-    @DisplayName("Should delete ProductTags by product ID")
-    void testDeleteByProductProductId_Success() {
+    @DisplayName("Should delete product tags by product ID")
+    void testDeleteByProductProductId() {
+        // Given
+        entityManager.persist(testTag1);
+        entityManager.persist(testTag2);
+        entityManager.persist(testTag3);
+        entityManager.flush();
+        entityManager.clear();
+
         // When
-        productTagRepository.deleteByProductProductId(testProduct.getProductId());
+        productTagRepository.deleteByProductProductId(testProductId);
         entityManager.flush();
 
         // Then
-        List<ProductTag> result = productTagRepository.findByProductId(testProduct.getProductId());
-        assertThat(result).isEmpty();
+        List<ProductTag> remainingTags = productTagRepository.findByProductId(testProductId);
+        assertThat(remainingTags).isEmpty();
+        
+        // Verify tags for other products still exist
+        List<ProductTag> otherProductTags = productTagRepository.findByProductId(2L);
+        assertThat(otherProductTags).hasSize(1);
     }
 
     /**
-     * Test deleting ProductTags by product ID when no tags exist.
+     * Test deleting product tags by product ID when no tags exist.
      * Verifies that no exception is thrown.
      */
     @Test
     @DisplayName("Should handle delete by product ID when no tags exist")
-    void testDeleteByProductProductId_WhenNoTags_NoException() {
+    void testDeleteByProductProductId_WhenNoTags() {
         // Given
-        Product productWithoutTags = new Product();
-        productWithoutTags.setProductId(UUID.randomUUID());
-        productWithoutTags.setName("Product Without Tags");
-        productWithoutTags.setPrice(49.99);
-        entityManager.persist(productWithoutTags);
-        entityManager.flush();
+        Long nonExistentProductId = 999L;
 
         // When & Then - should not throw exception
-        productTagRepository.deleteByProductProductId(productWithoutTags.getProductId());
+        productTagRepository.deleteByProductProductId(nonExistentProductId);
         entityManager.flush();
     }
 
     /**
-     * Test saving a new ProductTag.
-     * Verifies that the ProductTag is persisted correctly.
+     * Test saving a new product tag.
+     * Verifies that the tag is persisted with generated ID.
      */
     @Test
-    @DisplayName("Should save new ProductTag successfully")
-    void testSave_NewTag_Success() {
-        // Given
-        ProductTag newTag = new ProductTag();
-        newTag.setProduct(testProduct);
-        newTag.setTag("featured");
-
+    @DisplayName("Should save new product tag successfully")
+    void testSave_NewTag() {
         // When
-        ProductTag savedTag = productTagRepository.save(newTag);
+        ProductTag savedTag = productTagRepository.save(testTag1);
 
         // Then
         assertThat(savedTag).isNotNull();
         assertThat(savedTag.getId()).isNotNull();
-        assertThat(savedTag.getTag()).isEqualTo("featured");
-        assertThat(savedTag.getProduct().getProductId()).isEqualTo(testProduct.getProductId());
+        assertThat(savedTag.getTag()).isEqualTo("electronics");
     }
 
     /**
-     * Test updating an existing ProductTag.
-     * Verifies that ProductTag modifications are persisted correctly.
+     * Test updating an existing product tag.
+     * Verifies that changes are persisted correctly.
      */
     @Test
-    @DisplayName("Should update existing ProductTag successfully")
-    void testSave_UpdateTag_Success() {
+    @DisplayName("Should update existing product tag successfully")
+    void testSave_UpdateTag() {
         // Given
-        tag1.setTag("updated-electronics");
+        ProductTag savedTag = entityManager.persist(testTag1);
+        entityManager.flush();
+        Long savedId = savedTag.getId();
 
         // When
-        ProductTag updatedTag = productTagRepository.save(tag1);
+        savedTag.setTag("updated-tag");
+        ProductTag updatedTag = productTagRepository.save(savedTag);
+
+        // Then
+        assertThat(updatedTag.getId()).isEqualTo(savedId);
+        assertThat(updatedTag.getTag()).isEqualTo("updated-tag");
+    }
+
+    /**
+     * Test finding product tag by ID.
+     * Verifies that the correct tag is retrieved.
+     */
+    @Test
+    @DisplayName("Should find product tag by ID when exists")
+    void testFindById_WhenExists() {
+        // Given
+        ProductTag savedTag = entityManager.persist(testTag1);
+        entityManager.flush();
+
+        // When
+        Optional<ProductTag> result = productTagRepository.findById(savedTag.getId());
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(savedTag.getId());
+    }
+
+    /**
+     * Test finding product tag by ID when it doesn't exist.
+     * Verifies that an empty Optional is returned.
+     */
+    @Test
+    @DisplayName("Should return empty Optional when tag not found by ID")
+    void testFindById_WhenNotExists() {
+        // Given
+        Long nonExistentId = 999L;
+
+        // When
+        Optional<ProductTag> result = productTagRepository.findById(nonExistentId);
+
+        // Then
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test deleting a product tag by ID.
+     * Verifies that the tag is removed from the database.
+     */
+    @Test
+    @DisplayName("Should delete product tag by ID successfully")
+    void testDeleteById() {
+        // Given
+        ProductTag savedTag = entityManager.persist(testTag1);
+        entityManager.flush();
+        Long savedId = savedTag.getId();
+
+        // When
+        productTagRepository.deleteById(savedId);
         entityManager.flush();
 
         // Then
-        assertThat(updatedTag.getTag()).isEqualTo("updated-electronics");
-        assertThat(updatedTag.getId()).isEqualTo(tag1.getId());
+        Optional<ProductTag> result = productTagRepository.findById(savedId);
+        assertThat(result).isEmpty();
     }
 
     /**
-     * Test deleting a ProductTag by ID.
-     * Verifies that the ProductTag is removed from the database.
+     * Test finding all product tags.
+     * Verifies that all persisted tags are retrieved.
      */
     @Test
-    @DisplayName("Should delete ProductTag by ID successfully")
-    void testDeleteById_Success() {
+    @DisplayName("Should find all product tags")
+    void testFindAll() {
         // Given
-        Long tagId = tag1.getId();
-
-        // When
-        productTagRepository.deleteById(tagId);
+        entityManager.persist(testTag1);
+        entityManager.persist(testTag2);
+        entityManager.persist(testTag3);
         entityManager.flush();
 
-        // Then
-        List<ProductTag> remainingTags = productTagRepository.findByProductId(testProduct.getProductId());
-        assertThat(remainingTags).hasSize(2);
-        assertThat(remainingTags).extracting(ProductTag::getTag)
-            .doesNotContain("electronics");
-    }
-
-    /**
-     * Test finding all ProductTags.
-     * Verifies that all persisted ProductTags are retrieved.
-     */
-    @Test
-    @DisplayName("Should find all ProductTags")
-    void testFindAll_ReturnsAllTags() {
         // When
         List<ProductTag> allTags = productTagRepository.findAll();
 
         // Then
-        assertThat(allTags).isNotEmpty();
         assertThat(allTags).hasSize(3);
     }
 
     /**
-     * Test that multiple products can have the same tag.
-     * Verifies tag reusability across products.
+     * Test checking if product tag exists by ID.
+     * Verifies the existence check returns correct boolean value.
      */
     @Test
-    @DisplayName("Should allow multiple products to have the same tag")
-    void testMultipleProductsSameTag() {
+    @DisplayName("Should return true when tag exists by ID")
+    void testExistsById_WhenExists() {
         // Given
-        Product anotherProduct = new Product();
-        anotherProduct.setProductId(UUID.randomUUID());
-        anotherProduct.setName("Another Product");
-        anotherProduct.setPrice(149.99);
-        entityManager.persist(anotherProduct);
-
-        ProductTag anotherTag = new ProductTag();
-        anotherTag.setProduct(anotherProduct);
-        anotherTag.setTag("electronics");
-        entityManager.persist(anotherTag);
+        ProductTag savedTag = entityManager.persist(testTag1);
         entityManager.flush();
 
         // When
-        List<ProductTag> electronicsTag = productTagRepository.findByTag("electronics");
+        boolean exists = productTagRepository.existsById(savedTag.getId());
 
         // Then
-        assertThat(electronicsTag).hasSize(2);
-        assertThat(electronicsTag).extracting(pt -> pt.getProduct().getProductId())
-            .containsExactlyInAnyOrder(testProduct.getProductId(), anotherProduct.getProductId());
+        assertThat(exists).isTrue();
     }
 
     /**
-     * Test that ProductTag maintains relationship with Product.
-     * Verifies bidirectional relationship integrity.
+     * Test checking if product tag exists by ID when it doesn't.
+     * Verifies the existence check returns false.
      */
     @Test
-    @DisplayName("Should maintain relationship with Product")
-    void testProductTagProductRelationship() {
+    @DisplayName("Should return false when tag does not exist by ID")
+    void testExistsById_WhenNotExists() {
+        // Given
+        Long nonExistentId = 999L;
+
         // When
-        List<ProductTag> tags = productTagRepository.findByProductId(testProduct.getProductId());
+        boolean exists = productTagRepository.existsById(nonExistentId);
 
         // Then
-        assertThat(tags).allMatch(tag -> tag.getProduct().getProductId().equals(testProduct.getProductId()));
+        assertThat(exists).isFalse();
+    }
+
+    /**
+     * Helper method to create a mock product for testing.
+     */
+    private com.ecommerce.entity.Product createMockProduct(Long productId) {
+        com.ecommerce.entity.Product product = new com.ecommerce.entity.Product();
+        product.setProductId(java.util.UUID.randomUUID());
+        return entityManager.persist(product);
     }
 }

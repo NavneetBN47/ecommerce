@@ -1,7 +1,6 @@
 package com.ecommerce.repository;
 
 import com.ecommerce.entity.Cart;
-import com.ecommerce.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -17,16 +16,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for CartRepository.
- * Tests repository methods for Cart entity operations including user-specific queries.
+ * Tests all public methods including custom query methods.
  * Uses @DataJpaTest for repository layer testing with in-memory database.
- * 
- * @author Test Generation Agent
- * @version 1.0
  */
 @DataJpaTest
 @ActiveProfiles("test")
 @DisplayName("CartRepository Tests")
-public class test_CartRepository {
+class test_CartRepository {
 
     @Autowired
     private CartRepository cartRepository;
@@ -34,57 +30,46 @@ public class test_CartRepository {
     @Autowired
     private TestEntityManager entityManager;
 
-    private User testUser;
+    private UUID testUserId;
     private Cart testCart;
-    private UUID userId;
-    private UUID cartId;
 
     /**
      * Set up test data before each test method execution.
-     * Creates and persists test entities for User and Cart.
      */
     @BeforeEach
     void setUp() {
-        userId = UUID.randomUUID();
-        cartId = UUID.randomUUID();
-
-        testUser = new User();
-        testUser.setId(userId);
-        testUser.setUsername("testuser");
-        testUser.setEmail("test@example.com");
-        entityManager.persist(testUser);
-
-        testCart = new Cart();
-        testCart.setId(cartId);
-        testCart.setUserId(userId);
-        entityManager.persist(testCart);
+        testUserId = UUID.randomUUID();
         
-        entityManager.flush();
+        testCart = new Cart();
+        testCart.setUserId(testUserId);
     }
 
     /**
-     * Test finding a Cart by user ID when it exists.
-     * Verifies that the correct Cart is returned for the given user.
+     * Test finding cart by user ID when cart exists.
+     * Verifies that the correct cart is returned.
      */
     @Test
-    @DisplayName("Should find Cart by user ID when exists")
-    void testFindByUserId_WhenExists_ReturnsCart() {
+    @DisplayName("Should find cart by user ID when exists")
+    void testFindByUserId_WhenExists() {
+        // Given
+        entityManager.persist(testCart);
+        entityManager.flush();
+
         // When
-        Optional<Cart> result = cartRepository.findByUserId(userId);
+        Optional<Cart> result = cartRepository.findByUserId(testUserId);
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getUserId()).isEqualTo(userId);
-        assertThat(result.get().getId()).isEqualTo(cartId);
+        assertThat(result.get().getUserId()).isEqualTo(testUserId);
     }
 
     /**
-     * Test finding a Cart by user ID when it does not exist.
+     * Test finding cart by user ID when cart does not exist.
      * Verifies that an empty Optional is returned.
      */
     @Test
-    @DisplayName("Should return empty Optional when Cart does not exist for user")
-    void testFindByUserId_WhenNotExists_ReturnsEmpty() {
+    @DisplayName("Should return empty Optional when cart not found by user ID")
+    void testFindByUserId_WhenNotExists() {
         // Given
         UUID nonExistentUserId = UUID.randomUUID();
 
@@ -96,28 +81,33 @@ public class test_CartRepository {
     }
 
     /**
-     * Test deleting a Cart by user ID.
-     * Verifies that the Cart is removed from the database.
+     * Test deleting cart by user ID when cart exists.
+     * Verifies that the cart is removed from the database.
      */
     @Test
-    @DisplayName("Should delete Cart by user ID successfully")
-    void testDeleteByUserId_Success() {
+    @DisplayName("Should delete cart by user ID successfully")
+    void testDeleteByUserId_WhenExists() {
+        // Given
+        entityManager.persist(testCart);
+        entityManager.flush();
+        entityManager.clear();
+
         // When
-        cartRepository.deleteByUserId(userId);
+        cartRepository.deleteByUserId(testUserId);
         entityManager.flush();
 
         // Then
-        Optional<Cart> result = cartRepository.findByUserId(userId);
+        Optional<Cart> result = cartRepository.findByUserId(testUserId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test deleting a Cart by user ID when no cart exists.
-     * Verifies that no exception is thrown and operation completes successfully.
+     * Test deleting cart by user ID when cart does not exist.
+     * Verifies that no exception is thrown.
      */
     @Test
-    @DisplayName("Should handle delete by user ID when Cart does not exist")
-    void testDeleteByUserId_WhenNotExists_NoException() {
+    @DisplayName("Should handle delete by user ID when cart does not exist")
+    void testDeleteByUserId_WhenNotExists() {
         // Given
         UUID nonExistentUserId = UUID.randomUUID();
 
@@ -127,129 +117,175 @@ public class test_CartRepository {
     }
 
     /**
-     * Test saving a new Cart.
-     * Verifies that the Cart is persisted correctly with all attributes.
+     * Test saving a new cart.
+     * Verifies that the cart is persisted with generated ID.
      */
     @Test
-    @DisplayName("Should save new Cart successfully")
-    void testSave_NewCart_Success() {
-        // Given
-        UUID newUserId = UUID.randomUUID();
-        User newUser = new User();
-        newUser.setId(newUserId);
-        newUser.setUsername("newuser");
-        newUser.setEmail("newuser@example.com");
-        entityManager.persist(newUser);
-
-        Cart newCart = new Cart();
-        newCart.setUserId(newUserId);
-
+    @DisplayName("Should save new cart successfully")
+    void testSave_NewCart() {
         // When
-        Cart savedCart = cartRepository.save(newCart);
+        Cart savedCart = cartRepository.save(testCart);
 
         // Then
         assertThat(savedCart).isNotNull();
         assertThat(savedCart.getId()).isNotNull();
-        assertThat(savedCart.getUserId()).isEqualTo(newUserId);
+        assertThat(savedCart.getUserId()).isEqualTo(testUserId);
     }
 
     /**
-     * Test updating an existing Cart.
-     * Verifies that Cart modifications are persisted correctly.
+     * Test updating an existing cart.
+     * Verifies that changes are persisted correctly.
      */
     @Test
-    @DisplayName("Should update existing Cart successfully")
-    void testSave_UpdateCart_Success() {
+    @DisplayName("Should update existing cart successfully")
+    void testSave_UpdateCart() {
         // Given
-        testCart.setUserId(userId);
+        Cart savedCart = entityManager.persist(testCart);
+        entityManager.flush();
+        UUID savedId = savedCart.getId();
+        UUID newUserId = UUID.randomUUID();
 
         // When
-        Cart updatedCart = cartRepository.save(testCart);
-        entityManager.flush();
+        savedCart.setUserId(newUserId);
+        Cart updatedCart = cartRepository.save(savedCart);
 
         // Then
-        assertThat(updatedCart.getId()).isEqualTo(cartId);
-        assertThat(updatedCart.getUserId()).isEqualTo(userId);
+        assertThat(updatedCart.getId()).isEqualTo(savedId);
+        assertThat(updatedCart.getUserId()).isEqualTo(newUserId);
     }
 
     /**
-     * Test finding a Cart by ID.
-     * Verifies that the correct Cart is retrieved by its ID.
+     * Test finding cart by ID.
+     * Verifies that the correct cart is retrieved.
      */
     @Test
-    @DisplayName("Should find Cart by ID when exists")
-    void testFindById_WhenExists_ReturnsCart() {
+    @DisplayName("Should find cart by ID when exists")
+    void testFindById_WhenExists() {
+        // Given
+        Cart savedCart = entityManager.persist(testCart);
+        entityManager.flush();
+
         // When
-        Optional<Cart> result = cartRepository.findById(cartId);
+        Optional<Cart> result = cartRepository.findById(savedCart.getId());
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(cartId);
-        assertThat(result.get().getUserId()).isEqualTo(userId);
+        assertThat(result.get().getId()).isEqualTo(savedCart.getId());
     }
 
     /**
-     * Test finding a Cart by ID when it does not exist.
+     * Test finding cart by ID when it doesn't exist.
      * Verifies that an empty Optional is returned.
      */
     @Test
-    @DisplayName("Should return empty Optional when Cart ID does not exist")
-    void testFindById_WhenNotExists_ReturnsEmpty() {
+    @DisplayName("Should return empty Optional when cart not found by ID")
+    void testFindById_WhenNotExists() {
         // Given
-        UUID nonExistentCartId = UUID.randomUUID();
+        UUID nonExistentId = UUID.randomUUID();
 
         // When
-        Optional<Cart> result = cartRepository.findById(nonExistentCartId);
+        Optional<Cart> result = cartRepository.findById(nonExistentId);
 
         // Then
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test deleting a Cart by ID.
-     * Verifies that the Cart is removed from the database.
+     * Test deleting a cart by ID.
+     * Verifies that the cart is removed from the database.
      */
     @Test
-    @DisplayName("Should delete Cart by ID successfully")
-    void testDeleteById_Success() {
+    @DisplayName("Should delete cart by ID successfully")
+    void testDeleteById() {
+        // Given
+        Cart savedCart = entityManager.persist(testCart);
+        entityManager.flush();
+        UUID savedId = savedCart.getId();
+
         // When
-        cartRepository.deleteById(cartId);
+        cartRepository.deleteById(savedId);
         entityManager.flush();
 
         // Then
-        Optional<Cart> result = cartRepository.findById(cartId);
+        Optional<Cart> result = cartRepository.findById(savedId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test that multiple carts can exist but only one per user.
-     * Verifies user-cart relationship integrity.
+     * Test finding all carts.
+     * Verifies that all persisted carts are retrieved.
      */
     @Test
-    @DisplayName("Should maintain one cart per user relationship")
-    void testOneCartPerUser() {
+    @DisplayName("Should find all carts")
+    void testFindAll() {
         // Given
-        UUID anotherUserId = UUID.randomUUID();
-        User anotherUser = new User();
-        anotherUser.setId(anotherUserId);
-        anotherUser.setUsername("anotheruser");
-        anotherUser.setEmail("another@example.com");
-        entityManager.persist(anotherUser);
-
+        entityManager.persist(testCart);
+        
         Cart anotherCart = new Cart();
-        anotherCart.setUserId(anotherUserId);
+        anotherCart.setUserId(UUID.randomUUID());
         entityManager.persist(anotherCart);
         entityManager.flush();
 
         // When
-        Optional<Cart> userCart1 = cartRepository.findByUserId(userId);
-        Optional<Cart> userCart2 = cartRepository.findByUserId(anotherUserId);
+        var allCarts = cartRepository.findAll();
 
         // Then
-        assertThat(userCart1).isPresent();
-        assertThat(userCart2).isPresent();
-        assertThat(userCart1.get().getUserId()).isEqualTo(userId);
-        assertThat(userCart2.get().getUserId()).isEqualTo(anotherUserId);
-        assertThat(userCart1.get().getId()).isNotEqualTo(userCart2.get().getId());
+        assertThat(allCarts).hasSize(2);
+    }
+
+    /**
+     * Test checking if cart exists by ID.
+     * Verifies the existence check returns correct boolean value.
+     */
+    @Test
+    @DisplayName("Should return true when cart exists by ID")
+    void testExistsById_WhenExists() {
+        // Given
+        Cart savedCart = entityManager.persist(testCart);
+        entityManager.flush();
+
+        // When
+        boolean exists = cartRepository.existsById(savedCart.getId());
+
+        // Then
+        assertThat(exists).isTrue();
+    }
+
+    /**
+     * Test checking if cart exists by ID when it doesn't.
+     * Verifies the existence check returns false.
+     */
+    @Test
+    @DisplayName("Should return false when cart does not exist by ID")
+    void testExistsById_WhenNotExists() {
+        // Given
+        UUID nonExistentId = UUID.randomUUID();
+
+        // When
+        boolean exists = cartRepository.existsById(nonExistentId);
+
+        // Then
+        assertThat(exists).isFalse();
+    }
+
+    /**
+     * Test counting all carts.
+     * Verifies that the count is accurate.
+     */
+    @Test
+    @DisplayName("Should count all carts correctly")
+    void testCount() {
+        // Given
+        entityManager.persist(testCart);
+        Cart anotherCart = new Cart();
+        anotherCart.setUserId(UUID.randomUUID());
+        entityManager.persist(anotherCart);
+        entityManager.flush();
+
+        // When
+        long count = cartRepository.count();
+
+        // Then
+        assertThat(count).isEqualTo(2);
     }
 }
