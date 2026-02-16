@@ -5,311 +5,332 @@ import com.ecommerce.dto.CreateOrderRequestDTO;
 import com.ecommerce.dto.OrderDTO;
 import com.ecommerce.entity.Order;
 import com.ecommerce.service.OrderService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.DisplayName;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * JUnit 5 test class for OrderController.
- * Tests order management operations including creation, retrieval, status updates, and cancellation.
+ * JUnit 5 test class for OrderController
+ * Tests order management operations including creation, retrieval, status updates, and cancellation
  */
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(OrderController.class)
+@DisplayName("OrderController Tests")
 class test_OrderController {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private OrderService orderService;
 
-    @Mock
-    private Authentication authentication;
-
-    @InjectMocks
-    private OrderController orderController;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private CreateOrderRequestDTO createOrderRequest;
     private OrderDTO orderDTO;
-    private Long userId;
-    private Long orderId;
-    private String orderNumber;
+    private Authentication mockAuth;
 
+    /**
+     * Set up test data before each test
+     */
     @BeforeEach
     void setUp() {
-        userId = 1L;
-        orderId = 100L;
-        orderNumber = "ORD-2024-001";
-
         createOrderRequest = new CreateOrderRequestDTO();
-        createOrderRequest.setShippingAddress("123 Main St, City, Country");
+        createOrderRequest.setShippingAddress("123 Test Street");
         createOrderRequest.setPaymentMethod("CREDIT_CARD");
 
         orderDTO = new OrderDTO();
-        orderDTO.setId(orderId);
-        orderDTO.setOrderNumber(orderNumber);
-        orderDTO.setUserId(userId);
-        orderDTO.setTotalAmount(BigDecimal.valueOf(199.99));
+        orderDTO.setId(1L);
+        orderDTO.setOrderNumber("ORD-12345");
+        orderDTO.setUserId(1L);
         orderDTO.setStatus(Order.OrderStatus.PENDING);
+        orderDTO.setTotalAmount(BigDecimal.valueOf(150.00));
+        orderDTO.setShippingAddress("123 Test Street");
+        orderDTO.setCreatedAt(LocalDateTime.now());
+
+        mockAuth = mock(Authentication.class);
+        when(mockAuth.getName()).thenReturn("1");
     }
 
     /**
-     * Test creating order successfully.
-     * Verifies that order is created from cart and returns HTTP 201 CREATED status.
+     * Test successfully creating an order
+     * Verifies that valid order request returns 201 CREATED with order data
      */
     @Test
-    void testCreateOrder_Success() {
-        when(authentication.getName()).thenReturn(userId.toString());
-        when(orderService.createOrder(eq(userId), any(CreateOrderRequestDTO.class))).thenReturn(orderDTO);
+    @WithMockUser(username = "1")
+    @DisplayName("Should create order successfully")
+    void testCreateOrder_Success() throws Exception {
+        when(orderService.createOrder(anyLong(), any(CreateOrderRequestDTO.class)))
+                .thenReturn(orderDTO);
 
-        ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.createOrder(createOrderRequest, authentication);
+        mockMvc.perform(post("/api/orders")
+                .with(authentication(mockAuth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createOrderRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Order created successfully"))
+                .andExpect(jsonPath("$.data.orderNumber").value("ORD-12345"))
+                .andExpect(jsonPath("$.data.totalAmount").value(150.00));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Order created successfully", response.getBody().getMessage());
-        assertEquals(orderDTO, response.getBody().getData());
-        assertEquals(orderNumber, response.getBody().getData().getOrderNumber());
-        verify(orderService, times(1)).createOrder(eq(userId), any(CreateOrderRequestDTO.class));
+        verify(orderService, times(1)).createOrder(anyLong(), any(CreateOrderRequestDTO.class));
     }
 
     /**
-     * Test creating order with null request.
-     * Verifies proper exception handling.
+     * Test creating order with invalid data
+     * Verifies that validation errors are properly handled
      */
     @Test
-    void testCreateOrder_NullRequest() {
-        when(authentication.getName()).thenReturn(userId.toString());
+    @WithMockUser(username = "1")
+    @DisplayName("Should return 400 when order data is invalid")
+    void testCreateOrder_InvalidData() throws Exception {
+        CreateOrderRequestDTO invalidRequest = new CreateOrderRequestDTO();
+        invalidRequest.setShippingAddress("");
 
-        assertThrows(Exception.class, () -> {
-            orderController.createOrder(null, authentication);
-        });
+        mockMvc.perform(post("/api/orders")
+                .with(authentication(mockAuth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest());
+
+        verify(orderService, never()).createOrder(anyLong(), any(CreateOrderRequestDTO.class));
     }
 
     /**
-     * Test creating order with empty cart.
-     * Verifies validation logic for empty cart scenario.
+     * Test creating order without authentication
+     * Verifies that unauthenticated requests are rejected
      */
     @Test
-    void testCreateOrder_EmptyCart() {
-        when(authentication.getName()).thenReturn(userId.toString());
-        when(orderService.createOrder(eq(userId), any(CreateOrderRequestDTO.class)))
-            .thenThrow(new IllegalStateException("Cart is empty"));
+    @DisplayName("Should return 401 when creating order without authentication")
+    void testCreateOrder_Unauthenticated() throws Exception {
+        mockMvc.perform(post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createOrderRequest)))
+                .andExpect(status().isUnauthorized());
 
-        assertThrows(IllegalStateException.class, () -> {
-            orderController.createOrder(createOrderRequest, authentication);
-        });
+        verify(orderService, never()).createOrder(anyLong(), any(CreateOrderRequestDTO.class));
     }
 
     /**
-     * Test getting order by ID successfully.
-     * Verifies that order details are retrieved with HTTP 200 OK status.
+     * Test successfully retrieving order by ID
+     * Verifies that order retrieval returns order data
      */
     @Test
-    void testGetOrderById_Success() {
-        when(orderService.getOrderById(eq(orderId))).thenReturn(orderDTO);
+    @DisplayName("Should retrieve order by ID successfully")
+    void testGetOrderById_Success() throws Exception {
+        when(orderService.getOrderById(anyLong())).thenReturn(orderDTO);
 
-        ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.getOrderById(orderId);
+        mockMvc.perform(get("/api/orders/{orderId}", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.orderNumber").value("ORD-12345"));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(orderDTO, response.getBody().getData());
-        assertEquals(orderId, response.getBody().getData().getId());
-        verify(orderService, times(1)).getOrderById(eq(orderId));
+        verify(orderService, times(1)).getOrderById(1L);
     }
 
     /**
-     * Test getting order by non-existent ID.
-     * Verifies proper error handling for not found scenario.
+     * Test retrieving non-existent order
+     * Verifies that service exception is properly handled
      */
     @Test
-    void testGetOrderById_NotFound() {
-        Long nonExistentId = 999L;
-        when(orderService.getOrderById(eq(nonExistentId)))
-            .thenThrow(new RuntimeException("Order not found"));
+    @DisplayName("Should return error when order not found")
+    void testGetOrderById_NotFound() throws Exception {
+        when(orderService.getOrderById(anyLong()))
+                .thenThrow(new RuntimeException("Order not found"));
 
-        assertThrows(RuntimeException.class, () -> {
-            orderController.getOrderById(nonExistentId);
-        });
+        mockMvc.perform(get("/api/orders/{orderId}", 999L))
+                .andExpect(status().is5xxServerError());
+
+        verify(orderService, times(1)).getOrderById(999L);
     }
 
     /**
-     * Test getting order by order number successfully.
-     * Verifies that order can be retrieved using order number.
+     * Test successfully retrieving order by order number
+     * Verifies that order retrieval by order number works correctly
      */
     @Test
-    void testGetOrderByOrderNumber_Success() {
-        when(orderService.getOrderByOrderNumber(eq(orderNumber))).thenReturn(orderDTO);
+    @DisplayName("Should retrieve order by order number successfully")
+    void testGetOrderByOrderNumber_Success() throws Exception {
+        when(orderService.getOrderByOrderNumber(anyString())).thenReturn(orderDTO);
 
-        ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.getOrderByOrderNumber(orderNumber);
+        mockMvc.perform(get("/api/orders/number/{orderNumber}", "ORD-12345"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.orderNumber").value("ORD-12345"));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(orderDTO, response.getBody().getData());
-        assertEquals(orderNumber, response.getBody().getData().getOrderNumber());
-        verify(orderService, times(1)).getOrderByOrderNumber(eq(orderNumber));
+        verify(orderService, times(1)).getOrderByOrderNumber("ORD-12345");
     }
 
     /**
-     * Test getting order by invalid order number.
-     * Verifies proper error handling.
+     * Test retrieving order with invalid order number
+     * Verifies that invalid order number is handled
      */
     @Test
-    void testGetOrderByOrderNumber_Invalid() {
-        String invalidOrderNumber = "INVALID-ORDER";
-        when(orderService.getOrderByOrderNumber(eq(invalidOrderNumber)))
-            .thenThrow(new RuntimeException("Order not found"));
+    @DisplayName("Should return error when order number is invalid")
+    void testGetOrderByOrderNumber_Invalid() throws Exception {
+        when(orderService.getOrderByOrderNumber(anyString()))
+                .thenThrow(new RuntimeException("Invalid order number"));
 
-        assertThrows(RuntimeException.class, () -> {
-            orderController.getOrderByOrderNumber(invalidOrderNumber);
-        });
+        mockMvc.perform(get("/api/orders/number/{orderNumber}", "INVALID"))
+                .andExpect(status().is5xxServerError());
+
+        verify(orderService, times(1)).getOrderByOrderNumber("INVALID");
     }
 
     /**
-     * Test getting user orders with pagination.
-     * Verifies that paginated order list is retrieved successfully.
+     * Test successfully retrieving user orders
+     * Verifies that paginated user orders are returned
      */
     @Test
-    void testGetUserOrders_Success() {
-        when(authentication.getName()).thenReturn(userId.toString());
-        List<OrderDTO> orderList = Arrays.asList(orderDTO);
-        Page<OrderDTO> orderPage = new PageImpl<>(orderList, PageRequest.of(0, 10), 1);
-        when(orderService.getUserOrders(eq(userId), any(Pageable.class))).thenReturn(orderPage);
+    @WithMockUser(username = "1")
+    @DisplayName("Should retrieve user orders successfully")
+    void testGetUserOrders_Success() throws Exception {
+        List<OrderDTO> orders = Arrays.asList(orderDTO);
+        Page<OrderDTO> orderPage = new PageImpl<>(orders, PageRequest.of(0, 10), 1);
+        when(orderService.getUserOrders(anyLong(), any())).thenReturn(orderPage);
 
-        ResponseEntity<ApiResponseDTO<Page<OrderDTO>>> response = orderController.getUserOrders(0, 10, authentication);
+        mockMvc.perform(get("/api/orders")
+                .with(authentication(mockAuth))
+                .param("page", "0")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].orderNumber").value("ORD-12345"));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertNotNull(response.getBody().getData());
-        assertEquals(1, response.getBody().getData().getTotalElements());
-        assertEquals(orderDTO, response.getBody().getData().getContent().get(0));
-        verify(orderService, times(1)).getUserOrders(eq(userId), any(Pageable.class));
+        verify(orderService, times(1)).getUserOrders(anyLong(), any());
     }
 
     /**
-     * Test getting user orders with custom pagination.
-     * Verifies that custom page size and number are respected.
+     * Test retrieving user orders with custom pagination
+     * Verifies that custom page size is respected
      */
     @Test
-    void testGetUserOrders_CustomPagination() {
-        when(authentication.getName()).thenReturn(userId.toString());
-        List<OrderDTO> orderList = Arrays.asList(orderDTO, orderDTO, orderDTO);
-        Page<OrderDTO> orderPage = new PageImpl<>(orderList, PageRequest.of(1, 5), 15);
-        when(orderService.getUserOrders(eq(userId), any(Pageable.class))).thenReturn(orderPage);
+    @WithMockUser(username = "1")
+    @DisplayName("Should retrieve user orders with custom pagination")
+    void testGetUserOrders_CustomPagination() throws Exception {
+        List<OrderDTO> orders = new ArrayList<>();
+        Page<OrderDTO> orderPage = new PageImpl<>(orders, PageRequest.of(1, 5), 0);
+        when(orderService.getUserOrders(anyLong(), any())).thenReturn(orderPage);
 
-        ResponseEntity<ApiResponseDTO<Page<OrderDTO>>> response = orderController.getUserOrders(1, 5, authentication);
+        mockMvc.perform(get("/api/orders")
+                .with(authentication(mockAuth))
+                .param("page", "1")
+                .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(3, response.getBody().getData().getContent().size());
-        verify(orderService, times(1)).getUserOrders(eq(userId), any(Pageable.class));
+        verify(orderService, times(1)).getUserOrders(eq(1L), any());
     }
 
     /**
-     * Test updating order status successfully.
-     * Verifies that order status can be updated (admin operation).
+     * Test successfully updating order status
+     * Verifies that order status update works correctly
      */
     @Test
-    void testUpdateOrderStatus_Success() {
-        Order.OrderStatus newStatus = Order.OrderStatus.SHIPPED;
+    @DisplayName("Should update order status successfully")
+    void testUpdateOrderStatus_Success() throws Exception {
         OrderDTO updatedOrder = new OrderDTO();
-        updatedOrder.setId(orderId);
-        updatedOrder.setStatus(newStatus);
-        
-        when(orderService.updateOrderStatus(eq(orderId), eq(newStatus))).thenReturn(updatedOrder);
+        updatedOrder.setId(1L);
+        updatedOrder.setStatus(Order.OrderStatus.SHIPPED);
+        when(orderService.updateOrderStatus(anyLong(), any(Order.OrderStatus.class)))
+                .thenReturn(updatedOrder);
 
-        ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.updateOrderStatus(orderId, newStatus);
+        mockMvc.perform(patch("/api/orders/{orderId}/status", 1L)
+                .param("status", "SHIPPED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Order status updated successfully"));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Order status updated successfully", response.getBody().getMessage());
-        assertEquals(newStatus, response.getBody().getData().getStatus());
-        verify(orderService, times(1)).updateOrderStatus(eq(orderId), eq(newStatus));
+        verify(orderService, times(1)).updateOrderStatus(1L, Order.OrderStatus.SHIPPED);
     }
 
     /**
-     * Test updating order status to invalid state.
-     * Verifies validation of status transitions.
+     * Test updating order status with invalid status
+     * Verifies that invalid status is handled
      */
     @Test
-    void testUpdateOrderStatus_InvalidTransition() {
-        Order.OrderStatus invalidStatus = Order.OrderStatus.CANCELLED;
-        when(orderService.updateOrderStatus(eq(orderId), eq(invalidStatus)))
-            .thenThrow(new IllegalStateException("Invalid status transition"));
+    @DisplayName("Should return error when status is invalid")
+    void testUpdateOrderStatus_InvalidStatus() throws Exception {
+        mockMvc.perform(patch("/api/orders/{orderId}/status", 1L)
+                .param("status", "INVALID_STATUS"))
+                .andExpect(status().isBadRequest());
 
-        assertThrows(IllegalStateException.class, () -> {
-            orderController.updateOrderStatus(orderId, invalidStatus);
-        });
+        verify(orderService, never()).updateOrderStatus(anyLong(), any(Order.OrderStatus.class));
     }
 
     /**
-     * Test cancelling order successfully.
-     * Verifies that order can be cancelled and status is updated.
+     * Test successfully cancelling order
+     * Verifies that order cancellation works correctly
      */
     @Test
-    void testCancelOrder_Success() {
+    @DisplayName("Should cancel order successfully")
+    void testCancelOrder_Success() throws Exception {
         OrderDTO cancelledOrder = new OrderDTO();
-        cancelledOrder.setId(orderId);
+        cancelledOrder.setId(1L);
         cancelledOrder.setStatus(Order.OrderStatus.CANCELLED);
-        
-        when(orderService.cancelOrder(eq(orderId))).thenReturn(cancelledOrder);
+        when(orderService.cancelOrder(anyLong())).thenReturn(cancelledOrder);
 
-        ResponseEntity<ApiResponseDTO<OrderDTO>> response = orderController.cancelOrder(orderId);
+        mockMvc.perform(post("/api/orders/{orderId}/cancel", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Order cancelled successfully"));
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Order cancelled successfully", response.getBody().getMessage());
-        assertEquals(Order.OrderStatus.CANCELLED, response.getBody().getData().getStatus());
-        verify(orderService, times(1)).cancelOrder(eq(orderId));
+        verify(orderService, times(1)).cancelOrder(1L);
     }
 
     /**
-     * Test cancelling already shipped order.
-     * Verifies that shipped orders cannot be cancelled.
+     * Test cancelling non-existent order
+     * Verifies that service exception is properly handled
      */
     @Test
-    void testCancelOrder_AlreadyShipped() {
-        when(orderService.cancelOrder(eq(orderId)))
-            .thenThrow(new IllegalStateException("Cannot cancel shipped order"));
+    @DisplayName("Should return error when cancelling non-existent order")
+    void testCancelOrder_NotFound() throws Exception {
+        when(orderService.cancelOrder(anyLong()))
+                .thenThrow(new RuntimeException("Order not found"));
 
-        assertThrows(IllegalStateException.class, () -> {
-            orderController.cancelOrder(orderId);
-        });
-        verify(orderService, times(1)).cancelOrder(eq(orderId));
+        mockMvc.perform(post("/api/orders/{orderId}/cancel", 999L))
+                .andExpect(status().is5xxServerError());
+
+        verify(orderService, times(1)).cancelOrder(999L);
     }
 
     /**
-     * Test cancelling non-existent order.
-     * Verifies proper error handling.
+     * Test cancelling already cancelled order
+     * Verifies that business rule violation is handled
      */
     @Test
-    void testCancelOrder_NotFound() {
-        Long nonExistentId = 999L;
-        when(orderService.cancelOrder(eq(nonExistentId)))
-            .thenThrow(new RuntimeException("Order not found"));
+    @DisplayName("Should return error when cancelling already cancelled order")
+    void testCancelOrder_AlreadyCancelled() throws Exception {
+        when(orderService.cancelOrder(anyLong()))
+                .thenThrow(new RuntimeException("Order already cancelled"));
 
-        assertThrows(RuntimeException.class, () -> {
-            orderController.cancelOrder(nonExistentId);
-        });
+        mockMvc.perform(post("/api/orders/{orderId}/cancel", 1L))
+                .andExpect(status().is5xxServerError());
+
+        verify(orderService, times(1)).cancelOrder(1L);
     }
 }
