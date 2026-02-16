@@ -1,6 +1,6 @@
 package com.ecommerce.controller;
 
-import com.ecommerce.dto.ApiResponse;
+import com.ecommerce.security.UserPrincipal;
 import com.ecommerce.service.CartService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,15 +11,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Map;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 /**
- * JUnit test class for LogoutController.
- * Tests logout operations and cart cleanup functionality.
+ * Test class for LogoutController
+ * 
+ * This test class verifies the REST API endpoint for user logout,
+ * including cart cleanup functionality.
+ * 
+ * @author Shopping Cart System Team
+ * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 class test_LogoutController {
@@ -27,89 +32,93 @@ class test_LogoutController {
     @Mock
     private CartService cartService;
 
+    @Mock
+    private UserPrincipal currentUser;
+
     @InjectMocks
     private LogoutController logoutController;
 
     private UUID userId;
 
+    /**
+     * Setup method to initialize test data before each test
+     */
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        when(currentUser.getId()).thenReturn(userId);
     }
 
     /**
-     * Test successful logout operation.
-     * Verifies that user can logout and cart is cleared successfully.
+     * Test successful logout with cart cleanup
+     * 
+     * Verifies that logout endpoint properly cleans up the user's cart
+     * and returns HTTP 200 OK with success message.
      */
     @Test
-    void testLogout_Success() {
-        doNothing().when(cartService).clearCart(any(UUID.class));
+    void logout_WithValidUser_ShouldCleanupCartAndReturnSuccessMessage() {
+        doNothing().when(cartService).cleanupCartOnLogout(userId);
 
-        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(userId);
+        ResponseEntity<Map<String, String>> response = logoutController.logout(currentUser);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Logout successful", response.getBody().getMessage());
-        assertNull(response.getBody().getData());
-        verify(cartService, times(1)).clearCart(eq(userId));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsKey("message");
+        assertThat(response.getBody().get("message")).isEqualTo("Logged out successfully");
+        verify(cartService, times(1)).cleanupCartOnLogout(userId);
     }
 
     /**
-     * Test logout with null user ID.
-     * Verifies proper handling of null user ID.
+     * Test logout calls cart cleanup service
+     * 
+     * Verifies that the logout endpoint invokes the cart cleanup
+     * service method exactly once.
      */
     @Test
-    void testLogout_NullUserId() {
-        doThrow(new IllegalArgumentException("User ID cannot be null"))
-            .when(cartService).clearCart(null);
+    void logout_ShouldCallCartCleanupService() {
+        doNothing().when(cartService).cleanupCartOnLogout(userId);
 
-        assertThrows(IllegalArgumentException.class, () -> logoutController.logout(null));
-        verify(cartService, times(1)).clearCart(null);
+        logoutController.logout(currentUser);
+
+        verify(cartService, times(1)).cleanupCartOnLogout(userId);
     }
 
     /**
-     * Test logout when cart service throws exception.
-     * Verifies proper exception propagation.
+     * Test logout with different user IDs
+     * 
+     * Verifies that logout works correctly for different users
+     * and cleans up the correct user's cart.
      */
     @Test
-    void testLogout_ServiceException() {
-        doThrow(new RuntimeException("Database error"))
-            .when(cartService).clearCart(any(UUID.class));
+    void logout_WithDifferentUsers_ShouldCleanupCorrectCart() {
+        UUID anotherUserId = UUID.randomUUID();
+        UserPrincipal anotherUser = mock(UserPrincipal.class);
+        when(anotherUser.getId()).thenReturn(anotherUserId);
 
-        assertThrows(RuntimeException.class, () -> logoutController.logout(userId));
-        verify(cartService, times(1)).clearCart(eq(userId));
+        doNothing().when(cartService).cleanupCartOnLogout(anotherUserId);
+
+        ResponseEntity<Map<String, String>> response = logoutController.logout(anotherUser);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(cartService, times(1)).cleanupCartOnLogout(anotherUserId);
+        verify(cartService, never()).cleanupCartOnLogout(userId);
     }
 
     /**
-     * Test logout with invalid UUID format.
-     * Verifies handling of malformed user IDs.
+     * Test logout response message format
+     * 
+     * Verifies that the logout response contains the correct
+     * message format and structure.
      */
     @Test
-    void testLogout_InvalidUUID() {
-        UUID invalidUserId = UUID.fromString("00000000-0000-0000-0000-000000000000");
-        doThrow(new IllegalArgumentException("Invalid user ID"))
-            .when(cartService).clearCart(eq(invalidUserId));
+    void logout_ShouldReturnCorrectMessageFormat() {
+        doNothing().when(cartService).cleanupCartOnLogout(userId);
 
-        assertThrows(IllegalArgumentException.class, () -> logoutController.logout(invalidUserId));
-        verify(cartService, times(1)).clearCart(eq(invalidUserId));
-    }
+        ResponseEntity<Map<String, String>> response = logoutController.logout(currentUser);
 
-    /**
-     * Test multiple logout calls for same user.
-     * Verifies idempotent behavior of logout operation.
-     */
-    @Test
-    void testLogout_MultipleCallsSameUser() {
-        doNothing().when(cartService).clearCart(any(UUID.class));
-
-        ResponseEntity<ApiResponse<Void>> response1 = logoutController.logout(userId);
-        ResponseEntity<ApiResponse<Void>> response2 = logoutController.logout(userId);
-
-        assertNotNull(response1);
-        assertNotNull(response2);
-        assertEquals(HttpStatus.OK, response1.getStatusCode());
-        assertEquals(HttpStatus.OK, response2.getStatusCode());
-        verify(cartService, times(2)).clearCart(eq(userId));
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody()).containsOnlyKeys("message");
+        assertThat(response.getBody().get("message")).isNotEmpty();
     }
 }

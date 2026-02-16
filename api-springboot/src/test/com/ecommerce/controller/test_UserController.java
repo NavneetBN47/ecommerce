@@ -1,6 +1,7 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.*;
+import com.ecommerce.security.UserPrincipal;
 import com.ecommerce.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,16 +12,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * JUnit test class for UserController.
- * Tests user management operations including signup, login, profile retrieval, and profile updates.
+ * Test class for UserController
+ * 
+ * This test class verifies the REST API endpoints for user management,
+ * including signup, login, profile retrieval, and profile updates.
+ * 
+ * @author Shopping Cart System Team
+ * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 class test_UserController {
@@ -28,260 +35,271 @@ class test_UserController {
     @Mock
     private UserService userService;
 
+    @Mock
+    private UserPrincipal currentUser;
+
     @InjectMocks
     private UserController userController;
 
-    private SignupRequest signupRequest;
-    private LoginRequest loginRequest;
-    private UpdateProfileRequest updateProfileRequest;
-    private UserResponse userResponse;
     private UUID userId;
+    private UserResponse userResponse;
+    private AuthResponse authResponse;
 
+    /**
+     * Setup method to initialize test data before each test
+     */
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        when(currentUser.getId()).thenReturn(userId);
 
-        signupRequest = new SignupRequest();
-        signupRequest.setUsername("testuser");
-        signupRequest.setEmail("test@example.com");
-        signupRequest.setPassword("password123");
-        signupRequest.setFullName("Test User");
+        userResponse = UserResponse.builder()
+                .id(userId)
+                .username("testuser")
+                .fullName("Test User")
+                .email("test@example.com")
+                .createdAt(LocalDateTime.now())
+                .isActive(true)
+                .emailVerified(false)
+                .build();
 
-        loginRequest = new LoginRequest();
-        loginRequest.setUsername("testuser");
-        loginRequest.setPassword("password123");
-
-        updateProfileRequest = new UpdateProfileRequest();
-        updateProfileRequest.setFullName("Updated User");
-        updateProfileRequest.setEmail("updated@example.com");
-
-        userResponse = new UserResponse();
-        userResponse.setId(userId);
-        userResponse.setUsername("testuser");
-        userResponse.setEmail("test@example.com");
-        userResponse.setFullName("Test User");
+        authResponse = AuthResponse.builder()
+                .token("jwt-token-123")
+                .type("Bearer")
+                .user(userResponse)
+                .build();
     }
 
     /**
-     * Test successfully signing up a new user.
-     * Verifies that a new user can be registered and returns CREATED status.
+     * Test successful user signup
+     * 
+     * Verifies that a new user can be registered successfully and
+     * returns HTTP 201 CREATED with user details.
      */
     @Test
-    void testSignup_Success() {
-        when(userService.signup(any(SignupRequest.class))).thenReturn(userResponse);
+    void signup_WithValidRequest_ShouldReturnCreatedWithUserResponse() {
+        UserSignupRequest request = new UserSignupRequest();
+        request.setUsername("testuser");
+        request.setPassword("password123");
+        request.setFullName("Test User");
+        request.setEmail("test@example.com");
 
-        ResponseEntity<UserResponse> response = userController.signup(signupRequest);
+        when(userService.signup(any(UserSignupRequest.class))).thenReturn(userResponse);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("testuser", response.getBody().getUsername());
-        assertEquals("test@example.com", response.getBody().getEmail());
-        verify(userService, times(1)).signup(any(SignupRequest.class));
+        ResponseEntity<UserResponse> response = userController.signup(request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getUsername()).isEqualTo("testuser");
+        assertThat(response.getBody().getEmail()).isEqualTo("test@example.com");
+        verify(userService, times(1)).signup(any(UserSignupRequest.class));
     }
 
     /**
-     * Test signup with duplicate username.
-     * Verifies proper exception handling for duplicate username.
+     * Test signup with all required fields
+     * 
+     * Verifies that signup requires and properly processes all
+     * mandatory user fields.
      */
     @Test
-    void testSignup_DuplicateUsername() {
-        when(userService.signup(any(SignupRequest.class)))
-            .thenThrow(new RuntimeException("Username already exists"));
+    void signup_WithAllRequiredFields_ShouldCreateUserSuccessfully() {
+        UserSignupRequest request = new UserSignupRequest();
+        request.setUsername("newuser");
+        request.setPassword("securePassword123");
+        request.setFullName("New User");
+        request.setEmail("newuser@example.com");
 
-        assertThrows(RuntimeException.class, () -> userController.signup(signupRequest));
-        verify(userService, times(1)).signup(any(SignupRequest.class));
+        when(userService.signup(any(UserSignupRequest.class))).thenReturn(userResponse);
+
+        ResponseEntity<UserResponse> response = userController.signup(request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getIsActive()).isTrue();
+        assertThat(response.getBody().getEmailVerified()).isFalse();
     }
 
     /**
-     * Test signup with invalid email format.
-     * Verifies validation of email format.
+     * Test successful user login
+     * 
+     * Verifies that a user can login successfully and
+     * returns HTTP 200 OK with JWT token and user details.
      */
     @Test
-    void testSignup_InvalidEmail() {
-        signupRequest.setEmail("invalid-email");
-        when(userService.signup(any(SignupRequest.class)))
-            .thenThrow(new IllegalArgumentException("Invalid email format"));
+    void login_WithValidCredentials_ShouldReturnOkWithAuthResponse() {
+        UserLoginRequest request = new UserLoginRequest();
+        request.setUsername("testuser");
+        request.setPassword("password123");
 
-        assertThrows(IllegalArgumentException.class, () -> userController.signup(signupRequest));
-        verify(userService, times(1)).signup(any(SignupRequest.class));
+        when(userService.login(any(UserLoginRequest.class))).thenReturn(authResponse);
+
+        ResponseEntity<AuthResponse> response = userController.login(request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getToken()).isEqualTo("jwt-token-123");
+        assertThat(response.getBody().getType()).isEqualTo("Bearer");
+        assertThat(response.getBody().getUser()).isNotNull();
+        verify(userService, times(1)).login(any(UserLoginRequest.class));
     }
 
     /**
-     * Test signup with null request.
-     * Verifies proper handling of null input.
+     * Test login returns JWT token
+     * 
+     * Verifies that successful login returns a valid JWT token
+     * in the authentication response.
      */
     @Test
-    void testSignup_NullRequest() {
-        when(userService.signup(null))
-            .thenThrow(new IllegalArgumentException("Signup request cannot be null"));
+    void login_ShouldReturnJwtToken() {
+        UserLoginRequest request = new UserLoginRequest();
+        request.setUsername("testuser");
+        request.setPassword("password123");
 
-        assertThrows(IllegalArgumentException.class, () -> userController.signup(null));
-        verify(userService, times(1)).signup(null);
+        when(userService.login(any(UserLoginRequest.class))).thenReturn(authResponse);
+
+        ResponseEntity<AuthResponse> response = userController.login(request);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getToken()).isNotEmpty();
+        assertThat(response.getBody().getType()).isEqualTo("Bearer");
     }
 
     /**
-     * Test successfully logging in a user.
-     * Verifies that a user can login with valid credentials.
+     * Test successful profile retrieval
+     * 
+     * Verifies that an authenticated user can retrieve their profile
+     * and returns HTTP 200 OK with user details.
      */
     @Test
-    void testLogin_Success() {
-        when(userService.login(any(LoginRequest.class))).thenReturn(userResponse);
+    void getProfile_WithAuthenticatedUser_ShouldReturnOkWithUserResponse() {
+        when(userService.getProfile(userId)).thenReturn(userResponse);
 
-        ResponseEntity<UserResponse> response = userController.login(loginRequest);
+        ResponseEntity<UserResponse> response = userController.getProfile(currentUser);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("testuser", response.getBody().getUsername());
-        verify(userService, times(1)).login(any(LoginRequest.class));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getId()).isEqualTo(userId);
+        assertThat(response.getBody().getUsername()).isEqualTo("testuser");
+        verify(userService, times(1)).getProfile(userId);
     }
 
     /**
-     * Test login with invalid credentials.
-     * Verifies proper exception handling for authentication failures.
+     * Test profile retrieval returns complete user data
+     * 
+     * Verifies that the profile endpoint returns all user fields
+     * including timestamps and status flags.
      */
     @Test
-    void testLogin_InvalidCredentials() {
-        when(userService.login(any(LoginRequest.class)))
-            .thenThrow(new RuntimeException("Invalid username or password"));
+    void getProfile_ShouldReturnCompleteUserData() {
+        when(userService.getProfile(userId)).thenReturn(userResponse);
 
-        assertThrows(RuntimeException.class, () -> userController.login(loginRequest));
-        verify(userService, times(1)).login(any(LoginRequest.class));
+        ResponseEntity<UserResponse> response = userController.getProfile(currentUser);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getId()).isNotNull();
+        assertThat(response.getBody().getUsername()).isNotNull();
+        assertThat(response.getBody().getFullName()).isNotNull();
+        assertThat(response.getBody().getEmail()).isNotNull();
+        assertThat(response.getBody().getCreatedAt()).isNotNull();
+        assertThat(response.getBody().getIsActive()).isNotNull();
+        assertThat(response.getBody().getEmailVerified()).isNotNull();
     }
 
     /**
-     * Test login with null request.
-     * Verifies proper handling of null input.
+     * Test successful profile update
+     * 
+     * Verifies that an authenticated user can update their profile
+     * and returns HTTP 200 OK with updated user details.
      */
     @Test
-    void testLogin_NullRequest() {
-        when(userService.login(null))
-            .thenThrow(new IllegalArgumentException("Login request cannot be null"));
+    void updateProfile_WithValidRequest_ShouldReturnOkWithUpdatedUser() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("Updated Name");
+        request.setEmail("updated@example.com");
 
-        assertThrows(IllegalArgumentException.class, () -> userController.login(null));
-        verify(userService, times(1)).login(null);
+        UserResponse updatedUser = UserResponse.builder()
+                .id(userId)
+                .username("testuser")
+                .fullName("Updated Name")
+                .email("updated@example.com")
+                .createdAt(LocalDateTime.now())
+                .isActive(true)
+                .emailVerified(false)
+                .build();
+
+        when(userService.updateProfile(eq(userId), any(UserProfileUpdateRequest.class)))
+                .thenReturn(updatedUser);
+
+        ResponseEntity<UserResponse> response = userController.updateProfile(currentUser, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getFullName()).isEqualTo("Updated Name");
+        assertThat(response.getBody().getEmail()).isEqualTo("updated@example.com");
+        verify(userService, times(1)).updateProfile(eq(userId), any(UserProfileUpdateRequest.class));
     }
 
     /**
-     * Test login with empty username.
-     * Verifies validation of required fields.
+     * Test profile update with only name change
+     * 
+     * Verifies that a user can update only their full name
+     * while keeping other fields unchanged.
      */
     @Test
-    void testLogin_EmptyUsername() {
-        loginRequest.setUsername("");
-        when(userService.login(any(LoginRequest.class)))
-            .thenThrow(new IllegalArgumentException("Username cannot be empty"));
+    void updateProfile_WithOnlyNameChange_ShouldUpdateNameOnly() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("New Name");
+        request.setEmail("test@example.com");
 
-        assertThrows(IllegalArgumentException.class, () -> userController.login(loginRequest));
-        verify(userService, times(1)).login(any(LoginRequest.class));
+        UserResponse updatedUser = UserResponse.builder()
+                .id(userId)
+                .username("testuser")
+                .fullName("New Name")
+                .email("test@example.com")
+                .createdAt(LocalDateTime.now())
+                .isActive(true)
+                .emailVerified(false)
+                .build();
+
+        when(userService.updateProfile(eq(userId), any(UserProfileUpdateRequest.class)))
+                .thenReturn(updatedUser);
+
+        ResponseEntity<UserResponse> response = userController.updateProfile(currentUser, request);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getFullName()).isEqualTo("New Name");
+        assertThat(response.getBody().getEmail()).isEqualTo("test@example.com");
     }
 
     /**
-     * Test successfully retrieving user profile.
-     * Verifies that user profile can be fetched.
+     * Test profile update with only email change
+     * 
+     * Verifies that a user can update only their email
+     * while keeping other fields unchanged.
      */
     @Test
-    void testGetProfile_Success() {
-        when(userService.getProfile(any(UUID.class))).thenReturn(userResponse);
+    void updateProfile_WithOnlyEmailChange_ShouldUpdateEmailOnly() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("Test User");
+        request.setEmail("newemail@example.com");
 
-        ResponseEntity<UserResponse> response = userController.getProfile(userId);
+        UserResponse updatedUser = UserResponse.builder()
+                .id(userId)
+                .username("testuser")
+                .fullName("Test User")
+                .email("newemail@example.com")
+                .createdAt(LocalDateTime.now())
+                .isActive(true)
+                .emailVerified(false)
+                .build();
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(userId, response.getBody().getId());
-        assertEquals("testuser", response.getBody().getUsername());
-        verify(userService, times(1)).getProfile(eq(userId));
-    }
+        when(userService.updateProfile(eq(userId), any(UserProfileUpdateRequest.class)))
+                .thenReturn(updatedUser);
 
-    /**
-     * Test retrieving profile for non-existent user.
-     * Verifies proper exception handling for missing user.
-     */
-    @Test
-    void testGetProfile_UserNotFound() {
-        when(userService.getProfile(any(UUID.class)))
-            .thenThrow(new RuntimeException("User not found"));
+        ResponseEntity<UserResponse> response = userController.updateProfile(currentUser, request);
 
-        assertThrows(RuntimeException.class, () -> userController.getProfile(userId));
-        verify(userService, times(1)).getProfile(eq(userId));
-    }
-
-    /**
-     * Test retrieving profile with null user ID.
-     * Verifies proper handling of null user ID.
-     */
-    @Test
-    void testGetProfile_NullUserId() {
-        when(userService.getProfile(null))
-            .thenThrow(new IllegalArgumentException("User ID cannot be null"));
-
-        assertThrows(IllegalArgumentException.class, () -> userController.getProfile(null));
-        verify(userService, times(1)).getProfile(null);
-    }
-
-    /**
-     * Test successfully updating user profile.
-     * Verifies that user profile can be updated.
-     */
-    @Test
-    void testUpdateProfile_Success() {
-        userResponse.setFullName("Updated User");
-        userResponse.setEmail("updated@example.com");
-        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
-            .thenReturn(userResponse);
-
-        ResponseEntity<UserResponse> response = userController.updateProfile(userId, updateProfileRequest);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Updated User", response.getBody().getFullName());
-        assertEquals("updated@example.com", response.getBody().getEmail());
-        verify(userService, times(1)).updateProfile(eq(userId), any(UpdateProfileRequest.class));
-    }
-
-    /**
-     * Test updating profile with invalid email.
-     * Verifies validation of email format during update.
-     */
-    @Test
-    void testUpdateProfile_InvalidEmail() {
-        updateProfileRequest.setEmail("invalid-email");
-        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
-            .thenThrow(new IllegalArgumentException("Invalid email format"));
-
-        assertThrows(IllegalArgumentException.class, 
-            () -> userController.updateProfile(userId, updateProfileRequest));
-        verify(userService, times(1)).updateProfile(eq(userId), any(UpdateProfileRequest.class));
-    }
-
-    /**
-     * Test updating profile with null request.
-     * Verifies proper handling of null input.
-     */
-    @Test
-    void testUpdateProfile_NullRequest() {
-        when(userService.updateProfile(any(UUID.class), eq(null)))
-            .thenThrow(new IllegalArgumentException("Update request cannot be null"));
-
-        assertThrows(IllegalArgumentException.class, 
-            () -> userController.updateProfile(userId, null));
-        verify(userService, times(1)).updateProfile(eq(userId), eq(null));
-    }
-
-    /**
-     * Test updating profile for non-existent user.
-     * Verifies proper exception handling for missing user.
-     */
-    @Test
-    void testUpdateProfile_UserNotFound() {
-        when(userService.updateProfile(any(UUID.class), any(UpdateProfileRequest.class)))
-            .thenThrow(new RuntimeException("User not found"));
-
-        assertThrows(RuntimeException.class, 
-            () -> userController.updateProfile(userId, updateProfileRequest));
-        verify(userService, times(1)).updateProfile(eq(userId), any(UpdateProfileRequest.class));
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getFullName()).isEqualTo("Test User");
+        assertThat(response.getBody().getEmail()).isEqualTo("newemail@example.com");
     }
 }

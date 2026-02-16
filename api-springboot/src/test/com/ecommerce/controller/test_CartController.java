@@ -1,8 +1,10 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.AddToCartRequest;
+import com.ecommerce.dto.CartItemResponse;
 import com.ecommerce.dto.CartResponse;
 import com.ecommerce.dto.UpdateCartItemRequest;
+import com.ecommerce.security.UserPrincipal;
 import com.ecommerce.service.CartService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,16 +16,23 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * JUnit test class for CartController.
- * Tests shopping cart operations including add, update, remove, and retrieve cart items.
+ * Test class for CartController
+ * 
+ * This test class verifies the REST API endpoints for shopping cart management,
+ * including adding items, updating quantities, removing items, and retrieving cart.
+ * 
+ * @author Shopping Cart System Team
+ * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 class test_CartController {
@@ -31,230 +40,245 @@ class test_CartController {
     @Mock
     private CartService cartService;
 
+    @Mock
+    private UserPrincipal currentUser;
+
     @InjectMocks
     private CartController cartController;
 
     private UUID userId;
-    private UUID itemId;
     private UUID productId;
-    private AddToCartRequest addToCartRequest;
-    private UpdateCartItemRequest updateCartItemRequest;
+    private UUID cartId;
+    private UUID itemId;
     private CartResponse cartResponse;
 
+    /**
+     * Setup method to initialize test data before each test
+     */
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        itemId = UUID.randomUUID();
         productId = UUID.randomUUID();
+        cartId = UUID.randomUUID();
+        itemId = UUID.randomUUID();
 
-        addToCartRequest = new AddToCartRequest();
-        addToCartRequest.setProductId(productId);
-        addToCartRequest.setQuantity(2);
+        when(currentUser.getId()).thenReturn(userId);
 
-        updateCartItemRequest = new UpdateCartItemRequest();
-        updateCartItemRequest.setQuantity(3);
+        CartItemResponse cartItem = CartItemResponse.builder()
+                .id(itemId)
+                .productId(productId)
+                .productName("Test Product")
+                .quantity(2)
+                .unitPrice(new BigDecimal("99.99"))
+                .totalPrice(new BigDecimal("199.98"))
+                .build();
 
-        cartResponse = new CartResponse();
-        cartResponse.setUserId(userId);
-        cartResponse.setTotalPrice(BigDecimal.valueOf(100.00));
+        cartResponse = CartResponse.builder()
+                .cartId(cartId)
+                .items(Arrays.asList(cartItem))
+                .grandTotal(new BigDecimal("199.98"))
+                .totalItems(1)
+                .build();
     }
 
     /**
-     * Test successfully adding a product to cart.
-     * Verifies that a product can be added and returns CREATED status.
+     * Test successful addition of product to cart
+     * 
+     * Verifies that a product can be added to the cart and
+     * returns HTTP 201 CREATED with the updated cart response.
      */
     @Test
-    void testAddProductToCart_Success() {
-        when(cartService.addProductToCart(any(UUID.class), any(AddToCartRequest.class)))
-            .thenReturn(cartResponse);
+    void addToCart_WithValidRequest_ShouldReturnCreatedWithCartResponse() {
+        AddToCartRequest request = new AddToCartRequest();
+        request.setProductId(productId);
+        request.setQuantity(2);
 
-        ResponseEntity<CartResponse> response = cartController.addProductToCart(userId, addToCartRequest);
+        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
+                .thenReturn(cartResponse);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(userId, response.getBody().getUserId());
-        assertEquals(BigDecimal.valueOf(100.00), response.getBody().getTotalPrice());
+        ResponseEntity<CartResponse> response = cartController.addToCart(currentUser, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCartId()).isEqualTo(cartId);
+        assertThat(response.getBody().getTotalItems()).isEqualTo(1);
         verify(cartService, times(1)).addProductToCart(eq(userId), any(AddToCartRequest.class));
     }
 
     /**
-     * Test adding product with null request.
-     * Verifies proper handling of null input.
+     * Test adding product to cart with multiple items
+     * 
+     * Verifies that multiple products can be added to the cart
+     * and the grand total is calculated correctly.
      */
     @Test
-    void testAddProductToCart_NullRequest() {
-        when(cartService.addProductToCart(any(UUID.class), eq(null)))
-            .thenThrow(new IllegalArgumentException("Request cannot be null"));
+    void addToCart_WithMultipleItems_ShouldCalculateCorrectGrandTotal() {
+        AddToCartRequest request = new AddToCartRequest();
+        request.setProductId(productId);
+        request.setQuantity(3);
 
-        assertThrows(IllegalArgumentException.class, 
-            () -> cartController.addProductToCart(userId, null));
-        verify(cartService, times(1)).addProductToCart(eq(userId), eq(null));
+        CartItemResponse item1 = CartItemResponse.builder()
+                .id(UUID.randomUUID())
+                .productId(productId)
+                .productName("Product 1")
+                .quantity(2)
+                .unitPrice(new BigDecimal("50.00"))
+                .totalPrice(new BigDecimal("100.00"))
+                .build();
+
+        CartItemResponse item2 = CartItemResponse.builder()
+                .id(UUID.randomUUID())
+                .productId(UUID.randomUUID())
+                .productName("Product 2")
+                .quantity(1)
+                .unitPrice(new BigDecimal("75.00"))
+                .totalPrice(new BigDecimal("75.00"))
+                .build();
+
+        CartResponse multiItemCart = CartResponse.builder()
+                .cartId(cartId)
+                .items(Arrays.asList(item1, item2))
+                .grandTotal(new BigDecimal("175.00"))
+                .totalItems(2)
+                .build();
+
+        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
+                .thenReturn(multiItemCart);
+
+        ResponseEntity<CartResponse> response = cartController.addToCart(currentUser, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody().getTotalItems()).isEqualTo(2);
+        assertThat(response.getBody().getGrandTotal()).isEqualTo(new BigDecimal("175.00"));
     }
 
     /**
-     * Test adding product with invalid quantity.
-     * Verifies validation of quantity values.
+     * Test successful update of cart item quantity
+     * 
+     * Verifies that a cart item quantity can be updated and
+     * returns HTTP 200 OK with the updated cart response.
      */
     @Test
-    void testAddProductToCart_InvalidQuantity() {
-        addToCartRequest.setQuantity(-1);
-        when(cartService.addProductToCart(any(UUID.class), any(AddToCartRequest.class)))
-            .thenThrow(new IllegalArgumentException("Quantity must be positive"));
+    void updateCartItem_WithValidRequest_ShouldReturnOkWithUpdatedCart() {
+        UpdateCartItemRequest request = new UpdateCartItemRequest();
+        request.setQuantity(5);
 
-        assertThrows(IllegalArgumentException.class, 
-            () -> cartController.addProductToCart(userId, addToCartRequest));
-        verify(cartService, times(1)).addProductToCart(eq(userId), any(AddToCartRequest.class));
-    }
+        CartItemResponse updatedItem = CartItemResponse.builder()
+                .id(itemId)
+                .productId(productId)
+                .productName("Test Product")
+                .quantity(5)
+                .unitPrice(new BigDecimal("99.99"))
+                .totalPrice(new BigDecimal("499.95"))
+                .build();
 
-    /**
-     * Test successfully updating a cart item.
-     * Verifies that cart item quantity can be updated.
-     */
-    @Test
-    void testUpdateCartItem_Success() {
-        when(cartService.updateCartItem(any(UUID.class), any(UUID.class), any(UpdateCartItemRequest.class)))
-            .thenReturn(cartResponse);
+        CartResponse updatedCart = CartResponse.builder()
+                .cartId(cartId)
+                .items(Arrays.asList(updatedItem))
+                .grandTotal(new BigDecimal("499.95"))
+                .totalItems(1)
+                .build();
 
-        ResponseEntity<CartResponse> response = cartController.updateCartItem(userId, itemId, updateCartItemRequest);
+        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
+                .thenReturn(updatedCart);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(userId, response.getBody().getUserId());
+        ResponseEntity<CartResponse> response = cartController.updateCartItem(currentUser, itemId, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getItems().get(0).getQuantity()).isEqualTo(5);
+        assertThat(response.getBody().getGrandTotal()).isEqualTo(new BigDecimal("499.95"));
         verify(cartService, times(1)).updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class));
     }
 
     /**
-     * Test updating non-existent cart item.
-     * Verifies proper exception handling for missing items.
+     * Test successful removal of cart item
+     * 
+     * Verifies that a cart item can be removed and
+     * returns HTTP 200 OK with the updated cart response.
      */
     @Test
-    void testUpdateCartItem_ItemNotFound() {
-        when(cartService.updateCartItem(any(UUID.class), any(UUID.class), any(UpdateCartItemRequest.class)))
-            .thenThrow(new RuntimeException("Cart item not found"));
+    void removeCartItem_WithValidItemId_ShouldReturnOkWithUpdatedCart() {
+        CartResponse emptyCart = CartResponse.builder()
+                .cartId(cartId)
+                .items(Arrays.asList())
+                .grandTotal(BigDecimal.ZERO)
+                .totalItems(0)
+                .build();
 
-        assertThrows(RuntimeException.class, 
-            () -> cartController.updateCartItem(userId, itemId, updateCartItemRequest));
-        verify(cartService, times(1)).updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class));
+        when(cartService.removeCartItem(userId, itemId)).thenReturn(emptyCart);
+
+        ResponseEntity<CartResponse> response = cartController.removeCartItem(currentUser, itemId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getTotalItems()).isEqualTo(0);
+        verify(cartService, times(1)).removeCartItem(userId, itemId);
     }
 
     /**
-     * Test updating cart item with null request.
-     * Verifies proper handling of null input.
+     * Test removal of last cart item returns no content
+     * 
+     * Verifies that when the last item is removed from cart,
+     * returns HTTP 204 NO CONTENT.
      */
     @Test
-    void testUpdateCartItem_NullRequest() {
-        when(cartService.updateCartItem(any(UUID.class), any(UUID.class), eq(null)))
-            .thenThrow(new IllegalArgumentException("Update request cannot be null"));
+    void removeCartItem_WhenLastItemRemoved_ShouldReturnNoContent() {
+        CartResponse emptyCart = CartResponse.builder()
+                .cartId(null)
+                .items(Arrays.asList())
+                .grandTotal(BigDecimal.ZERO)
+                .totalItems(0)
+                .build();
 
-        assertThrows(IllegalArgumentException.class, 
-            () -> cartController.updateCartItem(userId, itemId, null));
-        verify(cartService, times(1)).updateCartItem(eq(userId), eq(itemId), eq(null));
+        when(cartService.removeCartItem(userId, itemId)).thenReturn(emptyCart);
+
+        ResponseEntity<CartResponse> response = cartController.removeCartItem(currentUser, itemId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(cartService, times(1)).removeCartItem(userId, itemId);
     }
 
     /**
-     * Test successfully removing a cart item.
-     * Verifies that a cart item can be removed.
+     * Test successful retrieval of user's cart
+     * 
+     * Verifies that a user can retrieve their cart and
+     * returns HTTP 200 OK with the cart response.
      */
     @Test
-    void testRemoveCartItem_Success() {
-        when(cartService.removeCartItem(any(UUID.class), any(UUID.class)))
-            .thenReturn(cartResponse);
+    void getCart_WithValidUser_ShouldReturnOkWithCartResponse() {
+        when(cartService.getCart(userId)).thenReturn(cartResponse);
 
-        ResponseEntity<?> response = cartController.removeCartItem(userId, itemId);
+        ResponseEntity<CartResponse> response = cartController.getCart(currentUser);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        verify(cartService, times(1)).removeCartItem(eq(userId), eq(itemId));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCartId()).isEqualTo(cartId);
+        assertThat(response.getBody().getTotalItems()).isEqualTo(1);
+        verify(cartService, times(1)).getCart(userId);
     }
 
     /**
-     * Test removing cart item when cart becomes empty.
-     * Verifies NO_CONTENT status when cart is empty after removal.
+     * Test retrieval of empty cart
+     * 
+     * Verifies that retrieving an empty cart returns
+     * a valid response with zero items and zero total.
      */
     @Test
-    void testRemoveCartItem_EmptyCart() {
-        when(cartService.removeCartItem(any(UUID.class), any(UUID.class)))
-            .thenReturn(null);
+    void getCart_WhenCartIsEmpty_ShouldReturnEmptyCart() {
+        CartResponse emptyCart = CartResponse.builder()
+                .cartId(cartId)
+                .items(Arrays.asList())
+                .grandTotal(BigDecimal.ZERO)
+                .totalItems(0)
+                .build();
 
-        ResponseEntity<?> response = cartController.removeCartItem(userId, itemId);
+        when(cartService.getCart(userId)).thenReturn(emptyCart);
 
-        assertNotNull(response);
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(cartService, times(1)).removeCartItem(eq(userId), eq(itemId));
-    }
+        ResponseEntity<CartResponse> response = cartController.getCart(currentUser);
 
-    /**
-     * Test removing non-existent cart item.
-     * Verifies proper exception handling for missing items.
-     */
-    @Test
-    void testRemoveCartItem_ItemNotFound() {
-        when(cartService.removeCartItem(any(UUID.class), any(UUID.class)))
-            .thenThrow(new RuntimeException("Cart item not found"));
-
-        assertThrows(RuntimeException.class, 
-            () -> cartController.removeCartItem(userId, itemId));
-        verify(cartService, times(1)).removeCartItem(eq(userId), eq(itemId));
-    }
-
-    /**
-     * Test successfully retrieving cart.
-     * Verifies that cart details can be fetched.
-     */
-    @Test
-    void testGetCart_Success() {
-        when(cartService.getCart(any(UUID.class))).thenReturn(cartResponse);
-
-        ResponseEntity<CartResponse> response = cartController.getCart(userId);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(userId, response.getBody().getUserId());
-        verify(cartService, times(1)).getCart(eq(userId));
-    }
-
-    /**
-     * Test retrieving cart for non-existent user.
-     * Verifies proper exception handling for invalid user.
-     */
-    @Test
-    void testGetCart_UserNotFound() {
-        when(cartService.getCart(any(UUID.class)))
-            .thenThrow(new RuntimeException("User not found"));
-
-        assertThrows(RuntimeException.class, () -> cartController.getCart(userId));
-        verify(cartService, times(1)).getCart(eq(userId));
-    }
-
-    /**
-     * Test successfully logging out and clearing cart.
-     * Verifies that cart is cleared on logout.
-     */
-    @Test
-    void testLogout_Success() {
-        doNothing().when(cartService).clearCart(any(UUID.class));
-
-        ResponseEntity<Void> response = cartController.logout(userId);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(cartService, times(1)).clearCart(eq(userId));
-    }
-
-    /**
-     * Test logout with null user ID.
-     * Verifies proper handling of null user ID.
-     */
-    @Test
-    void testLogout_NullUserId() {
-        doThrow(new IllegalArgumentException("User ID cannot be null"))
-            .when(cartService).clearCart(null);
-
-        assertThrows(IllegalArgumentException.class, () -> cartController.logout(null));
-        verify(cartService, times(1)).clearCart(null);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().getTotalItems()).isEqualTo(0);
+        assertThat(response.getBody().getGrandTotal()).isEqualTo(BigDecimal.ZERO);
     }
 }

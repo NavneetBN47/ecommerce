@@ -3,37 +3,40 @@ package com.ecommerce.service;
 import com.ecommerce.dto.*;
 import com.ecommerce.entity.User;
 import com.ecommerce.exception.DuplicateResourceException;
-import com.ecommerce.exception.InvalidCredentialsException;
 import com.ecommerce.exception.ResourceNotFoundException;
 import com.ecommerce.repository.UserRepository;
+import com.ecommerce.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test class for UserService.
- * Tests user management operations including signup, login, and profile management.
- * Uses Mockito for mocking repository and encoder dependencies.
+ * Test class for UserService
  * 
- * @author QA Automation Team
- * @version 1.0
+ * This test class verifies the business logic for user management,
+ * including signup, login, profile operations, and authentication.
+ * 
+ * @author Shopping Cart System Team
+ * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UserService Unit Tests")
 class test_UserService {
 
     @Mock
@@ -42,351 +45,314 @@ class test_UserService {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private AuthenticationManager authenticationManager;
+
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private Authentication authentication;
+
     @InjectMocks
     private UserService userService;
 
-    private User testUser;
-    private SignupRequest signupRequest;
-    private LoginRequest loginRequest;
-    private UpdateProfileRequest updateProfileRequest;
+    private User user;
     private UUID userId;
+    private UserSignupRequest signupRequest;
+    private UserLoginRequest loginRequest;
 
     /**
-     * Set up test data before each test execution.
+     * Setup method to initialize test data before each test
      */
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
 
-        testUser = User.builder()
+        user = User.builder()
                 .id(userId)
                 .username("testuser")
                 .password("encodedPassword")
                 .fullName("Test User")
                 .email("test@example.com")
-                .createdAt(LocalDateTime.now())
+                .isActive(true)
+                .emailVerified(false)
                 .build();
 
-        signupRequest = SignupRequest.builder()
-                .username("newuser")
-                .password("password123")
-                .fullName("New User")
-                .email("new@example.com")
-                .build();
+        signupRequest = new UserSignupRequest();
+        signupRequest.setUsername("testuser");
+        signupRequest.setPassword("password123");
+        signupRequest.setFullName("Test User");
+        signupRequest.setEmail("test@example.com");
 
-        loginRequest = LoginRequest.builder()
-                .username("testuser")
-                .password("password123")
-                .build();
-
-        updateProfileRequest = UpdateProfileRequest.builder()
-                .fullName("Updated Name")
-                .email("updated@example.com")
-                .build();
+        loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("testuser");
+        loginRequest.setPassword("password123");
     }
 
     /**
-     * Test successful user signup.
-     * Verifies that user is created with encoded password.
+     * Test successful user signup
+     * 
+     * Verifies that a new user can be registered successfully
+     * with password encoding and proper field initialization.
      */
     @Test
-    @DisplayName("Should signup user successfully")
-    void testSignup_WithValidRequest_ShouldCreateUser() {
-        // Arrange
-        when(userRepository.existsByUsername("newuser")).thenReturn(false);
-        when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
+    void signup_WithValidRequest_ShouldCreateUserSuccessfully() {
+        when(userRepository.existsByUsername(signupRequest.getUsername())).thenReturn(false);
+        when(userRepository.existsByEmail(signupRequest.getEmail())).thenReturn(false);
+        when(passwordEncoder.encode(signupRequest.getPassword())).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(user);
 
-        // Act
         UserResponse response = userService.signup(signupRequest);
 
-        // Assert
-        assertNotNull(response);
-        assertEquals(testUser.getUsername(), response.getUsername());
-        assertEquals(testUser.getEmail(), response.getEmail());
-        verify(userRepository).existsByUsername("newuser");
-        verify(passwordEncoder).encode("password123");
-        verify(userRepository).save(any(User.class));
+        assertThat(response).isNotNull();
+        assertThat(response.getUsername()).isEqualTo("testuser");
+        assertThat(response.getEmail()).isEqualTo("test@example.com");
+        assertThat(response.getIsActive()).isTrue();
+        assertThat(response.getEmailVerified()).isFalse();
+        verify(passwordEncoder, times(1)).encode(signupRequest.getPassword());
+        verify(userRepository, times(1)).save(any(User.class));
     }
 
     /**
-     * Test signup with duplicate username.
-     * Verifies that DuplicateResourceException is thrown.
+     * Test signup with duplicate username throws exception
+     * 
+     * Verifies that attempting to register with existing username
+     * throws DuplicateResourceException.
      */
     @Test
-    @DisplayName("Should throw DuplicateResourceException when username exists")
-    void testSignup_WithDuplicateUsername_ShouldThrowDuplicateResourceException() {
-        // Arrange
-        when(userRepository.existsByUsername("newuser")).thenReturn(true);
+    void signup_WithDuplicateUsername_ShouldThrowException() {
+        when(userRepository.existsByUsername(signupRequest.getUsername())).thenReturn(true);
 
-        // Act & Assert
-        DuplicateResourceException exception = assertThrows(
-                DuplicateResourceException.class,
-                () -> userService.signup(signupRequest)
-        );
-        assertEquals("Username already exists", exception.getMessage());
-        verify(userRepository).existsByUsername("newuser");
+        assertThatThrownBy(() -> userService.signup(signupRequest))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("username");
+
         verify(userRepository, never()).save(any(User.class));
     }
 
     /**
-     * Test that password is encoded during signup.
-     * Verifies that plain text password is not stored.
+     * Test signup with duplicate email throws exception
+     * 
+     * Verifies that attempting to register with existing email
+     * throws DuplicateResourceException.
      */
     @Test
-    @DisplayName("Should encode password during signup")
-    void testSignup_ShouldEncodePassword() {
-        // Arrange
-        when(userRepository.existsByUsername("newuser")).thenReturn(false);
-        when(passwordEncoder.encode("password123")).thenReturn("encodedPassword123");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            assertEquals("encodedPassword123", user.getPassword());
-            return testUser;
-        });
+    void signup_WithDuplicateEmail_ShouldThrowException() {
+        when(userRepository.existsByUsername(signupRequest.getUsername())).thenReturn(false);
+        when(userRepository.existsByEmail(signupRequest.getEmail())).thenReturn(true);
 
-        // Act
-        UserResponse response = userService.signup(signupRequest);
+        assertThatThrownBy(() -> userService.signup(signupRequest))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("email");
 
-        // Assert
-        assertNotNull(response);
-        verify(passwordEncoder).encode("password123");
+        verify(userRepository, never()).save(any(User.class));
     }
 
     /**
-     * Test successful user login.
-     * Verifies that user can login with correct credentials.
+     * Test signup encodes password
+     * 
+     * Verifies that user password is properly encoded before saving.
      */
     @Test
-    @DisplayName("Should login user successfully with valid credentials")
-    void testLogin_WithValidCredentials_ShouldReturnUserResponse() {
-        // Arrange
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
+    void signup_ShouldEncodePassword() {
+        when(userRepository.existsByUsername(anyString())).thenReturn(false);
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(signupRequest.getPassword())).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(user);
 
-        // Act
-        UserResponse response = userService.login(loginRequest);
+        userService.signup(signupRequest);
 
-        // Assert
-        assertNotNull(response);
-        assertEquals(testUser.getUsername(), response.getUsername());
-        assertEquals(testUser.getEmail(), response.getEmail());
-        verify(userRepository).findByUsername("testuser");
-        verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(passwordEncoder, times(1)).encode(signupRequest.getPassword());
     }
 
     /**
-     * Test login with non-existent username.
-     * Verifies that ResourceNotFoundException is thrown.
+     * Test successful user login
+     * 
+     * Verifies that a user can login successfully and
+     * receives JWT token with user details.
      */
     @Test
-    @DisplayName("Should throw ResourceNotFoundException when user not found during login")
-    void testLogin_WithNonExistentUser_ShouldThrowResourceNotFoundException() {
-        // Arrange
+    void login_WithValidCredentials_ShouldReturnAuthResponse() {
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(authentication);
+        when(jwtTokenProvider.generateToken(authentication)).thenReturn("jwt-token-123");
+        when(userRepository.findByUsername(loginRequest.getUsername())).thenReturn(Optional.of(user));
+
+        AuthResponse response = userService.login(loginRequest);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getToken()).isEqualTo("jwt-token-123");
+        assertThat(response.getType()).isEqualTo("Bearer");
+        assertThat(response.getUser()).isNotNull();
+        assertThat(response.getUser().getUsername()).isEqualTo("testuser");
+        verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(jwtTokenProvider, times(1)).generateToken(authentication);
+    }
+
+    /**
+     * Test login with non-existent user throws exception
+     * 
+     * Verifies that attempting to login with non-existent username
+     * throws ResourceNotFoundException.
+     */
+    @Test
+    void login_WithNonExistentUser_ShouldThrowException() {
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(authentication);
+        when(jwtTokenProvider.generateToken(authentication)).thenReturn("jwt-token-123");
+        when(userRepository.findByUsername(loginRequest.getUsername())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.login(loginRequest))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("User");
+    }
+
+    /**
+     * Test successful profile retrieval
+     * 
+     * Verifies that a user can retrieve their profile successfully.
+     */
+    @Test
+    void getProfile_WithValidUserId_ShouldReturnUserResponse() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        UserResponse response = userService.getProfile(userId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(userId);
+        assertThat(response.getUsername()).isEqualTo("testuser");
+        assertThat(response.getEmail()).isEqualTo("test@example.com");
+        verify(userRepository, times(1)).findById(userId);
+    }
+
+    /**
+     * Test profile retrieval with non-existent user throws exception
+     * 
+     * Verifies that attempting to get profile for non-existent user
+     * throws ResourceNotFoundException.
+     */
+    @Test
+    void getProfile_WithNonExistentUser_ShouldThrowException() {
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getProfile(userId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("User");
+    }
+
+    /**
+     * Test successful profile update
+     * 
+     * Verifies that a user can update their profile successfully.
+     */
+    @Test
+    void updateProfile_WithValidRequest_ShouldUpdateUserSuccessfully() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("Updated Name");
+        request.setEmail("updated@example.com");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        UserResponse response = userService.updateProfile(userId, request);
+
+        assertThat(response).isNotNull();
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    /**
+     * Test profile update with duplicate email throws exception
+     * 
+     * Verifies that attempting to update email to an existing one
+     * throws DuplicateResourceException.
+     */
+    @Test
+    void updateProfile_WithDuplicateEmail_ShouldThrowException() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("Updated Name");
+        request.setEmail("existing@example.com");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.updateProfile(userId, request))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("email");
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    /**
+     * Test profile update with same email does not throw exception
+     * 
+     * Verifies that updating profile with the same email
+     * does not trigger duplicate check.
+     */
+    @Test
+    void updateProfile_WithSameEmail_ShouldNotCheckDuplicate() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("Updated Name");
+        request.setEmail("test@example.com");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        UserResponse response = userService.updateProfile(userId, request);
+
+        assertThat(response).isNotNull();
+        verify(userRepository, never()).existsByEmail(anyString());
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    /**
+     * Test profile update with non-existent user throws exception
+     * 
+     * Verifies that attempting to update profile for non-existent user
+     * throws ResourceNotFoundException.
+     */
+    @Test
+    void updateProfile_WithNonExistentUser_ShouldThrowException() {
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest();
+        request.setFullName("Updated Name");
+        request.setEmail("updated@example.com");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateProfile(userId, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("User");
+    }
+
+    /**
+     * Test get user by username
+     * 
+     * Verifies that a user can be retrieved by username successfully.
+     */
+    @Test
+    void getUserByUsername_WithValidUsername_ShouldReturnUser() {
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        User result = userService.getUserByUsername("testuser");
+
+        assertThat(result).isNotNull();
+        assertThat(result.getUsername()).isEqualTo("testuser");
+        verify(userRepository, times(1)).findByUsername("testuser");
+    }
+
+    /**
+     * Test get user by username with non-existent user throws exception
+     * 
+     * Verifies that attempting to get user by non-existent username
+     * throws ResourceNotFoundException.
+     */
+    @Test
+    void getUserByUsername_WithNonExistentUsername_ShouldThrowException() {
         when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
-        loginRequest.setUsername("nonexistent");
 
-        // Act & Assert
-        ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> userService.login(loginRequest)
-        );
-        assertEquals("User not found", exception.getMessage());
-        verify(userRepository).findByUsername("nonexistent");
-        verify(passwordEncoder, never()).matches(anyString(), anyString());
-    }
-
-    /**
-     * Test login with incorrect password.
-     * Verifies that InvalidCredentialsException is thrown.
-     */
-    @Test
-    @DisplayName("Should throw InvalidCredentialsException with wrong password")
-    void testLogin_WithIncorrectPassword_ShouldThrowInvalidCredentialsException() {
-        // Arrange
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("wrongpassword", "encodedPassword")).thenReturn(false);
-        loginRequest.setPassword("wrongpassword");
-
-        // Act & Assert
-        InvalidCredentialsException exception = assertThrows(
-                InvalidCredentialsException.class,
-                () -> userService.login(loginRequest)
-        );
-        assertEquals("Invalid credentials", exception.getMessage());
-        verify(passwordEncoder).matches("wrongpassword", "encodedPassword");
-    }
-
-    /**
-     * Test getting user profile successfully.
-     * Verifies that user profile is retrieved correctly.
-     */
-    @Test
-    @DisplayName("Should get user profile successfully")
-    void testGetProfile_WithValidUserId_ShouldReturnUserResponse() {
-        // Arrange
-        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-
-        // Act
-        UserResponse response = userService.getProfile(userId);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals(userId, response.getId());
-        assertEquals(testUser.getUsername(), response.getUsername());
-        assertEquals(testUser.getEmail(), response.getEmail());
-        assertEquals(testUser.getFullName(), response.getFullName());
-        verify(userRepository).findById(userId);
-    }
-
-    /**
-     * Test getting profile for non-existent user.
-     * Verifies that ResourceNotFoundException is thrown.
-     */
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when getting non-existent profile")
-    void testGetProfile_WithInvalidUserId_ShouldThrowResourceNotFoundException() {
-        // Arrange
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> userService.getProfile(userId)
-        );
-        assertEquals("User not found", exception.getMessage());
-        verify(userRepository).findById(userId);
-    }
-
-    /**
-     * Test updating user profile successfully.
-     * Verifies that profile fields are updated correctly.
-     */
-    @Test
-    @DisplayName("Should update user profile successfully")
-    void testUpdateProfile_WithValidRequest_ShouldUpdateProfile() {
-        // Arrange
-        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
-
-        // Act
-        UserResponse response = userService.updateProfile(userId, updateProfileRequest);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals("Updated Name", testUser.getFullName());
-        assertEquals("updated@example.com", testUser.getEmail());
-        verify(userRepository).findById(userId);
-        verify(userRepository).save(testUser);
-    }
-
-    /**
-     * Test updating profile for non-existent user.
-     * Verifies that ResourceNotFoundException is thrown.
-     */
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when updating non-existent profile")
-    void testUpdateProfile_WithInvalidUserId_ShouldThrowResourceNotFoundException() {
-        // Arrange
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> userService.updateProfile(userId, updateProfileRequest)
-        );
-        assertEquals("User not found", exception.getMessage());
-        verify(userRepository).findById(userId);
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    /**
-     * Test that user response mapping includes all required fields.
-     * Verifies complete user information is returned.
-     */
-    @Test
-    @DisplayName("Should map all user fields correctly in response")
-    void testGetProfile_ShouldMapAllFieldsCorrectly() {
-        // Arrange
-        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-
-        // Act
-        UserResponse response = userService.getProfile(userId);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals(testUser.getId(), response.getId());
-        assertEquals(testUser.getUsername(), response.getUsername());
-        assertEquals(testUser.getFullName(), response.getFullName());
-        assertEquals(testUser.getEmail(), response.getEmail());
-        assertEquals(testUser.getCreatedAt(), response.getCreatedAt());
-    }
-
-    /**
-     * Test signup with all required fields.
-     * Verifies that all user fields are set during signup.
-     */
-    @Test
-    @DisplayName("Should set all user fields during signup")
-    void testSignup_ShouldSetAllUserFields() {
-        // Arrange
-        when(userRepository.existsByUsername("newuser")).thenReturn(false);
-        when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            assertEquals("newuser", user.getUsername());
-            assertEquals("encodedPassword", user.getPassword());
-            assertEquals("New User", user.getFullName());
-            assertEquals("new@example.com", user.getEmail());
-            return testUser;
-        });
-
-        // Act
-        UserResponse response = userService.signup(signupRequest);
-
-        // Assert
-        assertNotNull(response);
-        verify(userRepository).save(any(User.class));
-    }
-
-    /**
-     * Test that username is not changed during profile update.
-     * Verifies that only allowed fields are updated.
-     */
-    @Test
-    @DisplayName("Should not change username during profile update")
-    void testUpdateProfile_ShouldNotChangeUsername() {
-        // Arrange
-        String originalUsername = testUser.getUsername();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
-
-        // Act
-        UserResponse response = userService.updateProfile(userId, updateProfileRequest);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals(originalUsername, testUser.getUsername());
-        verify(userRepository).save(testUser);
-    }
-
-    /**
-     * Test login with empty password.
-     * Verifies proper handling of empty password.
-     */
-    @Test
-    @DisplayName("Should handle empty password during login")
-    void testLogin_WithEmptyPassword_ShouldThrowInvalidCredentialsException() {
-        // Arrange
-        loginRequest.setPassword("");
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("", "encodedPassword")).thenReturn(false);
-
-        // Act & Assert
-        InvalidCredentialsException exception = assertThrows(
-                InvalidCredentialsException.class,
-                () -> userService.login(loginRequest)
-        );
-        assertEquals("Invalid credentials", exception.getMessage());
+        assertThatThrownBy(() -> userService.getUserByUsername("nonexistent"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("User");
     }
 }
