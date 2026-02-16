@@ -13,23 +13,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for ProductService
- * Tests product search operations and validation
- * Uses Mockito for mocking repository dependencies
- *
+ * JUnit 5 test class for ProductService
+ * Tests product search and retrieval operations
+ * 
  * @author Test Generation Agent
  * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ProductService Tests")
+@DisplayName("ProductService Test Suite")
 class test_ProductService {
 
     @Mock
@@ -38,86 +37,77 @@ class test_ProductService {
     @InjectMocks
     private ProductService productService;
 
-    private List<Product> testProducts;
+    private Product testProduct1;
+    private Product testProduct2;
 
+    /**
+     * Setup method to initialize test data before each test
+     */
     @BeforeEach
     void setUp() {
-        testProducts = new ArrayList<>();
-        
-        Product product1 = Product.builder()
-            .id(1L)
-            .name("Laptop")
-            .description("High performance laptop")
-            .price(new BigDecimal("999.99"))
-            .availableQty(10)
-            .build();
+        testProduct1 = Product.builder()
+                .id(1L)
+                .name("Laptop Computer")
+                .description("High-performance laptop")
+                .price(new BigDecimal("999.99"))
+                .availableQty(50)
+                .build();
 
-        Product product2 = Product.builder()
-            .id(2L)
-            .name("Laptop Stand")
-            .description("Ergonomic laptop stand")
-            .price(new BigDecimal("49.99"))
-            .availableQty(25)
-            .build();
-
-        Product product3 = Product.builder()
-            .id(3L)
-            .name("Gaming Laptop")
-            .description("High-end gaming laptop")
-            .price(new BigDecimal("1999.99"))
-            .availableQty(5)
-            .build();
-
-        testProducts.add(product1);
-        testProducts.add(product2);
-        testProducts.add(product3);
+        testProduct2 = Product.builder()
+                .id(2L)
+                .name("Wireless Mouse")
+                .description("Ergonomic wireless mouse")
+                .price(new BigDecimal("29.99"))
+                .availableQty(100)
+                .build();
     }
 
     /**
-     * Test successful product search
-     * Verifies that products can be searched with a valid keyword
+     * Test searching products with valid keyword
+     * Verifies that products matching the keyword are returned
      */
     @Test
     @DisplayName("Should successfully search products with valid keyword")
     void testSearchProducts_Success() {
         // Arrange
         String keyword = "laptop";
-        when(productRepository.searchProducts(keyword)).thenReturn(testProducts);
+        List<Product> products = Arrays.asList(testProduct1);
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        assertEquals(3, results.size());
-        assertEquals("Laptop", results.get(0).getName());
-        assertEquals(new BigDecimal("999.99"), results.get(0).getPrice());
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("Laptop Computer", result.get(0).getName());
+        assertEquals(new BigDecimal("999.99"), result.get(0).getPrice());
         verify(productRepository).searchProducts(keyword);
     }
 
     /**
-     * Test product search with trimmed keyword
-     * Verifies that whitespace is trimmed from search keyword
+     * Test searching products with multiple results
+     * Verifies that all matching products are returned
      */
     @Test
-    @DisplayName("Should trim whitespace from search keyword")
-    void testSearchProducts_TrimsWhitespace() {
+    @DisplayName("Should return multiple products when multiple matches found")
+    void testSearchProducts_MultipleResults() {
         // Arrange
-        String keyword = "  laptop  ";
-        String trimmedKeyword = "laptop";
-        when(productRepository.searchProducts(trimmedKeyword)).thenReturn(testProducts);
+        String keyword = "wireless";
+        List<Product> products = Arrays.asList(testProduct1, testProduct2);
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        assertEquals(3, results.size());
-        verify(productRepository).searchProducts(trimmedKeyword);
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        verify(productRepository).searchProducts(keyword);
     }
 
     /**
-     * Test product search with no results
+     * Test searching products with no results
      * Verifies that empty list is returned when no products match
      */
     @Test
@@ -125,200 +115,197 @@ class test_ProductService {
     void testSearchProducts_NoResults() {
         // Arrange
         String keyword = "nonexistent";
-        when(productRepository.searchProducts(keyword)).thenReturn(new ArrayList<>());
+        when(productRepository.searchProducts(keyword)).thenReturn(Collections.emptyList());
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        assertTrue(results.isEmpty());
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
         verify(productRepository).searchProducts(keyword);
     }
 
     /**
-     * Test product search with null keyword
+     * Test searching products with null keyword
      * Verifies that ValidationException is thrown for null keyword
      */
     @Test
     @DisplayName("Should throw ValidationException when keyword is null")
-    void testSearchProducts_NullKeyword_ThrowsException() {
-        // Arrange
-        String keyword = null;
-
+    void testSearchProducts_NullKeyword() {
         // Act & Assert
         ValidationException exception = assertThrows(
-            ValidationException.class,
-            () -> productService.searchProducts(keyword)
+                ValidationException.class,
+                () -> productService.searchProducts(null)
         );
 
         assertEquals("Search keyword cannot be empty", exception.getMessage());
-        verify(productRepository, never()).searchProducts(anyString());
+        verify(productRepository, never()).searchProducts(any());
     }
 
     /**
-     * Test product search with empty keyword
+     * Test searching products with empty keyword
      * Verifies that ValidationException is thrown for empty keyword
      */
     @Test
     @DisplayName("Should throw ValidationException when keyword is empty")
-    void testSearchProducts_EmptyKeyword_ThrowsException() {
-        // Arrange
-        String keyword = "";
-
+    void testSearchProducts_EmptyKeyword() {
         // Act & Assert
         ValidationException exception = assertThrows(
-            ValidationException.class,
-            () -> productService.searchProducts(keyword)
+                ValidationException.class,
+                () -> productService.searchProducts("")
         );
 
         assertEquals("Search keyword cannot be empty", exception.getMessage());
-        verify(productRepository, never()).searchProducts(anyString());
+        verify(productRepository, never()).searchProducts(any());
     }
 
     /**
-     * Test product search with whitespace-only keyword
-     * Verifies that ValidationException is thrown for whitespace-only keyword
+     * Test searching products with whitespace-only keyword
+     * Verifies that ValidationException is thrown for whitespace keyword
      */
     @Test
     @DisplayName("Should throw ValidationException when keyword is only whitespace")
-    void testSearchProducts_WhitespaceOnlyKeyword_ThrowsException() {
-        // Arrange
-        String keyword = "   ";
-
+    void testSearchProducts_WhitespaceKeyword() {
         // Act & Assert
         ValidationException exception = assertThrows(
-            ValidationException.class,
-            () -> productService.searchProducts(keyword)
+                ValidationException.class,
+                () -> productService.searchProducts("   ")
         );
 
         assertEquals("Search keyword cannot be empty", exception.getMessage());
-        verify(productRepository, never()).searchProducts(anyString());
+        verify(productRepository, never()).searchProducts(any());
     }
 
     /**
-     * Test product search with special characters
-     * Verifies that search works with special characters in keyword
+     * Test searching products with keyword containing leading/trailing spaces
+     * Verifies that keyword is trimmed before search
      */
     @Test
-    @DisplayName("Should handle special characters in search keyword")
-    void testSearchProducts_SpecialCharacters() {
+    @DisplayName("Should trim keyword before searching")
+    void testSearchProducts_KeywordWithSpaces() {
         // Arrange
-        String keyword = "laptop-2024";
-        when(productRepository.searchProducts(keyword)).thenReturn(testProducts);
+        String keyword = "  laptop  ";
+        String trimmedKeyword = "laptop";
+        List<Product> products = Arrays.asList(testProduct1);
+        when(productRepository.searchProducts(trimmedKeyword)).thenReturn(products);
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        assertEquals(3, results.size());
-        verify(productRepository).searchProducts(keyword);
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        verify(productRepository).searchProducts(trimmedKeyword);
     }
 
     /**
-     * Test product search with numeric keyword
-     * Verifies that search works with numeric keywords
-     */
-    @Test
-    @DisplayName("Should handle numeric search keyword")
-    void testSearchProducts_NumericKeyword() {
-        // Arrange
-        String keyword = "999";
-        when(productRepository.searchProducts(keyword)).thenReturn(List.of(testProducts.get(0)));
-
-        // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
-
-        // Assert
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        verify(productRepository).searchProducts(keyword);
-    }
-
-    /**
-     * Test product search with case sensitivity
-     * Verifies that search handles different cases
-     */
-    @Test
-    @DisplayName("Should handle case variations in search keyword")
-    void testSearchProducts_CaseVariations() {
-        // Arrange
-        String keyword = "LAPTOP";
-        when(productRepository.searchProducts(keyword)).thenReturn(testProducts);
-
-        // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
-
-        // Assert
-        assertNotNull(results);
-        assertEquals(3, results.size());
-        verify(productRepository).searchProducts(keyword);
-    }
-
-    /**
-     * Test ProductResponse mapping
-     * Verifies that Product entity is correctly mapped to ProductResponse DTO
+     * Test product to ProductResponse mapping
+     * Verifies that all product fields are correctly mapped to response DTO
      */
     @Test
     @DisplayName("Should correctly map Product entity to ProductResponse DTO")
-    void testProductResponseMapping() {
+    void testSearchProducts_CorrectMapping() {
         // Arrange
         String keyword = "laptop";
-        when(productRepository.searchProducts(keyword)).thenReturn(testProducts);
+        List<Product> products = Arrays.asList(testProduct1);
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        ProductResponse firstResult = results.get(0);
-        assertEquals(testProducts.get(0).getId(), firstResult.getId());
-        assertEquals(testProducts.get(0).getName(), firstResult.getName());
-        assertEquals(testProducts.get(0).getDescription(), firstResult.getDescription());
-        assertEquals(testProducts.get(0).getPrice(), firstResult.getPrice());
-        assertEquals(testProducts.get(0).getAvailableQty(), firstResult.getAvailableQty());
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        ProductResponse response = result.get(0);
+        assertEquals(testProduct1.getId(), response.getId());
+        assertEquals(testProduct1.getName(), response.getName());
+        assertEquals(testProduct1.getDescription(), response.getDescription());
+        assertEquals(testProduct1.getPrice(), response.getPrice());
+        assertEquals(testProduct1.getAvailableQty(), response.getAvailableQty());
     }
 
     /**
-     * Test product search with single result
-     * Verifies that search works correctly with single matching product
+     * Test searching products with special characters
+     * Verifies that search handles special characters properly
      */
     @Test
-    @DisplayName("Should return single product when only one matches")
-    void testSearchProducts_SingleResult() {
+    @DisplayName("Should handle search with special characters")
+    void testSearchProducts_SpecialCharacters() {
         // Arrange
-        String keyword = "gaming";
-        when(productRepository.searchProducts(keyword))
-            .thenReturn(List.of(testProducts.get(2)));
+        String keyword = "laptop@#$";
+        List<Product> products = Collections.emptyList();
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        assertEquals("Gaming Laptop", results.get(0).getName());
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
         verify(productRepository).searchProducts(keyword);
     }
 
     /**
-     * Test product search with long keyword
-     * Verifies that search handles long keywords properly
+     * Test searching products with case sensitivity
+     * Verifies that search is case-insensitive (repository behavior)
      */
     @Test
-    @DisplayName("Should handle long search keywords")
-    void testSearchProducts_LongKeyword() {
+    @DisplayName("Should handle case-insensitive search")
+    void testSearchProducts_CaseInsensitive() {
         // Arrange
-        String keyword = "high performance gaming laptop with advanced features";
-        when(productRepository.searchProducts(keyword)).thenReturn(new ArrayList<>());
+        String keyword = "LAPTOP";
+        List<Product> products = Arrays.asList(testProduct1);
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
 
         // Act
-        List<ProductResponse> results = productService.searchProducts(keyword);
+        List<ProductResponse> result = productService.searchProducts(keyword);
 
         // Assert
-        assertNotNull(results);
-        assertTrue(results.isEmpty());
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        verify(productRepository).searchProducts(keyword);
+    }
+
+    /**
+     * Test searching products with numeric keyword
+     * Verifies that numeric search terms are handled
+     */
+    @Test
+    @DisplayName("Should handle numeric search keywords")
+    void testSearchProducts_NumericKeyword() {
+        // Arrange
+        String keyword = "999";
+        List<Product> products = Arrays.asList(testProduct1);
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
+
+        // Act
+        List<ProductResponse> result = productService.searchProducts(keyword);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        verify(productRepository).searchProducts(keyword);
+    }
+
+    /**
+     * Test searching products with very long keyword
+     * Verifies that long search terms are handled properly
+     */
+    @Test
+    @DisplayName("Should handle very long search keywords")
+    void testSearchProducts_LongKeyword() {
+        // Arrange
+        String keyword = "a".repeat(100);
+        List<Product> products = Collections.emptyList();
+        when(productRepository.searchProducts(keyword)).thenReturn(products);
+
+        // Act
+        List<ProductResponse> result = productService.searchProducts(keyword);
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
         verify(productRepository).searchProducts(keyword);
     }
 }

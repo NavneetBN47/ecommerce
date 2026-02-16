@@ -23,15 +23,14 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for AuthService
+ * JUnit 5 test class for AuthService
  * Tests authentication operations including login and logout functionality
- * Uses Mockito for mocking dependencies
- *
+ * 
  * @author Test Generation Agent
  * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AuthService Tests")
+@DisplayName("AuthService Test Suite")
 class test_AuthService {
 
     @Mock
@@ -52,23 +51,26 @@ class test_AuthService {
     private User testUser;
     private LoginRequestDTO loginRequest;
 
+    /**
+     * Setup method to initialize test data before each test
+     */
     @BeforeEach
     void setUp() {
         testUser = User.builder()
-            .id(1L)
-            .username("testuser")
-            .email("test@example.com")
-            .password("$2a$10$encodedPassword")
-            .firstName("Test")
-            .lastName("User")
-            .phoneNumber("1234567890")
-            .active(true)
-            .build();
+                .id(1L)
+                .username("testuser")
+                .email("test@example.com")
+                .password("encodedPassword")
+                .firstName("Test")
+                .lastName("User")
+                .phoneNumber("1234567890")
+                .active(true)
+                .build();
 
         loginRequest = LoginRequestDTO.builder()
-            .identifier("testuser")
-            .password("password123")
-            .build();
+                .identifier("testuser")
+                .password("password123")
+                .build();
     }
 
     /**
@@ -80,29 +82,28 @@ class test_AuthService {
     void testLogin_Success_WithUsername() {
         // Arrange
         when(userRepository.findByUsernameOrEmail("testuser"))
-            .thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("password123", testUser.getPassword()))
-            .thenReturn(true);
+                .thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("password123", "encodedPassword"))
+                .thenReturn(true);
         when(jwtTokenProvider.generateToken("testuser", 1L))
-            .thenReturn("jwt.token.here");
+                .thenReturn("jwt-token-123");
         when(jwtTokenProvider.getExpirationTime())
-            .thenReturn(3600000L);
+                .thenReturn(3600000L);
 
         // Act
         LoginResponseDTO response = authService.login(loginRequest);
 
         // Assert
         assertNotNull(response);
-        assertEquals("jwt.token.here", response.getToken());
+        assertEquals("jwt-token-123", response.getToken());
         assertEquals("Bearer", response.getTokenType());
         assertEquals(3600000L, response.getExpiresIn());
         assertNotNull(response.getUser());
-        assertEquals(1L, response.getUser().getId());
         assertEquals("testuser", response.getUser().getUsername());
         assertEquals("test@example.com", response.getUser().getEmail());
 
         verify(userRepository).findByUsernameOrEmail("testuser");
-        verify(passwordEncoder).matches("password123", testUser.getPassword());
+        verify(passwordEncoder).matches("password123", "encodedPassword");
         verify(jwtTokenProvider).generateToken("testuser", 1L);
     }
 
@@ -116,88 +117,61 @@ class test_AuthService {
         // Arrange
         loginRequest.setIdentifier("test@example.com");
         when(userRepository.findByUsernameOrEmail("test@example.com"))
-            .thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("password123", testUser.getPassword()))
-            .thenReturn(true);
+                .thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("password123", "encodedPassword"))
+                .thenReturn(true);
         when(jwtTokenProvider.generateToken("testuser", 1L))
-            .thenReturn("jwt.token.here");
+                .thenReturn("jwt-token-123");
         when(jwtTokenProvider.getExpirationTime())
-            .thenReturn(3600000L);
+                .thenReturn(3600000L);
 
         // Act
         LoginResponseDTO response = authService.login(loginRequest);
 
         // Assert
         assertNotNull(response);
-        assertEquals("jwt.token.here", response.getToken());
+        assertEquals("jwt-token-123", response.getToken());
         verify(userRepository).findByUsernameOrEmail("test@example.com");
     }
 
     /**
-     * Test login failure with invalid username/email
-     * Verifies that authentication exception is thrown for non-existent user
+     * Test login failure with invalid username
+     * Verifies that authentication fails when user is not found
      */
     @Test
     @DisplayName("Should throw AuthenticationException when user not found")
     void testLogin_Failure_UserNotFound() {
         // Arrange
-        when(userRepository.findByUsernameOrEmail("nonexistent"))
-            .thenReturn(Optional.empty());
-        loginRequest.setIdentifier("nonexistent");
-
-        // Act & Assert
-        AuthenticationException exception = assertThrows(
-            AuthenticationException.class,
-            () -> authService.login(loginRequest)
-        );
-
-        assertEquals("Invalid username/email or password", exception.getMessage());
-        verify(userRepository).findByUsernameOrEmail("nonexistent");
-        verify(passwordEncoder, never()).matches(anyString(), anyString());
-    }
-
-    /**
-     * Test login failure with incorrect password
-     * Verifies that authentication exception is thrown for wrong password
-     */
-    @Test
-    @DisplayName("Should throw AuthenticationException when password is incorrect")
-    void testLogin_Failure_IncorrectPassword() {
-        // Arrange
         when(userRepository.findByUsernameOrEmail("testuser"))
-            .thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("wrongpassword", testUser.getPassword()))
-            .thenReturn(false);
-        loginRequest.setPassword("wrongpassword");
+                .thenReturn(Optional.empty());
 
         // Act & Assert
         AuthenticationException exception = assertThrows(
-            AuthenticationException.class,
-            () -> authService.login(loginRequest)
+                AuthenticationException.class,
+                () -> authService.login(loginRequest)
         );
 
         assertEquals("Invalid username/email or password", exception.getMessage());
         verify(userRepository).findByUsernameOrEmail("testuser");
-        verify(passwordEncoder).matches("wrongpassword", testUser.getPassword());
-        verify(jwtTokenProvider, never()).generateToken(anyString(), anyLong());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
     }
 
     /**
-     * Test login failure with deactivated account
-     * Verifies that authentication exception is thrown for inactive users
+     * Test login failure with inactive user
+     * Verifies that deactivated users cannot login
      */
     @Test
-    @DisplayName("Should throw AuthenticationException when user account is deactivated")
-    void testLogin_Failure_DeactivatedAccount() {
+    @DisplayName("Should throw AuthenticationException when user is inactive")
+    void testLogin_Failure_InactiveUser() {
         // Arrange
         testUser.setActive(false);
         when(userRepository.findByUsernameOrEmail("testuser"))
-            .thenReturn(Optional.of(testUser));
+                .thenReturn(Optional.of(testUser));
 
         // Act & Assert
         AuthenticationException exception = assertThrows(
-            AuthenticationException.class,
-            () -> authService.login(loginRequest)
+                AuthenticationException.class,
+                () -> authService.login(loginRequest)
         );
 
         assertEquals("User account is deactivated", exception.getMessage());
@@ -206,11 +180,36 @@ class test_AuthService {
     }
 
     /**
-     * Test successful logout
-     * Verifies that user cart is cleared during logout
+     * Test login failure with wrong password
+     * Verifies that authentication fails with incorrect password
      */
     @Test
-    @DisplayName("Should successfully logout user and clear cart")
+    @DisplayName("Should throw AuthenticationException when password is incorrect")
+    void testLogin_Failure_WrongPassword() {
+        // Arrange
+        when(userRepository.findByUsernameOrEmail("testuser"))
+                .thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("password123", "encodedPassword"))
+                .thenReturn(false);
+
+        // Act & Assert
+        AuthenticationException exception = assertThrows(
+                AuthenticationException.class,
+                () -> authService.login(loginRequest)
+        );
+
+        assertEquals("Invalid username/email or password", exception.getMessage());
+        verify(userRepository).findByUsernameOrEmail("testuser");
+        verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(jwtTokenProvider, never()).generateToken(anyString(), anyLong());
+    }
+
+    /**
+     * Test successful logout
+     * Verifies that logout clears user's cart
+     */
+    @Test
+    @DisplayName("Should successfully logout and clear cart")
     void testLogout_Success() {
         // Arrange
         Long userId = 1L;
@@ -224,12 +223,12 @@ class test_AuthService {
     }
 
     /**
-     * Test logout with null user ID
-     * Verifies behavior when logout is called with null user ID
+     * Test logout with null userId
+     * Verifies behavior when logout is called with null
      */
     @Test
-    @DisplayName("Should handle logout with null user ID")
-    void testLogout_WithNullUserId() {
+    @DisplayName("Should handle logout with null userId")
+    void testLogout_NullUserId() {
         // Arrange
         doNothing().when(cartService).clearCart(null);
 
@@ -241,79 +240,89 @@ class test_AuthService {
     }
 
     /**
-     * Test login with null identifier
-     * Verifies that appropriate exception is thrown for null identifier
+     * Test login with null request
+     * Verifies that null login request throws exception
      */
     @Test
-    @DisplayName("Should throw exception when login identifier is null")
-    void testLogin_Failure_NullIdentifier() {
-        // Arrange
-        loginRequest.setIdentifier(null);
-        when(userRepository.findByUsernameOrEmail(null))
-            .thenReturn(Optional.empty());
-
+    @DisplayName("Should throw exception when login request is null")
+    void testLogin_NullRequest() {
         // Act & Assert
-        assertThrows(
-            AuthenticationException.class,
-            () -> authService.login(loginRequest)
-        );
+        assertThrows(NullPointerException.class, () -> authService.login(null));
+    }
 
-        verify(userRepository).findByUsernameOrEmail(null);
+    /**
+     * Test login response contains all user details
+     * Verifies that UserDTO is properly mapped with all fields
+     */
+    @Test
+    @DisplayName("Should return complete user details in login response")
+    void testLogin_CompleteUserDetails() {
+        // Arrange
+        when(userRepository.findByUsernameOrEmail("testuser"))
+                .thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("password123", "encodedPassword"))
+                .thenReturn(true);
+        when(jwtTokenProvider.generateToken("testuser", 1L))
+                .thenReturn("jwt-token-123");
+        when(jwtTokenProvider.getExpirationTime())
+                .thenReturn(3600000L);
+
+        // Act
+        LoginResponseDTO response = authService.login(loginRequest);
+
+        // Assert
+        UserDTO userDTO = response.getUser();
+        assertNotNull(userDTO);
+        assertEquals(1L, userDTO.getId());
+        assertEquals("testuser", userDTO.getUsername());
+        assertEquals("test@example.com", userDTO.getEmail());
+        assertEquals("Test", userDTO.getFirstName());
+        assertEquals("User", userDTO.getLastName());
+        assertEquals("1234567890", userDTO.getPhoneNumber());
+        assertTrue(userDTO.getActive());
     }
 
     /**
      * Test login with empty password
-     * Verifies that authentication fails with empty password
+     * Verifies that empty password is handled properly
      */
     @Test
-    @DisplayName("Should fail login when password is empty")
-    void testLogin_Failure_EmptyPassword() {
+    @DisplayName("Should handle login with empty password")
+    void testLogin_EmptyPassword() {
         // Arrange
         loginRequest.setPassword("");
         when(userRepository.findByUsernameOrEmail("testuser"))
-            .thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("", testUser.getPassword()))
-            .thenReturn(false);
+                .thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("", "encodedPassword"))
+                .thenReturn(false);
 
         // Act & Assert
-        assertThrows(
-            AuthenticationException.class,
-            () -> authService.login(loginRequest)
+        AuthenticationException exception = assertThrows(
+                AuthenticationException.class,
+                () -> authService.login(loginRequest)
         );
 
-        verify(userRepository).findByUsernameOrEmail("testuser");
-        verify(passwordEncoder).matches("", testUser.getPassword());
+        assertEquals("Invalid username/email or password", exception.getMessage());
     }
 
     /**
-     * Test UserDTO mapping
-     * Verifies that User entity is correctly mapped to UserDTO
+     * Test login with empty identifier
+     * Verifies that empty username/email is handled properly
      */
     @Test
-    @DisplayName("Should correctly map User entity to UserDTO")
-    void testUserDTOMapping() {
+    @DisplayName("Should handle login with empty identifier")
+    void testLogin_EmptyIdentifier() {
         // Arrange
-        when(userRepository.findByUsernameOrEmail("testuser"))
-            .thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches("password123", testUser.getPassword()))
-            .thenReturn(true);
-        when(jwtTokenProvider.generateToken("testuser", 1L))
-            .thenReturn("jwt.token.here");
-        when(jwtTokenProvider.getExpirationTime())
-            .thenReturn(3600000L);
+        loginRequest.setIdentifier("");
+        when(userRepository.findByUsernameOrEmail(""))
+                .thenReturn(Optional.empty());
 
-        // Act
-        LoginResponseDTO response = authService.login(loginRequest);
-        UserDTO userDTO = response.getUser();
+        // Act & Assert
+        AuthenticationException exception = assertThrows(
+                AuthenticationException.class,
+                () -> authService.login(loginRequest)
+        );
 
-        // Assert
-        assertNotNull(userDTO);
-        assertEquals(testUser.getId(), userDTO.getId());
-        assertEquals(testUser.getUsername(), userDTO.getUsername());
-        assertEquals(testUser.getEmail(), userDTO.getEmail());
-        assertEquals(testUser.getFirstName(), userDTO.getFirstName());
-        assertEquals(testUser.getLastName(), userDTO.getLastName());
-        assertEquals(testUser.getPhoneNumber(), userDTO.getPhoneNumber());
-        assertEquals(testUser.getActive(), userDTO.getActive());
+        assertEquals("Invalid username/email or password", exception.getMessage());
     }
 }

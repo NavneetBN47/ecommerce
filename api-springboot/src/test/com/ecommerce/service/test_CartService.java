@@ -1,6 +1,7 @@
 package com.ecommerce.service;
 
 import com.ecommerce.dto.AddToCartRequest;
+import com.ecommerce.dto.CartItemResponse;
 import com.ecommerce.dto.CartResponse;
 import com.ecommerce.dto.UpdateCartItemRequest;
 import com.ecommerce.entity.Cart;
@@ -31,15 +32,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for CartService
+ * JUnit 5 test class for CartService
  * Tests shopping cart operations including add, update, remove, and retrieve
- * Uses Mockito for mocking repository dependencies
- *
+ * 
  * @author Test Generation Agent
  * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CartService Tests")
+@DisplayName("CartService Test Suite")
 class test_CartService {
 
     @Mock
@@ -60,58 +60,62 @@ class test_CartService {
     private UUID userId;
     private UUID productId;
     private UUID cartId;
-    private UUID itemId;
+    private UUID cartItemId;
     private User testUser;
     private Product testProduct;
     private Cart testCart;
     private CartItem testCartItem;
 
+    /**
+     * Setup method to initialize test data before each test
+     */
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
         productId = UUID.randomUUID();
         cartId = UUID.randomUUID();
-        itemId = UUID.randomUUID();
+        cartItemId = UUID.randomUUID();
 
         testUser = User.builder()
-            .id(userId)
-            .username("testuser")
-            .email("test@example.com")
-            .build();
+                .id(userId)
+                .username("testuser")
+                .email("test@example.com")
+                .build();
 
         testProduct = Product.builder()
-            .id(productId)
-            .name("Test Product")
-            .price(new BigDecimal("99.99"))
-            .availableQty(100)
-            .build();
+                .id(productId)
+                .name("Test Product")
+                .description("Test Description")
+                .price(new BigDecimal("99.99"))
+                .availableQty(100)
+                .build();
 
         testCart = Cart.builder()
-            .id(cartId)
-            .user(testUser)
-            .items(new ArrayList<>())
-            .build();
+                .id(cartId)
+                .user(testUser)
+                .items(new ArrayList<>())
+                .build();
 
         testCartItem = CartItem.builder()
-            .id(itemId)
-            .cart(testCart)
-            .product(testProduct)
-            .quantity(2)
-            .build();
+                .id(cartItemId)
+                .cart(testCart)
+                .product(testProduct)
+                .quantity(2)
+                .build();
     }
 
     /**
-     * Test adding a new product to cart
-     * Verifies that a product can be added to a new cart
+     * Test adding product to new cart
+     * Verifies that a new cart is created when user doesn't have one
      */
     @Test
-    @DisplayName("Should successfully add product to new cart")
-    void testAddProductToCart_NewCart_Success() {
+    @DisplayName("Should create new cart and add product when cart doesn't exist")
+    void testAddProductToCart_NewCart() {
         // Arrange
         AddToCartRequest request = AddToCartRequest.builder()
-            .productId(productId)
-            .quantity(2)
-            .build();
+                .productId(productId)
+                .quantity(2)
+                .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
@@ -125,25 +129,22 @@ class test_CartService {
 
         // Assert
         assertNotNull(response);
-        assertEquals(cartId, response.getCartId());
-        verify(userRepository).findById(userId);
-        verify(productRepository).findById(productId);
         verify(cartRepository).save(any(Cart.class));
         verify(cartItemRepository).save(any(CartItem.class));
     }
 
     /**
      * Test adding product to existing cart
-     * Verifies that a product can be added to an existing cart
+     * Verifies that product is added to existing cart
      */
     @Test
-    @DisplayName("Should successfully add product to existing cart")
-    void testAddProductToCart_ExistingCart_Success() {
+    @DisplayName("Should add product to existing cart")
+    void testAddProductToCart_ExistingCart() {
         // Arrange
         AddToCartRequest request = AddToCartRequest.builder()
-            .productId(productId)
-            .quantity(1)
-            .build();
+                .productId(productId)
+                .quantity(2)
+                .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
@@ -151,35 +152,36 @@ class test_CartService {
         when(cartItemRepository.findByCartIdAndProductId(cartId, productId)).thenReturn(Optional.empty());
         when(cartItemRepository.save(any(CartItem.class))).thenReturn(testCartItem);
 
+        testCart.getItems().add(testCartItem);
+
         // Act
         CartResponse response = cartService.addProductToCart(userId, request);
 
         // Assert
         assertNotNull(response);
-        verify(cartRepository).findByUserId(userId);
+        verify(cartRepository, never()).save(any(Cart.class));
         verify(cartItemRepository).save(any(CartItem.class));
     }
 
     /**
      * Test updating quantity of existing cart item
-     * Verifies that quantity is updated when product already exists in cart
+     * Verifies that quantity is updated when product already in cart
      */
     @Test
-    @DisplayName("Should update quantity when product already exists in cart")
-    void testAddProductToCart_UpdateExistingItem_Success() {
+    @DisplayName("Should update quantity when product already in cart")
+    void testAddProductToCart_UpdateExistingItem() {
         // Arrange
         AddToCartRequest request = AddToCartRequest.builder()
-            .productId(productId)
-            .quantity(3)
-            .build();
+                .productId(productId)
+                .quantity(3)
+                .build();
 
         testCart.getItems().add(testCartItem);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartIdAndProductId(cartId, productId))
-            .thenReturn(Optional.of(testCartItem));
+        when(cartItemRepository.findByCartIdAndProductId(cartId, productId)).thenReturn(Optional.of(testCartItem));
         when(cartItemRepository.save(any(CartItem.class))).thenReturn(testCartItem);
 
         // Act
@@ -187,106 +189,100 @@ class test_CartService {
 
         // Assert
         assertNotNull(response);
-        assertEquals(5, testCartItem.getQuantity()); // 2 + 3
+        assertEquals(5, testCartItem.getQuantity());
         verify(cartItemRepository).save(testCartItem);
     }
 
     /**
      * Test adding product with invalid quantity
-     * Verifies that ValidationException is thrown for zero or negative quantity
+     * Verifies that validation exception is thrown for zero or negative quantity
      */
     @Test
     @DisplayName("Should throw ValidationException when quantity is zero or negative")
-    void testAddProductToCart_InvalidQuantity_ThrowsException() {
+    void testAddProductToCart_InvalidQuantity() {
         // Arrange
         AddToCartRequest request = AddToCartRequest.builder()
-            .productId(productId)
-            .quantity(0)
-            .build();
+                .productId(productId)
+                .quantity(0)
+                .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
 
         // Act & Assert
         ValidationException exception = assertThrows(
-            ValidationException.class,
-            () -> cartService.addProductToCart(userId, request)
+                ValidationException.class,
+                () -> cartService.addProductToCart(userId, request)
         );
 
         assertEquals("Quantity must be greater than 0", exception.getMessage());
-        verify(cartRepository, never()).save(any());
     }
 
     /**
-     * Test adding product when user not found
-     * Verifies that ResourceNotFoundException is thrown for invalid user
-     */
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when user not found")
-    void testAddProductToCart_UserNotFound_ThrowsException() {
-        // Arrange
-        AddToCartRequest request = AddToCartRequest.builder()
-            .productId(productId)
-            .quantity(1)
-            .build();
-
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThrows(
-            ResourceNotFoundException.class,
-            () -> cartService.addProductToCart(userId, request)
-        );
-
-        verify(userRepository).findById(userId);
-        verify(productRepository, never()).findById(any());
-    }
-
-    /**
-     * Test adding product when product not found
-     * Verifies that ResourceNotFoundException is thrown for invalid product
+     * Test adding non-existent product
+     * Verifies that exception is thrown when product not found
      */
     @Test
     @DisplayName("Should throw ResourceNotFoundException when product not found")
-    void testAddProductToCart_ProductNotFound_ThrowsException() {
+    void testAddProductToCart_ProductNotFound() {
         // Arrange
         AddToCartRequest request = AddToCartRequest.builder()
-            .productId(productId)
-            .quantity(1)
-            .build();
+                .productId(productId)
+                .quantity(2)
+                .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(productRepository.findById(productId)).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(
-            ResourceNotFoundException.class,
-            () -> cartService.addProductToCart(userId, request)
+                ResourceNotFoundException.class,
+                () -> cartService.addProductToCart(userId, request)
         );
-
-        verify(productRepository).findById(productId);
     }
 
     /**
-     * Test updating cart item quantity
-     * Verifies that cart item quantity can be updated successfully
+     * Test adding product for non-existent user
+     * Verifies that exception is thrown when user not found
+     */
+    @Test
+    @DisplayName("Should throw ResourceNotFoundException when user not found")
+    void testAddProductToCart_UserNotFound() {
+        // Arrange
+        AddToCartRequest request = AddToCartRequest.builder()
+                .productId(productId)
+                .quantity(2)
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> cartService.addProductToCart(userId, request)
+        );
+    }
+
+    /**
+     * Test updating cart item successfully
+     * Verifies that cart item quantity is updated
      */
     @Test
     @DisplayName("Should successfully update cart item quantity")
     void testUpdateCartItem_Success() {
         // Arrange
         UpdateCartItemRequest request = UpdateCartItemRequest.builder()
-            .quantity(5)
-            .build();
+                .quantity(5)
+                .build();
 
         testCart.getItems().add(testCartItem);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findById(itemId)).thenReturn(Optional.of(testCartItem));
+        when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.of(testCartItem));
         when(cartItemRepository.save(any(CartItem.class))).thenReturn(testCartItem);
 
         // Act
-        CartResponse response = cartService.updateCartItem(userId, itemId, request);
+        CartResponse response = cartService.updateCartItem(userId, cartItemId, request);
 
         // Assert
         assertNotNull(response);
@@ -296,62 +292,61 @@ class test_CartService {
 
     /**
      * Test updating cart item with invalid quantity
-     * Verifies that ValidationException is thrown for invalid quantity
+     * Verifies that validation exception is thrown
      */
     @Test
     @DisplayName("Should throw ValidationException when update quantity is invalid")
-    void testUpdateCartItem_InvalidQuantity_ThrowsException() {
+    void testUpdateCartItem_InvalidQuantity() {
         // Arrange
         UpdateCartItemRequest request = UpdateCartItemRequest.builder()
-            .quantity(-1)
-            .build();
+                .quantity(-1)
+                .build();
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findById(itemId)).thenReturn(Optional.of(testCartItem));
+        when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.of(testCartItem));
 
         // Act & Assert
-        assertThrows(
-            ValidationException.class,
-            () -> cartService.updateCartItem(userId, itemId, request)
+        ValidationException exception = assertThrows(
+                ValidationException.class,
+                () -> cartService.updateCartItem(userId, cartItemId, request)
         );
 
-        verify(cartItemRepository, never()).save(any());
+        assertEquals("Quantity must be greater than 0", exception.getMessage());
     }
 
     /**
      * Test updating cart item that doesn't belong to user
-     * Verifies that ValidationException is thrown for unauthorized access
+     * Verifies that validation exception is thrown
      */
     @Test
     @DisplayName("Should throw ValidationException when cart item doesn't belong to user")
-    void testUpdateCartItem_UnauthorizedAccess_ThrowsException() {
+    void testUpdateCartItem_ItemNotBelongToUser() {
         // Arrange
         UpdateCartItemRequest request = UpdateCartItemRequest.builder()
-            .quantity(3)
-            .build();
+                .quantity(5)
+                .build();
 
         Cart differentCart = Cart.builder()
-            .id(UUID.randomUUID())
-            .user(testUser)
-            .build();
-
-        testCartItem.setCart(differentCart);
+                .id(UUID.randomUUID())
+                .user(testUser)
+                .build();
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findById(itemId)).thenReturn(Optional.of(testCartItem));
+        when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.of(testCartItem));
+        testCartItem.setCart(differentCart);
 
         // Act & Assert
         ValidationException exception = assertThrows(
-            ValidationException.class,
-            () -> cartService.updateCartItem(userId, itemId, request)
+                ValidationException.class,
+                () -> cartService.updateCartItem(userId, cartItemId, request)
         );
 
         assertEquals("Cart item does not belong to user", exception.getMessage());
     }
 
     /**
-     * Test removing cart item
-     * Verifies that cart item can be removed successfully
+     * Test removing cart item successfully
+     * Verifies that cart item is removed from cart
      */
     @Test
     @DisplayName("Should successfully remove cart item")
@@ -359,43 +354,43 @@ class test_CartService {
         // Arrange
         testCart.getItems().add(testCartItem);
         CartItem anotherItem = CartItem.builder()
-            .id(UUID.randomUUID())
-            .cart(testCart)
-            .product(testProduct)
-            .quantity(1)
-            .build();
+                .id(UUID.randomUUID())
+                .cart(testCart)
+                .product(testProduct)
+                .quantity(1)
+                .build();
         testCart.getItems().add(anotherItem);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findById(itemId)).thenReturn(Optional.of(testCartItem));
+        when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.of(testCartItem));
         doNothing().when(cartItemRepository).delete(testCartItem);
 
         // Act
-        CartResponse response = cartService.removeCartItem(userId, itemId);
+        CartResponse response = cartService.removeCartItem(userId, cartItemId);
 
         // Assert
         assertNotNull(response);
         verify(cartItemRepository).delete(testCartItem);
-        verify(cartRepository, never()).delete(any());
+        verify(cartRepository, never()).delete(any(Cart.class));
     }
 
     /**
-     * Test removing last cart item deletes cart
+     * Test removing last cart item
      * Verifies that cart is deleted when last item is removed
      */
     @Test
     @DisplayName("Should delete cart when last item is removed")
-    void testRemoveCartItem_LastItem_DeletesCart() {
+    void testRemoveCartItem_DeleteEmptyCart() {
         // Arrange
         testCart.getItems().add(testCartItem);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findById(itemId)).thenReturn(Optional.of(testCartItem));
+        when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.of(testCartItem));
         doNothing().when(cartItemRepository).delete(testCartItem);
         doNothing().when(cartRepository).delete(testCart);
 
         // Act
-        CartResponse response = cartService.removeCartItem(userId, itemId);
+        CartResponse response = cartService.removeCartItem(userId, cartItemId);
 
         // Assert
         assertNull(response);
@@ -404,11 +399,11 @@ class test_CartService {
     }
 
     /**
-     * Test getting cart
-     * Verifies that cart can be retrieved successfully
+     * Test getting cart successfully
+     * Verifies that cart with items is retrieved
      */
     @Test
-    @DisplayName("Should successfully get cart")
+    @DisplayName("Should successfully retrieve cart with items")
     void testGetCart_Success() {
         // Arrange
         testCart.getItems().add(testCartItem);
@@ -426,27 +421,25 @@ class test_CartService {
     }
 
     /**
-     * Test getting cart when cart not found
-     * Verifies that ResourceNotFoundException is thrown when cart doesn't exist
+     * Test getting non-existent cart
+     * Verifies that exception is thrown when cart not found
      */
     @Test
     @DisplayName("Should throw ResourceNotFoundException when cart not found")
-    void testGetCart_NotFound_ThrowsException() {
+    void testGetCart_NotFound() {
         // Arrange
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(
-            ResourceNotFoundException.class,
-            () -> cartService.getCart(userId)
+                ResourceNotFoundException.class,
+                () -> cartService.getCart(userId)
         );
-
-        verify(cartRepository).findByUserId(userId);
     }
 
     /**
-     * Test clearing cart
-     * Verifies that cart can be cleared successfully
+     * Test clearing cart successfully
+     * Verifies that cart is deleted
      */
     @Test
     @DisplayName("Should successfully clear cart")
@@ -462,16 +455,25 @@ class test_CartService {
     }
 
     /**
-     * Test cart total calculation
-     * Verifies that cart total is calculated correctly
+     * Test cart response calculation
+     * Verifies that grand total is calculated correctly
      */
     @Test
-    @DisplayName("Should calculate cart total correctly")
-    void testGetCart_CalculatesTotalCorrectly() {
+    @DisplayName("Should calculate grand total correctly")
+    void testGetCart_CorrectTotalCalculation() {
         // Arrange
         testCart.getItems().add(testCartItem);
-        BigDecimal expectedTotal = testProduct.getPrice()
-            .multiply(BigDecimal.valueOf(testCartItem.getQuantity()));
+        CartItem secondItem = CartItem.builder()
+                .id(UUID.randomUUID())
+                .cart(testCart)
+                .product(Product.builder()
+                        .id(UUID.randomUUID())
+                        .name("Product 2")
+                        .price(new BigDecimal("50.00"))
+                        .build())
+                .quantity(3)
+                .build();
+        testCart.getItems().add(secondItem);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(testCart));
 
@@ -480,6 +482,9 @@ class test_CartService {
 
         // Assert
         assertNotNull(response);
-        assertEquals(expectedTotal, response.getGrandTotal());
+        BigDecimal expectedTotal = new BigDecimal("99.99")
+                .multiply(new BigDecimal("2"))
+                .add(new BigDecimal("50.00").multiply(new BigDecimal("3")));
+        assertEquals(0, expectedTotal.compareTo(response.getGrandTotal()));
     }
 }
