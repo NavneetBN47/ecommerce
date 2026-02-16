@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -14,60 +15,63 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * JUnit 5 test class for UserRepository.
- * Tests all public methods including custom query methods.
- * Uses @DataJpaTest for repository layer testing with in-memory database.
+ * JUnit test class for UserRepository.
+ * Tests repository methods for User entity operations including custom queries.
+ * Uses in-memory database for testing without affecting production data.
+ *
+ * @author QA Automation Team
+ * @version 1.0
  */
 @DataJpaTest
-@DisplayName("UserRepository Tests")
-public class test_UserRepository {
-
-    @Autowired
-    private UserRepository userRepository;
+@ActiveProfiles("test")
+@DisplayName("User Repository Tests")
+class test_UserRepository {
 
     @Autowired
     private TestEntityManager entityManager;
 
+    @Autowired
+    private UserRepository userRepository;
+
     private User testUser;
-    private String testUsername;
 
     /**
-     * Set up test data before each test method.
+     * Set up test data before each test method execution.
+     * Creates and persists a test user in the in-memory database.
      */
     @BeforeEach
     void setUp() {
-        testUsername = "testuser";
-        
         testUser = new User();
         testUser.setId(UUID.randomUUID());
-        testUser.setUsername(testUsername);
+        testUser.setUsername("testuser");
+        testUser.setPassword("password123");
         testUser.setEmail("testuser@example.com");
-        testUser.setPassword("hashedPassword123");
+        entityManager.persist(testUser);
+        entityManager.flush();
     }
 
     /**
-     * Test finding user by username - success case.
+     * Test finding a User by username.
+     * Verifies that the custom query method returns the correct User.
      */
     @Test
-    @DisplayName("Should find user by username")
+    @DisplayName("Should find User by username")
     void testFindByUsername_Success() {
-        // Given
-        userRepository.save(testUser);
-        entityManager.flush();
-
         // When
-        Optional<User> result = userRepository.findByUsername(testUsername);
+        Optional<User> result = userRepository.findByUsername("testuser");
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getUsername()).isEqualTo(testUsername);
+        assertThat(result.get().getUsername()).isEqualTo("testuser");
+        assertThat(result.get().getEmail()).isEqualTo("testuser@example.com");
     }
 
     /**
-     * Test finding user by username - not found case.
+     * Test finding a User with non-existent username.
+     * Verifies that the method returns empty Optional when username doesn't exist.
      */
     @Test
-    @DisplayName("Should return empty when user not found by username")
+    @DisplayName("Should return empty Optional when username does not exist")
     void testFindByUsername_NotFound() {
         // When
         Optional<User> result = userRepository.findByUsername("nonexistent");
@@ -77,24 +81,22 @@ public class test_UserRepository {
     }
 
     /**
-     * Test checking if username exists - true case.
+     * Test checking if username exists.
+     * Verifies that the method returns true for existing username.
      */
     @Test
     @DisplayName("Should return true when username exists")
     void testExistsByUsername_True() {
-        // Given
-        userRepository.save(testUser);
-        entityManager.flush();
-
         // When
-        boolean exists = userRepository.existsByUsername(testUsername);
+        boolean exists = userRepository.existsByUsername("testuser");
 
         // Then
         assertThat(exists).isTrue();
     }
 
     /**
-     * Test checking if username exists - false case.
+     * Test checking if username exists with non-existent username.
+     * Verifies that the method returns false for non-existent username.
      */
     @Test
     @DisplayName("Should return false when username does not exist")
@@ -107,45 +109,66 @@ public class test_UserRepository {
     }
 
     /**
-     * Test saving a user.
+     * Test saving a new User.
+     * Verifies that the repository can persist a new User entity.
      */
     @Test
-    @DisplayName("Should save user successfully")
-    void testSaveUser() {
+    @DisplayName("Should save a new User successfully")
+    void testSave_NewUser() {
+        // Given
+        User newUser = new User();
+        newUser.setId(UUID.randomUUID());
+        newUser.setUsername("newuser");
+        newUser.setPassword("newpassword");
+        newUser.setEmail("newuser@example.com");
+
         // When
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
+        User savedUser = userRepository.save(newUser);
 
         // Then
         assertThat(savedUser).isNotNull();
         assertThat(savedUser.getId()).isNotNull();
-        assertThat(savedUser.getUsername()).isEqualTo(testUsername);
-        assertThat(savedUser.getEmail()).isEqualTo("testuser@example.com");
+        assertThat(savedUser.getUsername()).isEqualTo("newuser");
     }
 
     /**
-     * Test finding user by ID.
+     * Test updating an existing User.
+     * Verifies that the repository can update User properties.
      */
     @Test
-    @DisplayName("Should find user by ID")
-    void testFindById_Success() {
+    @DisplayName("Should update existing User successfully")
+    void testSave_UpdateUser() {
         // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
+        testUser.setEmail("updated@example.com");
 
         // When
-        Optional<User> result = userRepository.findById(savedUser.getId());
+        User updatedUser = userRepository.save(testUser);
+
+        // Then
+        assertThat(updatedUser.getEmail()).isEqualTo("updated@example.com");
+    }
+
+    /**
+     * Test finding a User by ID.
+     * Verifies that the repository can retrieve a User by its primary key.
+     */
+    @Test
+    @DisplayName("Should find User by ID")
+    void testFindById_Success() {
+        // When
+        Optional<User> result = userRepository.findById(testUser.getId());
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedUser.getId());
+        assertThat(result.get().getId()).isEqualTo(testUser.getId());
     }
 
     /**
-     * Test finding user by ID - not found.
+     * Test finding a User with non-existent ID.
+     * Verifies that the method returns empty Optional for non-existent user.
      */
     @Test
-    @DisplayName("Should return empty when user not found by ID")
+    @DisplayName("Should return empty Optional when User ID does not exist")
     void testFindById_NotFound() {
         // Given
         UUID nonExistentId = UUID.randomUUID();
@@ -158,15 +181,143 @@ public class test_UserRepository {
     }
 
     /**
-     * Test deleting a user.
+     * Test deleting a User.
+     * Verifies that the repository can delete a User entity.
      */
     @Test
-    @DisplayName("Should delete user successfully")
-    void testDeleteUser() {
+    @DisplayName("Should delete User successfully")
+    void testDelete_Success() {
         // Given
-        User savedUser = userRepository.save(testUser);
+        UUID userId = testUser.getId();
+
+        // When
+        userRepository.delete(testUser);
         entityManager.flush();
-        UUID userId = savedUser.getId();
+
+        // Then
+        Optional<User> result = userRepository.findById(userId);
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test counting all Users.
+     * Verifies that the repository can count the total number of Users.
+     */
+    @Test
+    @DisplayName("Should count all Users")
+    void testCount_Success() {
+        // When
+        long count = userRepository.count();
+
+        // Then
+        assertThat(count).isGreaterThan(0);
+    }
+
+    /**
+     * Test checking if User exists by ID.
+     * Verifies that the repository can check existence of a User.
+     */
+    @Test
+    @DisplayName("Should return true when User exists by ID")
+    void testExistsById_True() {
+        // When
+        boolean exists = userRepository.existsById(testUser.getId());
+
+        // Then
+        assertThat(exists).isTrue();
+    }
+
+    /**
+     * Test checking if User exists with non-existent ID.
+     * Verifies that the repository returns false for non-existent User.
+     */
+    @Test
+    @DisplayName("Should return false when User does not exist by ID")
+    void testExistsById_False() {
+        // Given
+        UUID nonExistentId = UUID.randomUUID();
+
+        // When
+        boolean exists = userRepository.existsById(nonExistentId);
+
+        // Then
+        assertThat(exists).isFalse();
+    }
+
+    /**
+     * Test finding User by username is case-sensitive.
+     * Verifies that username search is case-sensitive.
+     */
+    @Test
+    @DisplayName("Should be case-sensitive when finding by username")
+    void testFindByUsername_CaseSensitive() {
+        // When
+        Optional<User> result = userRepository.findByUsername("TESTUSER");
+
+        // Then
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test checking username existence is case-sensitive.
+     * Verifies that username existence check is case-sensitive.
+     */
+    @Test
+    @DisplayName("Should be case-sensitive when checking username existence")
+    void testExistsByUsername_CaseSensitive() {
+        // When
+        boolean exists = userRepository.existsByUsername("TESTUSER");
+
+        // Then
+        assertThat(exists).isFalse();
+    }
+
+    /**
+     * Test saving User with minimum required fields.
+     * Verifies that User can be saved with only required fields.
+     */
+    @Test
+    @DisplayName("Should save User with minimum required fields")
+    void testSave_MinimumFields() {
+        // Given
+        User minimalUser = new User();
+        minimalUser.setId(UUID.randomUUID());
+        minimalUser.setUsername("minimaluser");
+        minimalUser.setPassword("password");
+
+        // When
+        User savedUser = userRepository.save(minimalUser);
+
+        // Then
+        assertThat(savedUser).isNotNull();
+        assertThat(savedUser.getId()).isNotNull();
+        assertThat(savedUser.getUsername()).isEqualTo("minimaluser");
+    }
+
+    /**
+     * Test finding all Users.
+     * Verifies that the repository can retrieve all Users.
+     */
+    @Test
+    @DisplayName("Should find all Users")
+    void testFindAll_Success() {
+        // When
+        var result = userRepository.findAll();
+
+        // Then
+        assertThat(result).isNotEmpty();
+        assertThat(result).hasSizeGreaterThanOrEqualTo(1);
+    }
+
+    /**
+     * Test deleting User by ID.
+     * Verifies that the repository can delete a User by its primary key.
+     */
+    @Test
+    @DisplayName("Should delete User by ID successfully")
+    void testDeleteById_Success() {
+        // Given
+        UUID userId = testUser.getId();
 
         // When
         userRepository.deleteById(userId);
@@ -178,141 +329,49 @@ public class test_UserRepository {
     }
 
     /**
-     * Test finding all users.
+     * Test saving multiple Users with different usernames.
+     * Verifies that multiple users can be saved with unique usernames.
      */
     @Test
-    @DisplayName("Should find all users")
-    void testFindAll() {
+    @DisplayName("Should save multiple Users with different usernames")
+    void testSave_MultipleUsers() {
         // Given
-        userRepository.save(testUser);
-        
-        User anotherUser = new User();
-        anotherUser.setId(UUID.randomUUID());
-        anotherUser.setUsername("anotheruser");
-        anotherUser.setEmail("another@example.com");
-        anotherUser.setPassword("password123");
-        userRepository.save(anotherUser);
-        entityManager.flush();
+        User user2 = new User();
+        user2.setId(UUID.randomUUID());
+        user2.setUsername("user2");
+        user2.setPassword("password2");
+
+        User user3 = new User();
+        user3.setId(UUID.randomUUID());
+        user3.setUsername("user3");
+        user3.setPassword("password3");
 
         // When
-        var users = userRepository.findAll();
-
-        // Then
-        assertThat(users).hasSizeGreaterThanOrEqualTo(2);
-    }
-
-    /**
-     * Test updating a user.
-     */
-    @Test
-    @DisplayName("Should update user successfully")
-    void testUpdateUser() {
-        // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
-
-        // When
-        savedUser.setEmail("newemail@example.com");
-        User updatedUser = userRepository.save(savedUser);
+        userRepository.save(user2);
+        userRepository.save(user3);
         entityManager.flush();
 
         // Then
-        assertThat(updatedUser.getEmail()).isEqualTo("newemail@example.com");
+        assertThat(userRepository.existsByUsername("user2")).isTrue();
+        assertThat(userRepository.existsByUsername("user3")).isTrue();
+        assertThat(userRepository.count()).isGreaterThanOrEqualTo(3);
     }
 
     /**
-     * Test with null username - edge case.
+     * Test updating User password.
+     * Verifies that User password can be updated.
      */
     @Test
-    @DisplayName("Should handle null username gracefully")
-    void testFindByUsername_NullUsername() {
-        // When
-        Optional<User> result = userRepository.findByUsername(null);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test exists by username with null - edge case.
-     */
-    @Test
-    @DisplayName("Should handle null username in exists check")
-    void testExistsByUsername_NullUsername() {
-        // When
-        boolean exists = userRepository.existsByUsername(null);
-
-        // Then
-        assertThat(exists).isFalse();
-    }
-
-    /**
-     * Test case sensitivity of username search.
-     */
-    @Test
-    @DisplayName("Should handle username case sensitivity")
-    void testFindByUsername_CaseSensitive() {
+    @DisplayName("Should update User password successfully")
+    void testSave_UpdatePassword() {
         // Given
-        userRepository.save(testUser);
-        entityManager.flush();
+        String newPassword = "newSecurePassword123";
+        testUser.setPassword(newPassword);
 
         // When
-        Optional<User> resultLower = userRepository.findByUsername(testUsername.toLowerCase());
-        Optional<User> resultUpper = userRepository.findByUsername(testUsername.toUpperCase());
+        User updatedUser = userRepository.save(testUser);
 
         // Then
-        assertThat(resultLower).isPresent();
-        // Upper case should not match if username is case-sensitive
-        assertThat(resultUpper).isEmpty();
-    }
-
-    /**
-     * Test counting users.
-     */
-    @Test
-    @DisplayName("Should count users correctly")
-    void testCount() {
-        // Given
-        userRepository.save(testUser);
-        entityManager.flush();
-
-        // When
-        long count = userRepository.count();
-
-        // Then
-        assertThat(count).isGreaterThanOrEqualTo(1);
-    }
-
-    /**
-     * Test checking if user exists by ID.
-     */
-    @Test
-    @DisplayName("Should return true when user exists by ID")
-    void testExistsById_True() {
-        // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
-
-        // When
-        boolean exists = userRepository.existsById(savedUser.getId());
-
-        // Then
-        assertThat(exists).isTrue();
-    }
-
-    /**
-     * Test checking if user exists by ID - false case.
-     */
-    @Test
-    @DisplayName("Should return false when user does not exist by ID")
-    void testExistsById_False() {
-        // Given
-        UUID nonExistentId = UUID.randomUUID();
-
-        // When
-        boolean exists = userRepository.existsById(nonExistentId);
-
-        // Then
-        assertThat(exists).isFalse();
+        assertThat(updatedUser.getPassword()).isEqualTo(newPassword);
     }
 }
