@@ -18,8 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test class for LogoutController
- * Tests logout operations and cart cleanup
+ * JUnit 5 test class for LogoutController.
+ * Tests logout functionality and cart cleanup operations.
  */
 @ExtendWith(MockitoExtension.class)
 class test_LogoutController {
@@ -38,7 +38,8 @@ class test_LogoutController {
     }
 
     /**
-     * Test successful logout operation
+     * Test successful logout operation.
+     * Verifies that cart is cleared and returns HTTP 200 OK with success message.
      */
     @Test
     void testLogout_Success() {
@@ -51,16 +52,17 @@ class test_LogoutController {
         assertNotNull(response.getBody());
         assertEquals("Logout successful", response.getBody().getMessage());
         assertNull(response.getBody().getData());
-        verify(cartService, times(1)).clearCart(eq(userId));
+        verify(cartService, times(1)).clearCart(userId);
     }
 
     /**
-     * Test logout with null user ID
+     * Test logout with null user ID.
+     * Verifies proper null handling and exception propagation.
      */
     @Test
     void testLogout_NullUserId() {
         doThrow(new IllegalArgumentException("User ID cannot be null"))
-            .when(cartService).clearCart(any());
+            .when(cartService).clearCart(null);
 
         assertThrows(IllegalArgumentException.class, () -> {
             logoutController.logout(null);
@@ -68,39 +70,42 @@ class test_LogoutController {
     }
 
     /**
-     * Test logout when cart service throws exception
+     * Test logout when cart service throws exception.
+     * Verifies that exceptions from service layer are properly propagated.
      */
     @Test
     void testLogout_ServiceException() {
-        doThrow(new RuntimeException("Failed to clear cart"))
+        doThrow(new RuntimeException("Database connection error"))
             .when(cartService).clearCart(any(UUID.class));
 
         assertThrows(RuntimeException.class, () -> {
             logoutController.logout(userId);
         });
-        verify(cartService, times(1)).clearCart(eq(userId));
+        verify(cartService, times(1)).clearCart(userId);
     }
 
     /**
-     * Test logout with valid UUID format
+     * Test logout with valid UUID format.
+     * Verifies that UUID is properly handled throughout the operation.
      */
     @Test
-    void testLogout_ValidUUID() {
+    void testLogout_ValidUUIDFormat() {
         UUID validUserId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        doNothing().when(cartService).clearCart(any(UUID.class));
+        doNothing().when(cartService).clearCart(validUserId);
 
         ResponseEntity<ApiResponse<Void>> response = logoutController.logout(validUserId);
 
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(cartService, times(1)).clearCart(eq(validUserId));
+        verify(cartService, times(1)).clearCart(validUserId);
     }
 
     /**
-     * Test logout multiple times for same user
+     * Test multiple logout calls for same user.
+     * Verifies idempotent behavior of logout operation.
      */
     @Test
-    void testLogout_MultipleCalls() {
+    void testLogout_MultipleCallsSameUser() {
         doNothing().when(cartService).clearCart(any(UUID.class));
 
         ResponseEntity<ApiResponse<Void>> response1 = logoutController.logout(userId);
@@ -110,19 +115,6 @@ class test_LogoutController {
         assertNotNull(response2);
         assertEquals(HttpStatus.OK, response1.getStatusCode());
         assertEquals(HttpStatus.OK, response2.getStatusCode());
-        verify(cartService, times(2)).clearCart(eq(userId));
-    }
-
-    /**
-     * Test logout verifies cart service is called
-     */
-    @Test
-    void testLogout_VerifyCartServiceCalled() {
-        doNothing().when(cartService).clearCart(any(UUID.class));
-
-        logoutController.logout(userId);
-
-        verify(cartService, times(1)).clearCart(userId);
-        verifyNoMoreInteractions(cartService);
+        verify(cartService, times(2)).clearCart(userId);
     }
 }

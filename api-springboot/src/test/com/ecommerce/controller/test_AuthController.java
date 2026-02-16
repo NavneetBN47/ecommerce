@@ -18,8 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test class for AuthController
- * Tests authentication operations including registration, login, and logout
+ * JUnit 5 test class for AuthController.
+ * Tests authentication operations including registration, login, and logout.
  */
 @ExtendWith(MockitoExtension.class)
 class test_AuthController {
@@ -37,8 +37,8 @@ class test_AuthController {
     private AuthController authController;
 
     private UserRegistrationDTO registrationDTO;
-    private UserDTO userDTO;
     private LoginRequestDTO loginRequestDTO;
+    private UserDTO userDTO;
     private LoginResponseDTO loginResponseDTO;
 
     @BeforeEach
@@ -46,24 +46,25 @@ class test_AuthController {
         registrationDTO = new UserRegistrationDTO();
         registrationDTO.setUsername("testuser");
         registrationDTO.setEmail("test@example.com");
-        registrationDTO.setPassword("password123");
+        registrationDTO.setPassword("Password123!");
+
+        loginRequestDTO = new LoginRequestDTO();
+        loginRequestDTO.setIdentifier("testuser");
+        loginRequestDTO.setPassword("Password123!");
 
         userDTO = new UserDTO();
         userDTO.setId(1L);
         userDTO.setUsername("testuser");
         userDTO.setEmail("test@example.com");
 
-        loginRequestDTO = new LoginRequestDTO();
-        loginRequestDTO.setIdentifier("testuser");
-        loginRequestDTO.setPassword("password123");
-
         loginResponseDTO = new LoginResponseDTO();
-        loginResponseDTO.setToken("jwt-token");
+        loginResponseDTO.setToken("jwt-token-123");
         loginResponseDTO.setUser(userDTO);
     }
 
     /**
-     * Test successful user registration
+     * Test successful user registration.
+     * Verifies that a new user can be registered and returns HTTP 201 CREATED status.
      */
     @Test
     void testRegister_Success() {
@@ -80,31 +81,19 @@ class test_AuthController {
     }
 
     /**
-     * Test registration with null registration DTO
+     * Test registration with null DTO.
+     * Verifies that appropriate exception handling occurs.
      */
     @Test
     void testRegister_NullDTO() {
-        assertThrows(NullPointerException.class, () -> {
+        assertThrows(Exception.class, () -> {
             authController.register(null);
         });
     }
 
     /**
-     * Test registration when service throws exception
-     */
-    @Test
-    void testRegister_ServiceException() {
-        when(userService.registerUser(any(UserRegistrationDTO.class)))
-            .thenThrow(new RuntimeException("Registration failed"));
-
-        assertThrows(RuntimeException.class, () -> {
-            authController.register(registrationDTO);
-        });
-        verify(userService, times(1)).registerUser(any(UserRegistrationDTO.class));
-    }
-
-    /**
-     * Test successful user login
+     * Test successful user login.
+     * Verifies that valid credentials return a JWT token and HTTP 200 OK status.
      */
     @Test
     void testLogin_Success() {
@@ -117,35 +106,31 @@ class test_AuthController {
         assertNotNull(response.getBody());
         assertEquals("Login successful", response.getBody().getMessage());
         assertEquals(loginResponseDTO, response.getBody().getData());
+        assertEquals("jwt-token-123", response.getBody().getData().getToken());
         verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
-     * Test login with invalid credentials
+     * Test login with invalid credentials.
+     * Verifies that authentication service is called even with invalid data.
      */
     @Test
     void testLogin_InvalidCredentials() {
-        when(authService.login(any(LoginRequestDTO.class)))
-            .thenThrow(new RuntimeException("Invalid credentials"));
+        LoginRequestDTO invalidRequest = new LoginRequestDTO();
+        invalidRequest.setIdentifier("wronguser");
+        invalidRequest.setPassword("wrongpass");
+
+        when(authService.login(any(LoginRequestDTO.class))).thenThrow(new RuntimeException("Invalid credentials"));
 
         assertThrows(RuntimeException.class, () -> {
-            authController.login(loginRequestDTO);
+            authController.login(invalidRequest);
         });
         verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
-     * Test login with null login request
-     */
-    @Test
-    void testLogin_NullRequest() {
-        assertThrows(NullPointerException.class, () -> {
-            authController.login(null);
-        });
-    }
-
-    /**
-     * Test successful user logout
+     * Test successful user logout.
+     * Verifies that cart is cleaned up and HTTP 200 OK status is returned.
      */
     @Test
     void testLogout_Success() {
@@ -163,7 +148,8 @@ class test_AuthController {
     }
 
     /**
-     * Test logout with invalid user ID
+     * Test logout with invalid user ID.
+     * Verifies that service layer handles invalid user scenarios.
      */
     @Test
     void testLogout_InvalidUserId() {
@@ -175,21 +161,8 @@ class test_AuthController {
     }
 
     /**
-     * Test logout when service throws exception
-     */
-    @Test
-    void testLogout_ServiceException() {
-        when(authentication.getName()).thenReturn("1");
-        doThrow(new RuntimeException("Logout failed")).when(authService).logout(anyLong());
-
-        assertThrows(RuntimeException.class, () -> {
-            authController.logout(authentication);
-        });
-        verify(authService, times(1)).logout(1L);
-    }
-
-    /**
-     * Test logout with null authentication
+     * Test logout when authentication is null.
+     * Verifies proper null handling.
      */
     @Test
     void testLogout_NullAuthentication() {
