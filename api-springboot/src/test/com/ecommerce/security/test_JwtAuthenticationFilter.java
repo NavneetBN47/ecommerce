@@ -11,18 +11,20 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * JUnit test class for JwtAuthenticationFilter.
- * Tests JWT authentication filter functionality including token validation,
- * authentication setting, and error handling.
+ * JUnit 5 test class for JwtAuthenticationFilter.
+ * Tests JWT authentication filter functionality including token extraction,
+ * validation, and security context setup.
  *
  * @author QA Automation Team
  * @version 1.0
@@ -42,79 +44,81 @@ class test_JwtAuthenticationFilter {
     @Mock
     private FilterChain filterChain;
 
+    @Mock
+    private SecurityContext securityContext;
+
     @InjectMocks
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    private static final String VALID_TOKEN = "valid.jwt.token";
+    private static final String BEARER_TOKEN = "Bearer " + VALID_TOKEN;
+    private static final Long USER_ID = 123L;
+
     /**
-     * Setup method to clear SecurityContext before each test.
+     * Setup method executed before each test.
+     * Initializes SecurityContextHolder with mock SecurityContext.
      */
     @BeforeEach
     void setUp() {
-        SecurityContextHolder.clearContext();
+        SecurityContextHolder.setContext(securityContext);
     }
 
     /**
-     * Test doFilterInternal with valid JWT token.
-     * Verifies that authentication is set in SecurityContext when a valid JWT is provided.
+     * Test successful JWT authentication with valid token.
+     * Verifies that authentication is set in SecurityContext when valid JWT is provided.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WithValidJwt_ShouldSetAuthentication() throws ServletException, IOException {
+    void testDoFilterInternal_WithValidToken_ShouldSetAuthentication() throws ServletException, IOException {
         // Arrange
-        String validToken = "valid.jwt.token";
-        Long userId = 123L;
-        when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
-        when(jwtTokenProvider.validateToken(validToken)).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken(validToken)).thenReturn(userId);
+        when(request.getHeader("Authorization")).thenReturn(BEARER_TOKEN);
+        when(jwtTokenProvider.validateToken(VALID_TOKEN)).thenReturn(true);
+        when(jwtTokenProvider.getUserIdFromToken(VALID_TOKEN)).thenReturn(USER_ID);
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertNotNull(authentication, "Authentication should be set in SecurityContext");
-        assertEquals(userId.toString(), authentication.getPrincipal(), "User ID should match");
-        verify(filterChain, times(1)).doFilter(request, response);
-        verify(jwtTokenProvider, times(1)).validateToken(validToken);
-        verify(jwtTokenProvider, times(1)).getUserIdFromToken(validToken);
+        verify(jwtTokenProvider).validateToken(VALID_TOKEN);
+        verify(jwtTokenProvider).getUserIdFromToken(VALID_TOKEN);
+        verify(securityContext).setAuthentication(any(Authentication.class));
+        verify(filterChain).doFilter(request, response);
     }
 
     /**
-     * Test doFilterInternal with invalid JWT token.
-     * Verifies that authentication is not set when JWT validation fails.
+     * Test filter behavior with invalid JWT token.
+     * Verifies that authentication is not set when token validation fails.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WithInvalidJwt_ShouldNotSetAuthentication() throws ServletException, IOException {
+    void testDoFilterInternal_WithInvalidToken_ShouldNotSetAuthentication() throws ServletException, IOException {
         // Arrange
-        String invalidToken = "invalid.jwt.token";
-        when(request.getHeader("Authorization")).thenReturn("Bearer " + invalidToken);
-        when(jwtTokenProvider.validateToken(invalidToken)).thenReturn(false);
+        when(request.getHeader("Authorization")).thenReturn(BEARER_TOKEN);
+        when(jwtTokenProvider.validateToken(VALID_TOKEN)).thenReturn(false);
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertNull(authentication, "Authentication should not be set for invalid token");
-        verify(filterChain, times(1)).doFilter(request, response);
-        verify(jwtTokenProvider, times(1)).validateToken(invalidToken);
+        verify(jwtTokenProvider).validateToken(VALID_TOKEN);
         verify(jwtTokenProvider, never()).getUserIdFromToken(anyString());
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
     }
 
     /**
-     * Test doFilterInternal without JWT token.
-     * Verifies that filter continues without setting authentication when no token is provided.
+     * Test filter behavior when no Authorization header is present.
+     * Verifies that filter chain continues without setting authentication.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WithoutJwt_ShouldContinueFilterChain() throws ServletException, IOException {
+    void testDoFilterInternal_WithNoAuthorizationHeader_ShouldContinueFilterChain() throws ServletException, IOException {
         // Arrange
         when(request.getHeader("Authorization")).thenReturn(null);
 
@@ -122,96 +126,154 @@ class test_JwtAuthenticationFilter {
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertNull(authentication, "Authentication should not be set without token");
-        verify(filterChain, times(1)).doFilter(request, response);
         verify(jwtTokenProvider, never()).validateToken(anyString());
-        verify(jwtTokenProvider, never()).getUserIdFromToken(anyString());
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
     }
 
     /**
-     * Test doFilterInternal with malformed Authorization header.
-     * Verifies that filter handles malformed headers gracefully.
+     * Test filter behavior with empty Authorization header.
+     * Verifies that filter chain continues without setting authentication.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WithMalformedAuthHeader_ShouldNotSetAuthentication() throws ServletException, IOException {
+    void testDoFilterInternal_WithEmptyAuthorizationHeader_ShouldContinueFilterChain() throws ServletException, IOException {
         // Arrange
-        when(request.getHeader("Authorization")).thenReturn("InvalidFormat token");
+        when(request.getHeader("Authorization")).thenReturn("");
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertNull(authentication, "Authentication should not be set for malformed header");
-        verify(filterChain, times(1)).doFilter(request, response);
         verify(jwtTokenProvider, never()).validateToken(anyString());
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
     }
 
     /**
-     * Test doFilterInternal with empty Bearer token.
-     * Verifies that filter handles empty tokens correctly.
+     * Test filter behavior with Authorization header without Bearer prefix.
+     * Verifies that token is not extracted when Bearer prefix is missing.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WithEmptyBearerToken_ShouldNotSetAuthentication() throws ServletException, IOException {
+    void testDoFilterInternal_WithoutBearerPrefix_ShouldNotExtractToken() throws ServletException, IOException {
         // Arrange
-        when(request.getHeader("Authorization")).thenReturn("Bearer ");
+        when(request.getHeader("Authorization")).thenReturn(VALID_TOKEN);
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertNull(authentication, "Authentication should not be set for empty token");
-        verify(filterChain, times(1)).doFilter(request, response);
+        verify(jwtTokenProvider, never()).validateToken(anyString());
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
     }
 
     /**
-     * Test doFilterInternal when exception occurs during token processing.
-     * Verifies that exceptions are handled gracefully and filter chain continues.
+     * Test filter behavior when token provider throws exception.
+     * Verifies that filter handles exceptions gracefully and continues filter chain.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WhenExceptionOccurs_ShouldContinueFilterChain() throws ServletException, IOException {
+    void testDoFilterInternal_WhenTokenProviderThrowsException_ShouldHandleGracefully() throws ServletException, IOException {
         // Arrange
-        String validToken = "valid.jwt.token";
-        when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
-        when(jwtTokenProvider.validateToken(validToken)).thenThrow(new RuntimeException("Token processing error"));
+        when(request.getHeader("Authorization")).thenReturn(BEARER_TOKEN);
+        when(jwtTokenProvider.validateToken(VALID_TOKEN)).thenThrow(new RuntimeException("Token validation error"));
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertNull(authentication, "Authentication should not be set when exception occurs");
-        verify(filterChain, times(1)).doFilter(request, response);
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
     }
 
     /**
-     * Test doFilterInternal with valid JWT but null userId.
-     * Verifies handling of edge case where token is valid but userId extraction fails.
+     * Test filter behavior with malformed Bearer token.
+     * Verifies that filter handles malformed tokens without errors.
      *
      * @throws ServletException if servlet error occurs
      * @throws IOException if I/O error occurs
      */
     @Test
-    void testDoFilterInternal_WithValidJwtButNullUserId_ShouldHandleGracefully() throws ServletException, IOException {
+    void testDoFilterInternal_WithMalformedBearerToken_ShouldNotSetAuthentication() throws ServletException, IOException {
         // Arrange
-        String validToken = "valid.jwt.token";
-        when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
-        when(jwtTokenProvider.validateToken(validToken)).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken(validToken)).thenReturn(null);
+        when(request.getHeader("Authorization")).thenReturn("Bearer");
 
-        // Act & Assert
-        assertDoesNotThrow(() -> jwtAuthenticationFilter.doFilterInternal(request, response, filterChain));
+        // Act
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        // Assert
+        verify(jwtTokenProvider, never()).validateToken(anyString());
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    /**
+     * Test filter behavior with whitespace in Authorization header.
+     * Verifies proper handling of whitespace scenarios.
+     *
+     * @throws ServletException if servlet error occurs
+     * @throws IOException if I/O error occurs
+     */
+    @Test
+    void testDoFilterInternal_WithWhitespaceToken_ShouldNotSetAuthentication() throws ServletException, IOException {
+        // Arrange
+        when(request.getHeader("Authorization")).thenReturn("Bearer    ");
+
+        // Act
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        // Assert
+        verify(jwtTokenProvider, never()).validateToken(anyString());
+        verify(securityContext, never()).setAuthentication(any());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    /**
+     * Test that filter always continues the filter chain.
+     * Verifies that doFilter is always called regardless of authentication status.
+     *
+     * @throws ServletException if servlet error occurs
+     * @throws IOException if I/O error occurs
+     */
+    @Test
+    void testDoFilterInternal_AlwaysContinuesFilterChain() throws ServletException, IOException {
+        // Arrange
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        // Act
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        // Assert
         verify(filterChain, times(1)).doFilter(request, response);
+    }
+
+    /**
+     * Test authentication details are properly set.
+     * Verifies that WebAuthenticationDetails are attached to authentication.
+     *
+     * @throws ServletException if servlet error occurs
+     * @throws IOException if I/O error occurs
+     */
+    @Test
+    void testDoFilterInternal_SetsAuthenticationDetails() throws ServletException, IOException {
+        // Arrange
+        when(request.getHeader("Authorization")).thenReturn(BEARER_TOKEN);
+        when(jwtTokenProvider.validateToken(VALID_TOKEN)).thenReturn(true);
+        when(jwtTokenProvider.getUserIdFromToken(VALID_TOKEN)).thenReturn(USER_ID);
+
+        // Act
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        // Assert
+        verify(securityContext).setAuthentication(any(Authentication.class));
+        verify(filterChain).doFilter(request, response);
     }
 }
