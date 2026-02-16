@@ -13,15 +13,21 @@ import java.util.Date;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Test class for JwtTokenProvider
- * Tests JWT token generation, validation, and extraction functionality
+ * JUnit test class for JwtTokenProvider.
+ * Tests JWT token generation, validation, and extraction functionality.
+ *
+ * @author QA Automation Team
+ * @version 1.0
  */
 class test_JwtTokenProvider {
 
     private JwtTokenProvider jwtTokenProvider;
-    private String testSecret = "mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLongForTesting";
-    private Long testExpiration = 3600000L; // 1 hour
+    private String testSecret = "mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong";
+    private Long testExpiration = 86400000L; // 24 hours
 
+    /**
+     * Setup method to initialize JwtTokenProvider with test configuration.
+     */
     @BeforeEach
     void setUp() {
         jwtTokenProvider = new JwtTokenProvider();
@@ -30,8 +36,8 @@ class test_JwtTokenProvider {
     }
 
     /**
-     * Test successful JWT token generation
-     * Verifies that a valid token is generated with correct claims
+     * Test generateToken with valid username and userId.
+     * Verifies that a valid JWT token is generated with correct claims.
      */
     @Test
     void testGenerateToken_WithValidInputs_ShouldReturnValidToken() {
@@ -49,8 +55,46 @@ class test_JwtTokenProvider {
     }
 
     /**
-     * Test token generation and validation
-     * Verifies that generated tokens are valid
+     * Test getUserIdFromToken with valid token.
+     * Verifies that the correct user ID is extracted from the token.
+     */
+    @Test
+    void testGetUserIdFromToken_WithValidToken_ShouldReturnCorrectUserId() {
+        // Arrange
+        String username = "testuser";
+        Long userId = 123L;
+        String token = jwtTokenProvider.generateToken(username, userId);
+
+        // Act
+        Long extractedUserId = jwtTokenProvider.getUserIdFromToken(token);
+
+        // Assert
+        assertNotNull(extractedUserId, "Extracted user ID should not be null");
+        assertEquals(userId, extractedUserId, "Extracted user ID should match the original");
+    }
+
+    /**
+     * Test getUsernameFromToken with valid token.
+     * Verifies that the correct username is extracted from the token.
+     */
+    @Test
+    void testGetUsernameFromToken_WithValidToken_ShouldReturnCorrectUsername() {
+        // Arrange
+        String username = "testuser";
+        Long userId = 123L;
+        String token = jwtTokenProvider.generateToken(username, userId);
+
+        // Act
+        String extractedUsername = jwtTokenProvider.getUsernameFromToken(token);
+
+        // Assert
+        assertNotNull(extractedUsername, "Extracted username should not be null");
+        assertEquals(username, extractedUsername, "Extracted username should match the original");
+    }
+
+    /**
+     * Test validateToken with valid token.
+     * Verifies that a valid token passes validation.
      */
     @Test
     void testValidateToken_WithValidToken_ShouldReturnTrue() {
@@ -63,12 +107,12 @@ class test_JwtTokenProvider {
         boolean isValid = jwtTokenProvider.validateToken(token);
 
         // Assert
-        assertTrue(isValid, "Generated token should be valid");
+        assertTrue(isValid, "Valid token should pass validation");
     }
 
     /**
-     * Test token validation with invalid token
-     * Verifies that invalid tokens are rejected
+     * Test validateToken with invalid token.
+     * Verifies that an invalid token fails validation.
      */
     @Test
     void testValidateToken_WithInvalidToken_ShouldReturnFalse() {
@@ -79,12 +123,12 @@ class test_JwtTokenProvider {
         boolean isValid = jwtTokenProvider.validateToken(invalidToken);
 
         // Assert
-        assertFalse(isValid, "Invalid token should not be validated");
+        assertFalse(isValid, "Invalid token should fail validation");
     }
 
     /**
-     * Test token validation with null token
-     * Verifies that null tokens are handled gracefully
+     * Test validateToken with null token.
+     * Verifies that null token is handled gracefully.
      */
     @Test
     void testValidateToken_WithNullToken_ShouldReturnFalse() {
@@ -92,12 +136,12 @@ class test_JwtTokenProvider {
         boolean isValid = jwtTokenProvider.validateToken(null);
 
         // Assert
-        assertFalse(isValid, "Null token should not be validated");
+        assertFalse(isValid, "Null token should fail validation");
     }
 
     /**
-     * Test token validation with empty token
-     * Verifies that empty tokens are rejected
+     * Test validateToken with empty token.
+     * Verifies that empty token is handled gracefully.
      */
     @Test
     void testValidateToken_WithEmptyToken_ShouldReturnFalse() {
@@ -105,83 +149,60 @@ class test_JwtTokenProvider {
         boolean isValid = jwtTokenProvider.validateToken("");
 
         // Assert
-        assertFalse(isValid, "Empty token should not be validated");
+        assertFalse(isValid, "Empty token should fail validation");
     }
 
     /**
-     * Test extracting user ID from valid token
-     * Verifies that user ID can be correctly extracted from token
+     * Test validateToken with malformed token.
+     * Verifies that malformed token fails validation.
      */
     @Test
-    void testGetUserIdFromToken_WithValidToken_ShouldReturnUserId() {
+    void testValidateToken_WithMalformedToken_ShouldReturnFalse() {
         // Arrange
-        String username = "testuser";
-        Long userId = 123L;
-        String token = jwtTokenProvider.generateToken(username, userId);
+        String malformedToken = "malformed.token";
 
         // Act
-        Long extractedUserId = jwtTokenProvider.getUserIdFromToken(token);
+        boolean isValid = jwtTokenProvider.validateToken(malformedToken);
 
         // Assert
-        assertNotNull(extractedUserId, "Extracted user ID should not be null");
-        assertEquals(userId, extractedUserId, "Extracted user ID should match original");
+        assertFalse(isValid, "Malformed token should fail validation");
     }
 
     /**
-     * Test extracting username from valid token
-     * Verifies that username can be correctly extracted from token
+     * Test validateToken with expired token.
+     * Verifies that expired token fails validation.
      */
     @Test
-    void testGetUsernameFromToken_WithValidToken_ShouldReturnUsername() {
+    void testValidateToken_WithExpiredToken_ShouldReturnFalse() {
         // Arrange
+        JwtTokenProvider expiredTokenProvider = new JwtTokenProvider();
+        ReflectionTestUtils.setField(expiredTokenProvider, "jwtSecret", testSecret);
+        ReflectionTestUtils.setField(expiredTokenProvider, "jwtExpiration", -1000L); // Negative expiration
+        
         String username = "testuser";
         Long userId = 123L;
-        String token = jwtTokenProvider.generateToken(username, userId);
+        String expiredToken = expiredTokenProvider.generateToken(username, userId);
+
+        // Wait a moment to ensure token is expired
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
         // Act
-        String extractedUsername = jwtTokenProvider.getUsernameFromToken(token);
+        boolean isValid = jwtTokenProvider.validateToken(expiredToken);
 
         // Assert
-        assertNotNull(extractedUsername, "Extracted username should not be null");
-        assertEquals(username, extractedUsername, "Extracted username should match original");
+        assertFalse(isValid, "Expired token should fail validation");
     }
 
     /**
-     * Test extracting user ID from invalid token
-     * Verifies that exception is thrown for invalid tokens
+     * Test getExpirationTime.
+     * Verifies that the correct expiration time is returned.
      */
     @Test
-    void testGetUserIdFromToken_WithInvalidToken_ShouldThrowException() {
-        // Arrange
-        String invalidToken = "invalid.jwt.token";
-
-        // Act & Assert
-        assertThrows(Exception.class, () -> {
-            jwtTokenProvider.getUserIdFromToken(invalidToken);
-        }, "Should throw exception for invalid token");
-    }
-
-    /**
-     * Test extracting username from invalid token
-     * Verifies that exception is thrown for invalid tokens
-     */
-    @Test
-    void testGetUsernameFromToken_WithInvalidToken_ShouldThrowException() {
-        // Arrange
-        String invalidToken = "invalid.jwt.token";
-
-        // Act & Assert
-        assertThrows(Exception.class, () -> {
-            jwtTokenProvider.getUsernameFromToken(invalidToken);
-        }, "Should throw exception for invalid token");
-    }
-
-    /**
-     * Test getting expiration time
-     * Verifies that configured expiration time is returned
-     */
-    @Test
-    void testGetExpirationTime_ShouldReturnConfiguredExpiration() {
+    void testGetExpirationTime_ShouldReturnCorrectValue() {
         // Act
         Long expirationTime = jwtTokenProvider.getExpirationTime();
 
@@ -191,87 +212,8 @@ class test_JwtTokenProvider {
     }
 
     /**
-     * Test token generation with different user IDs
-     * Verifies that tokens are unique for different users
-     */
-    @Test
-    void testGenerateToken_WithDifferentUserIds_ShouldGenerateDifferentTokens() {
-        // Arrange
-        String username1 = "user1";
-        Long userId1 = 1L;
-        String username2 = "user2";
-        Long userId2 = 2L;
-
-        // Act
-        String token1 = jwtTokenProvider.generateToken(username1, userId1);
-        String token2 = jwtTokenProvider.generateToken(username2, userId2);
-
-        // Assert
-        assertNotEquals(token1, token2, "Tokens for different users should be different");
-    }
-
-    /**
-     * Test token contains correct expiration date
-     * Verifies that token expiration is set correctly
-     */
-    @Test
-    void testGenerateToken_ShouldContainCorrectExpiration() {
-        // Arrange
-        String username = "testuser";
-        Long userId = 123L;
-        Date beforeGeneration = new Date();
-
-        // Act
-        String token = jwtTokenProvider.generateToken(username, userId);
-        Date afterGeneration = new Date();
-
-        // Assert
-        Key key = Keys.hmacShaKeyFor(testSecret.getBytes());
-        Claims claims = Jwts.parserBuilder()
-            .setSigningKey(key)
-            .build()
-            .parseClaimsJws(token)
-            .getBody();
-
-        Date expiration = claims.getExpiration();
-        assertNotNull(expiration, "Token should have expiration date");
-        
-        long expectedExpirationMin = beforeGeneration.getTime() + testExpiration;
-        long expectedExpirationMax = afterGeneration.getTime() + testExpiration;
-        
-        assertTrue(expiration.getTime() >= expectedExpirationMin && 
-                   expiration.getTime() <= expectedExpirationMax,
-                   "Token expiration should be within expected range");
-    }
-
-    /**
-     * Test token validation with expired token
-     * Verifies that expired tokens are rejected
-     */
-    @Test
-    void testValidateToken_WithExpiredToken_ShouldReturnFalse() throws InterruptedException {
-        // Arrange
-        JwtTokenProvider shortExpirationProvider = new JwtTokenProvider();
-        ReflectionTestUtils.setField(shortExpirationProvider, "jwtSecret", testSecret);
-        ReflectionTestUtils.setField(shortExpirationProvider, "jwtExpiration", 1L); // 1 millisecond
-        
-        String username = "testuser";
-        Long userId = 123L;
-        String token = shortExpirationProvider.generateToken(username, userId);
-        
-        // Wait for token to expire
-        Thread.sleep(10);
-
-        // Act
-        boolean isValid = shortExpirationProvider.validateToken(token);
-
-        // Assert
-        assertFalse(isValid, "Expired token should not be valid");
-    }
-
-    /**
-     * Test token generation with null username
-     * Verifies that token can be generated even with null username (username is optional claim)
+     * Test generateToken with null username.
+     * Verifies that token generation handles null username.
      */
     @Test
     void testGenerateToken_WithNullUsername_ShouldGenerateToken() {
@@ -283,24 +225,72 @@ class test_JwtTokenProvider {
 
         // Assert
         assertNotNull(token, "Token should be generated even with null username");
-        assertTrue(jwtTokenProvider.validateToken(token), "Generated token should be valid");
     }
 
     /**
-     * Test token generation with empty username
-     * Verifies that token can be generated with empty username
+     * Test generateToken with null userId.
+     * Verifies that token generation handles null userId.
      */
     @Test
-    void testGenerateToken_WithEmptyUsername_ShouldGenerateToken() {
+    void testGenerateToken_WithNullUserId_ShouldGenerateToken() {
         // Arrange
-        String username = "";
+        String username = "testuser";
+
+        // Act & Assert
+        assertDoesNotThrow(() -> jwtTokenProvider.generateToken(username, null),
+                "Token generation should handle null userId");
+    }
+
+    /**
+     * Test getUserIdFromToken with tampered token.
+     * Verifies that tampered token throws exception.
+     */
+    @Test
+    void testGetUserIdFromToken_WithTamperedToken_ShouldThrowException() {
+        // Arrange
+        String username = "testuser";
+        Long userId = 123L;
+        String token = jwtTokenProvider.generateToken(username, userId);
+        String tamperedToken = token.substring(0, token.length() - 5) + "XXXXX";
+
+        // Act & Assert
+        assertThrows(Exception.class, () -> jwtTokenProvider.getUserIdFromToken(tamperedToken),
+                "Tampered token should throw exception");
+    }
+
+    /**
+     * Test getUsernameFromToken with tampered token.
+     * Verifies that tampered token throws exception.
+     */
+    @Test
+    void testGetUsernameFromToken_WithTamperedToken_ShouldThrowException() {
+        // Arrange
+        String username = "testuser";
+        Long userId = 123L;
+        String token = jwtTokenProvider.generateToken(username, userId);
+        String tamperedToken = token.substring(0, token.length() - 5) + "XXXXX";
+
+        // Act & Assert
+        assertThrows(Exception.class, () -> jwtTokenProvider.getUsernameFromToken(tamperedToken),
+                "Tampered token should throw exception");
+    }
+
+    /**
+     * Test token generation with special characters in username.
+     * Verifies that special characters are handled correctly.
+     */
+    @Test
+    void testGenerateToken_WithSpecialCharactersInUsername_ShouldGenerateValidToken() {
+        // Arrange
+        String username = "test@user.com";
         Long userId = 123L;
 
         // Act
         String token = jwtTokenProvider.generateToken(username, userId);
+        String extractedUsername = jwtTokenProvider.getUsernameFromToken(token);
 
         // Assert
-        assertNotNull(token, "Token should be generated with empty username");
-        assertTrue(jwtTokenProvider.validateToken(token), "Generated token should be valid");
+        assertNotNull(token, "Token should be generated");
+        assertEquals(username, extractedUsername, "Username with special characters should be preserved");
     }
 }

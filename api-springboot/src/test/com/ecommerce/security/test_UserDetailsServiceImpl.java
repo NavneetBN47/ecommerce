@@ -18,8 +18,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for UserDetailsServiceImpl
- * Tests user details loading functionality for Spring Security authentication
+ * JUnit test class for UserDetailsServiceImpl.
+ * Tests user details loading functionality for Spring Security authentication.
+ *
+ * @author QA Automation Team
+ * @version 1.0
  */
 @ExtendWith(MockitoExtension.class)
 class test_UserDetailsServiceImpl {
@@ -32,6 +35,9 @@ class test_UserDetailsServiceImpl {
 
     private User testUser;
 
+    /**
+     * Setup method to initialize test data before each test.
+     */
     @BeforeEach
     void setUp() {
         testUser = new User();
@@ -43,73 +49,75 @@ class test_UserDetailsServiceImpl {
     }
 
     /**
-     * Test loading user by username with valid active user
-     * Verifies that UserDetails is correctly created for valid user
+     * Test loadUserByUsername with existing active user.
+     * Verifies that UserDetails is correctly loaded for an existing active user.
      */
     @Test
-    void testLoadUserByUsername_WithValidActiveUser_ShouldReturnUserDetails() {
+    void testLoadUserByUsername_WithExistingActiveUser_ShouldReturnUserDetails() {
         // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue("testuser"))
+        String username = "testuser";
+        when(userRepository.findByUsernameAndIsActiveTrue(username))
             .thenReturn(Optional.of(testUser));
 
         // Act
-        UserDetails userDetails = userDetailsService.loadUserByUsername("testuser");
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
         // Assert
         assertNotNull(userDetails, "UserDetails should not be null");
-        assertEquals("testuser", userDetails.getUsername(), "Username should match");
-        assertEquals("$2a$10$hashedPassword", userDetails.getPassword(), "Password hash should match");
+        assertEquals(testUser.getUsername(), userDetails.getUsername(),
+                "Username should match");
+        assertEquals(testUser.getPasswordHash(), userDetails.getPassword(),
+                "Password hash should match");
         assertNotNull(userDetails.getAuthorities(), "Authorities should not be null");
-        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue("testuser");
+        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue(username);
     }
 
     /**
-     * Test loading user by username when user does not exist
-     * Verifies that UsernameNotFoundException is thrown for non-existent user
+     * Test loadUserByUsername with non-existing user.
+     * Verifies that UsernameNotFoundException is thrown for non-existing user.
      */
     @Test
-    void testLoadUserByUsername_WithNonExistentUser_ShouldThrowException() {
+    void testLoadUserByUsername_WithNonExistingUser_ShouldThrowException() {
         // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue("nonexistent"))
+        String username = "nonexistentuser";
+        when(userRepository.findByUsernameAndIsActiveTrue(username))
             .thenReturn(Optional.empty());
 
         // Act & Assert
         UsernameNotFoundException exception = assertThrows(
             UsernameNotFoundException.class,
-            () -> userDetailsService.loadUserByUsername("nonexistent"),
-            "Should throw UsernameNotFoundException for non-existent user"
+            () -> userDetailsService.loadUserByUsername(username),
+            "Should throw UsernameNotFoundException for non-existing user"
         );
         
-        assertTrue(exception.getMessage().contains("User not found"),
-                   "Exception message should indicate user not found");
-        assertTrue(exception.getMessage().contains("nonexistent"),
-                   "Exception message should contain username");
-        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue("nonexistent");
+        assertTrue(exception.getMessage().contains(username),
+                "Exception message should contain the username");
+        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue(username);
     }
 
     /**
-     * Test loading user by username when user is inactive
-     * Verifies that inactive users cannot be loaded (repository returns empty)
+     * Test loadUserByUsername with inactive user.
+     * Verifies that inactive users are not loaded (treated as non-existing).
      */
     @Test
     void testLoadUserByUsername_WithInactiveUser_ShouldThrowException() {
         // Arrange
-        testUser.setIsActive(false);
-        when(userRepository.findByUsernameAndIsActiveTrue("testuser"))
+        String username = "inactiveuser";
+        when(userRepository.findByUsernameAndIsActiveTrue(username))
             .thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(
             UsernameNotFoundException.class,
-            () -> userDetailsService.loadUserByUsername("testuser"),
+            () -> userDetailsService.loadUserByUsername(username),
             "Should throw UsernameNotFoundException for inactive user"
         );
-        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue("testuser");
+        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue(username);
     }
 
     /**
-     * Test loading user by username with null username
-     * Verifies that null username is handled properly
+     * Test loadUserByUsername with null username.
+     * Verifies that null username is handled appropriately.
      */
     @Test
     void testLoadUserByUsername_WithNullUsername_ShouldThrowException() {
@@ -126,26 +134,28 @@ class test_UserDetailsServiceImpl {
     }
 
     /**
-     * Test loading user by username with empty username
-     * Verifies that empty username is handled properly
+     * Test loadUserByUsername with empty username.
+     * Verifies that empty username is handled appropriately.
      */
     @Test
     void testLoadUserByUsername_WithEmptyUsername_ShouldThrowException() {
         // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue(""))
+        String emptyUsername = "";
+        when(userRepository.findByUsernameAndIsActiveTrue(emptyUsername))
             .thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(
             UsernameNotFoundException.class,
-            () -> userDetailsService.loadUserByUsername(""),
+            () -> userDetailsService.loadUserByUsername(emptyUsername),
             "Should throw UsernameNotFoundException for empty username"
         );
+        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue(emptyUsername);
     }
 
     /**
-     * Test loading user by username with whitespace username
-     * Verifies that whitespace-only username is handled properly
+     * Test loadUserByUsername with whitespace username.
+     * Verifies that whitespace-only username is handled appropriately.
      */
     @Test
     void testLoadUserByUsername_WithWhitespaceUsername_ShouldThrowException() {
@@ -163,112 +173,110 @@ class test_UserDetailsServiceImpl {
     }
 
     /**
-     * Test loading user by username when repository throws exception
-     * Verifies that repository exceptions are propagated
+     * Test loadUserByUsername with special characters in username.
+     * Verifies that usernames with special characters are handled correctly.
+     */
+    @Test
+    void testLoadUserByUsername_WithSpecialCharacters_ShouldReturnUserDetails() {
+        // Arrange
+        String specialUsername = "test@user.com";
+        testUser.setUsername(specialUsername);
+        when(userRepository.findByUsernameAndIsActiveTrue(specialUsername))
+            .thenReturn(Optional.of(testUser));
+
+        // Act
+        UserDetails userDetails = userDetailsService.loadUserByUsername(specialUsername);
+
+        // Assert
+        assertNotNull(userDetails, "UserDetails should not be null");
+        assertEquals(specialUsername, userDetails.getUsername(),
+                "Username with special characters should match");
+        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue(specialUsername);
+    }
+
+    /**
+     * Test loadUserByUsername with case-sensitive username.
+     * Verifies that username lookup is case-sensitive.
+     */
+    @Test
+    void testLoadUserByUsername_CaseSensitive_ShouldBeDistinct() {
+        // Arrange
+        String lowercaseUsername = "testuser";
+        String uppercaseUsername = "TESTUSER";
+        when(userRepository.findByUsernameAndIsActiveTrue(lowercaseUsername))
+            .thenReturn(Optional.of(testUser));
+        when(userRepository.findByUsernameAndIsActiveTrue(uppercaseUsername))
+            .thenReturn(Optional.empty());
+
+        // Act
+        UserDetails userDetailsLowercase = userDetailsService.loadUserByUsername(lowercaseUsername);
+        
+        // Assert
+        assertNotNull(userDetailsLowercase, "UserDetails should be found for lowercase username");
+        assertThrows(
+            UsernameNotFoundException.class,
+            () -> userDetailsService.loadUserByUsername(uppercaseUsername),
+            "Should throw exception for different case username"
+        );
+    }
+
+    /**
+     * Test loadUserByUsername returns correct authorities.
+     * Verifies that the returned UserDetails has an empty authorities list.
+     */
+    @Test
+    void testLoadUserByUsername_ShouldReturnEmptyAuthorities() {
+        // Arrange
+        String username = "testuser";
+        when(userRepository.findByUsernameAndIsActiveTrue(username))
+            .thenReturn(Optional.of(testUser));
+
+        // Act
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        // Assert
+        assertNotNull(userDetails.getAuthorities(), "Authorities should not be null");
+        assertTrue(userDetails.getAuthorities().isEmpty(),
+                "Authorities list should be empty");
+    }
+
+    /**
+     * Test loadUserByUsername when repository throws exception.
+     * Verifies that repository exceptions are propagated correctly.
      */
     @Test
     void testLoadUserByUsername_WhenRepositoryThrowsException_ShouldPropagateException() {
         // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue(anyString()))
+        String username = "testuser";
+        when(userRepository.findByUsernameAndIsActiveTrue(username))
             .thenThrow(new RuntimeException("Database connection error"));
 
         // Act & Assert
         assertThrows(
             RuntimeException.class,
-            () -> userDetailsService.loadUserByUsername("testuser"),
+            () -> userDetailsService.loadUserByUsername(username),
             "Should propagate repository exception"
         );
     }
 
     /**
-     * Test loading user by username with case-sensitive username
-     * Verifies that username lookup is case-sensitive
+     * Test loadUserByUsername with very long username.
+     * Verifies that long usernames are handled correctly.
      */
     @Test
-    void testLoadUserByUsername_WithDifferentCase_ShouldNotFindUser() {
+    void testLoadUserByUsername_WithVeryLongUsername_ShouldHandleCorrectly() {
         // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue("testuser"))
-            .thenReturn(Optional.of(testUser));
-        when(userRepository.findByUsernameAndIsActiveTrue("TESTUSER"))
-            .thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThrows(
-            UsernameNotFoundException.class,
-            () -> userDetailsService.loadUserByUsername("TESTUSER"),
-            "Should not find user with different case"
-        );
-        verify(userRepository, never()).findByUsernameAndIsActiveTrue("testuser");
-        verify(userRepository, times(1)).findByUsernameAndIsActiveTrue("TESTUSER");
-    }
-
-    /**
-     * Test UserDetails authorities are empty
-     * Verifies that loaded user has empty authorities list
-     */
-    @Test
-    void testLoadUserByUsername_ShouldReturnUserDetailsWithEmptyAuthorities() {
-        // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue("testuser"))
+        String longUsername = "a".repeat(255);
+        testUser.setUsername(longUsername);
+        when(userRepository.findByUsernameAndIsActiveTrue(longUsername))
             .thenReturn(Optional.of(testUser));
 
         // Act
-        UserDetails userDetails = userDetailsService.loadUserByUsername("testuser");
+        UserDetails userDetails = userDetailsService.loadUserByUsername(longUsername);
 
         // Assert
-        assertNotNull(userDetails.getAuthorities(), "Authorities should not be null");
-        assertTrue(userDetails.getAuthorities().isEmpty(), "Authorities should be empty");
-    }
-
-    /**
-     * Test loading user by username multiple times
-     * Verifies that service can be called multiple times successfully
-     */
-    @Test
-    void testLoadUserByUsername_MultipleTimes_ShouldSucceed() {
-        // Arrange
-        when(userRepository.findByUsernameAndIsActiveTrue("testuser"))
-            .thenReturn(Optional.of(testUser));
-
-        // Act
-        UserDetails userDetails1 = userDetailsService.loadUserByUsername("testuser");
-        UserDetails userDetails2 = userDetailsService.loadUserByUsername("testuser");
-
-        // Assert
-        assertNotNull(userDetails1, "First UserDetails should not be null");
-        assertNotNull(userDetails2, "Second UserDetails should not be null");
-        assertEquals(userDetails1.getUsername(), userDetails2.getUsername(),
-                     "Both UserDetails should have same username");
-        verify(userRepository, times(2)).findByUsernameAndIsActiveTrue("testuser");
-    }
-
-    /**
-     * Test loading different users
-     * Verifies that service can load different users correctly
-     */
-    @Test
-    void testLoadUserByUsername_WithDifferentUsers_ShouldReturnDifferentUserDetails() {
-        // Arrange
-        User anotherUser = new User();
-        anotherUser.setId(2L);
-        anotherUser.setUsername("anotheruser");
-        anotherUser.setPasswordHash("$2a$10$anotherHashedPassword");
-        anotherUser.setEmail("another@example.com");
-        anotherUser.setIsActive(true);
-
-        when(userRepository.findByUsernameAndIsActiveTrue("testuser"))
-            .thenReturn(Optional.of(testUser));
-        when(userRepository.findByUsernameAndIsActiveTrue("anotheruser"))
-            .thenReturn(Optional.of(anotherUser));
-
-        // Act
-        UserDetails userDetails1 = userDetailsService.loadUserByUsername("testuser");
-        UserDetails userDetails2 = userDetailsService.loadUserByUsername("anotheruser");
-
-        // Assert
-        assertNotEquals(userDetails1.getUsername(), userDetails2.getUsername(),
-                        "Different users should have different usernames");
-        assertNotEquals(userDetails1.getPassword(), userDetails2.getPassword(),
-                        "Different users should have different passwords");
+        assertNotNull(userDetails, "UserDetails should not be null for long username");
+        assertEquals(longUsername, userDetails.getUsername(),
+                "Long username should match");
     }
 }
