@@ -14,12 +14,10 @@ import org.springframework.http.ResponseEntity;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for LogoutController
- * 
+ * JUnit 5 test class for LogoutController
  * Tests logout functionality and cart cleanup
  * 
  * @author QA Automation Agent
@@ -43,54 +41,66 @@ class test_LogoutController {
 
     /**
      * Test successful logout
-     * 
-     * Verifies:
-     * - Logout endpoint returns OK status
-     * - Cart is cleared for the user
-     * - Success message is returned
+     * Verifies HTTP 200 status and success message
      */
     @Test
-    void testLogout_Success() {
+    void logoutShouldReturnOkStatusWithSuccessMessage() {
         // Given
-        doNothing().when(cartService).clearCart(any(UUID.class));
+        doNothing().when(cartService).clearCart(userId);
 
         // When
         ResponseEntity<ApiResponse<Void>> response = logoutController.logout(userId);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("Logout successful", response.getBody().getMessage());
-        assertNull(response.getBody().getData(), "Data should be null for logout");
+        assertNull(response.getBody().getData());
+        verify(cartService, times(1)).clearCart(userId);
+    }
+
+    /**
+     * Test logout clears user cart
+     * Verifies cart service is invoked with correct user ID
+     */
+    @Test
+    void logoutShouldClearUserCart() {
+        // Given
+        doNothing().when(cartService).clearCart(userId);
+
+        // When
+        logoutController.logout(userId);
+
+        // Then
         verify(cartService, times(1)).clearCart(userId);
     }
 
     /**
      * Test logout with null user ID
-     * 
-     * Verifies:
-     * - Appropriate exception handling for null user ID
+     * Verifies proper handling of null user ID
      */
     @Test
-    void testLogout_NullUserId() {
+    void logoutShouldHandleNullUserId() {
+        // Given
+        doThrow(new IllegalArgumentException("User ID cannot be null"))
+            .when(cartService).clearCart(null);
+
         // When/Then
-        assertThrows(Exception.class, () -> {
+        assertThrows(IllegalArgumentException.class, () -> {
             logoutController.logout(null);
         });
     }
 
     /**
      * Test logout when cart service throws exception
-     * 
-     * Verifies:
-     * - Exception from cart service is propagated
+     * Verifies exception propagation
      */
     @Test
-    void testLogout_CartServiceException() {
+    void logoutShouldPropagateCartServiceException() {
         // Given
-        doThrow(new RuntimeException("Cart service error"))
-            .when(cartService).clearCart(any(UUID.class));
+        doThrow(new RuntimeException("Database error"))
+            .when(cartService).clearCart(userId);
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
@@ -100,24 +110,58 @@ class test_LogoutController {
     }
 
     /**
-     * Test logout with valid user ID format
-     * 
-     * Verifies:
-     * - UUID format is correctly handled
-     * - Cart service receives correct user ID
+     * Test logout with non-existent user
+     * Verifies handling when user has no cart
      */
     @Test
-    void testLogout_ValidUUIDFormat() {
+    void logoutShouldHandleNonExistentUserCart() {
         // Given
-        UUID specificUserId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        doNothing().when(cartService).clearCart(specificUserId);
+        UUID nonExistentUserId = UUID.randomUUID();
+        doNothing().when(cartService).clearCart(nonExistentUserId);
 
         // When
-        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(specificUserId);
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(nonExistentUserId);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        verify(cartService, times(1)).clearCart(specificUserId);
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(cartService, times(1)).clearCart(nonExistentUserId);
+    }
+
+    /**
+     * Test multiple logout calls for same user
+     * Verifies idempotency of logout operation
+     */
+    @Test
+    void logoutShouldBeIdempotent() {
+        // Given
+        doNothing().when(cartService).clearCart(userId);
+
+        // When
+        ResponseEntity<ApiResponse<Void>> response1 = logoutController.logout(userId);
+        ResponseEntity<ApiResponse<Void>> response2 = logoutController.logout(userId);
+
+        // Then
+        assertEquals(HttpStatus.OK, response1.getStatusCode());
+        assertEquals(HttpStatus.OK, response2.getStatusCode());
+        verify(cartService, times(2)).clearCart(userId);
+    }
+
+    /**
+     * Test logout response structure
+     * Verifies ApiResponse contains correct fields
+     */
+    @Test
+    void logoutShouldReturnCorrectApiResponseStructure() {
+        // Given
+        doNothing().when(cartService).clearCart(userId);
+
+        // When
+        ResponseEntity<ApiResponse<Void>> response = logoutController.logout(userId);
+
+        // Then
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().getMessage().contains("successful"));
+        assertNull(response.getBody().getData());
     }
 }

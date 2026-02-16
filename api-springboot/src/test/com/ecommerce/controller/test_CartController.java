@@ -23,9 +23,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for CartController
- * 
- * Tests cart operations including add, update, remove, and retrieve cart items
+ * JUnit 5 test class for CartController
+ * Tests shopping cart operations including add, update, remove, and retrieve
  * 
  * @author QA Automation Agent
  * @version 1.0.0
@@ -40,25 +39,16 @@ class test_CartController {
     private CartController cartController;
 
     private UUID userId;
-    private UUID itemId;
     private UUID productId;
-    private AddToCartRequest addToCartRequest;
-    private UpdateCartItemRequest updateCartItemRequest;
+    private UUID itemId;
     private CartResponse cartResponse;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        itemId = UUID.randomUUID();
         productId = UUID.randomUUID();
-
-        addToCartRequest = new AddToCartRequest();
-        addToCartRequest.setProductId(productId);
-        addToCartRequest.setQuantity(2);
-
-        updateCartItemRequest = new UpdateCartItemRequest();
-        updateCartItemRequest.setQuantity(3);
-
+        itemId = UUID.randomUUID();
+        
         cartResponse = CartResponse.builder()
             .cartId(UUID.randomUUID())
             .items(new ArrayList<>())
@@ -68,206 +58,269 @@ class test_CartController {
 
     /**
      * Test adding product to cart successfully
-     * 
-     * Verifies:
-     * - Product is added to cart
-     * - Returns CREATED status
-     * - CartService.addProductToCart is called with correct parameters
+     * Verifies HTTP 201 status and cart response
      */
     @Test
-    void testAddProductToCart_Success() {
+    void addProductToCartShouldReturnCreatedStatus() {
         // Given
-        when(cartService.addProductToCart(any(UUID.class), any(AddToCartRequest.class)))
+        AddToCartRequest request = new AddToCartRequest();
+        request.setProductId(productId);
+        request.setQuantity(2);
+
+        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
             .thenReturn(cartResponse);
 
         // When
-        ResponseEntity<CartResponse> response = cartController.addProductToCart(userId, addToCartRequest);
+        ResponseEntity<CartResponse> response = cartController.addProductToCart(userId, request);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.CREATED, response.getStatusCode(), "Status should be CREATED");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(cartResponse, response.getBody());
-        verify(cartService, times(1)).addProductToCart(userId, addToCartRequest);
+        verify(cartService, times(1)).addProductToCart(eq(userId), any(AddToCartRequest.class));
     }
 
     /**
      * Test adding product with invalid quantity
-     * 
-     * Verifies:
-     * - Validation rejects zero or negative quantities
+     * Verifies validation exception handling
      */
     @Test
-    void testAddProductToCart_InvalidQuantity() {
+    void addProductToCartShouldHandleInvalidQuantity() {
         // Given
-        addToCartRequest.setQuantity(0);
-        when(cartService.addProductToCart(any(UUID.class), any(AddToCartRequest.class)))
+        AddToCartRequest request = new AddToCartRequest();
+        request.setProductId(productId);
+        request.setQuantity(-1);
+
+        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
             .thenThrow(new RuntimeException("Quantity must be greater than 0"));
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
-            cartController.addProductToCart(userId, addToCartRequest);
+            cartController.addProductToCart(userId, request);
+        });
+        verify(cartService, times(1)).addProductToCart(eq(userId), any(AddToCartRequest.class));
+    }
+
+    /**
+     * Test adding non-existent product to cart
+     * Verifies resource not found exception handling
+     */
+    @Test
+    void addProductToCartShouldHandleNonExistentProduct() {
+        // Given
+        AddToCartRequest request = new AddToCartRequest();
+        request.setProductId(UUID.randomUUID());
+        request.setQuantity(1);
+
+        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
+            .thenThrow(new RuntimeException("Product not found"));
+
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            cartController.addProductToCart(userId, request);
         });
     }
 
     /**
-     * Test updating cart item successfully
-     * 
-     * Verifies:
-     * - Cart item quantity is updated
-     * - Returns OK status
-     * - CartService.updateCartItem is called with correct parameters
+     * Test updating cart item quantity successfully
+     * Verifies HTTP 200 status and updated cart response
      */
     @Test
-    void testUpdateCartItem_Success() {
+    void updateCartItemShouldReturnOkStatus() {
         // Given
-        when(cartService.updateCartItem(any(UUID.class), any(UUID.class), any(UpdateCartItemRequest.class)))
+        UpdateCartItemRequest request = new UpdateCartItemRequest();
+        request.setQuantity(5);
+
+        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
             .thenReturn(cartResponse);
 
         // When
-        ResponseEntity<CartResponse> response = cartController.updateCartItem(userId, itemId, updateCartItemRequest);
+        ResponseEntity<CartResponse> response = cartController.updateCartItem(userId, itemId, request);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(cartResponse, response.getBody());
-        verify(cartService, times(1)).updateCartItem(userId, itemId, updateCartItemRequest);
+        verify(cartService, times(1)).updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class));
+    }
+
+    /**
+     * Test updating cart item with invalid quantity
+     * Verifies validation of quantity parameter
+     */
+    @Test
+    void updateCartItemShouldHandleInvalidQuantity() {
+        // Given
+        UpdateCartItemRequest request = new UpdateCartItemRequest();
+        request.setQuantity(0);
+
+        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
+            .thenThrow(new RuntimeException("Quantity must be greater than 0"));
+
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            cartController.updateCartItem(userId, itemId, request);
+        });
     }
 
     /**
      * Test updating non-existent cart item
-     * 
-     * Verifies:
-     * - Appropriate exception is thrown for non-existent item
+     * Verifies proper exception handling
      */
     @Test
-    void testUpdateCartItem_ItemNotFound() {
+    void updateCartItemShouldHandleNonExistentItem() {
         // Given
-        when(cartService.updateCartItem(any(UUID.class), any(UUID.class), any(UpdateCartItemRequest.class)))
+        UpdateCartItemRequest request = new UpdateCartItemRequest();
+        request.setQuantity(3);
+
+        when(cartService.updateCartItem(eq(userId), eq(itemId), any(UpdateCartItemRequest.class)))
             .thenThrow(new RuntimeException("Cart item not found"));
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
-            cartController.updateCartItem(userId, itemId, updateCartItemRequest);
+            cartController.updateCartItem(userId, itemId, request);
         });
     }
 
     /**
      * Test removing cart item successfully
-     * 
-     * Verifies:
-     * - Cart item is removed
-     * - Returns OK status with updated cart
-     * - CartService.removeCartItem is called with correct parameters
+     * Verifies HTTP 200 status and updated cart
      */
     @Test
-    void testRemoveCartItem_Success() {
+    void removeCartItemShouldReturnOkStatus() {
         // Given
-        when(cartService.removeCartItem(any(UUID.class), any(UUID.class)))
-            .thenReturn(cartResponse);
+        when(cartService.removeCartItem(userId, itemId)).thenReturn(cartResponse);
 
         // When
         ResponseEntity<?> response = cartController.removeCartItem(userId, itemId);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(cartResponse, response.getBody());
         verify(cartService, times(1)).removeCartItem(userId, itemId);
     }
 
     /**
      * Test removing last item from cart
-     * 
-     * Verifies:
-     * - Cart is deleted when last item is removed
-     * - Returns NO_CONTENT status
+     * Verifies HTTP 204 No Content when cart becomes empty
      */
     @Test
-    void testRemoveCartItem_LastItem() {
+    void removeCartItemShouldReturnNoContentWhenCartEmpty() {
         // Given
-        when(cartService.removeCartItem(any(UUID.class), any(UUID.class)))
-            .thenReturn(null);
+        when(cartService.removeCartItem(userId, itemId)).thenReturn(null);
 
         // When
         ResponseEntity<?> response = cartController.removeCartItem(userId, itemId);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode(), "Status should be NO_CONTENT");
+        assertNotNull(response);
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         verify(cartService, times(1)).removeCartItem(userId, itemId);
     }
 
     /**
-     * Test retrieving cart successfully
-     * 
-     * Verifies:
-     * - Cart is retrieved with all items
-     * - Returns OK status
-     * - CartService.getCart is called with correct user ID
+     * Test removing non-existent cart item
+     * Verifies exception handling
      */
     @Test
-    void testGetCart_Success() {
+    void removeCartItemShouldHandleNonExistentItem() {
         // Given
-        when(cartService.getCart(any(UUID.class))).thenReturn(cartResponse);
+        when(cartService.removeCartItem(userId, itemId))
+            .thenThrow(new RuntimeException("Cart item not found"));
+
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            cartController.removeCartItem(userId, itemId);
+        });
+    }
+
+    /**
+     * Test getting cart successfully
+     * Verifies HTTP 200 status and cart data
+     */
+    @Test
+    void getCartShouldReturnOkStatus() {
+        // Given
+        when(cartService.getCart(userId)).thenReturn(cartResponse);
 
         // When
         ResponseEntity<CartResponse> response = cartController.getCart(userId);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(cartResponse, response.getBody());
         verify(cartService, times(1)).getCart(userId);
     }
 
     /**
-     * Test retrieving empty cart
-     * 
-     * Verifies:
-     * - Empty cart is handled appropriately
+     * Test getting non-existent cart
+     * Verifies exception handling when cart not found
      */
     @Test
-    void testGetCart_EmptyCart() {
+    void getCartShouldHandleNonExistentCart() {
         // Given
-        CartResponse emptyCart = CartResponse.builder()
-            .cartId(UUID.randomUUID())
-            .items(new ArrayList<>())
-            .grandTotal(BigDecimal.ZERO)
-            .build();
-        when(cartService.getCart(any(UUID.class))).thenReturn(emptyCart);
+        when(cartService.getCart(userId))
+            .thenThrow(new RuntimeException("Cart not found"));
 
-        // When
-        ResponseEntity<CartResponse> response = cartController.getCart(userId);
-
-        // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertTrue(response.getBody().getItems().isEmpty(), "Cart should be empty");
-        assertEquals(BigDecimal.ZERO, response.getBody().getGrandTotal());
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            cartController.getCart(userId);
+        });
     }
 
     /**
-     * Test logout clears cart
-     * 
-     * Verifies:
-     * - Cart is cleared on logout
-     * - Returns OK status
-     * - CartService.clearCart is called with correct user ID
+     * Test logout clears cart successfully
+     * Verifies HTTP 200 status
      */
     @Test
-    void testLogout_Success() {
+    void logoutShouldReturnOkStatus() {
         // Given
-        doNothing().when(cartService).clearCart(any(UUID.class));
+        doNothing().when(cartService).clearCart(userId);
 
         // When
         ResponseEntity<Void> response = cartController.logout(userId);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(cartService, times(1)).clearCart(userId);
+    }
+
+    /**
+     * Test logout with null user ID
+     * Verifies validation of user ID parameter
+     */
+    @Test
+    void logoutShouldHandleNullUserId() {
+        // Given
+        doThrow(new IllegalArgumentException("User ID cannot be null"))
+            .when(cartService).clearCart(null);
+
+        // When/Then
+        assertThrows(IllegalArgumentException.class, () -> {
+            cartController.logout(null);
+        });
+    }
+
+    /**
+     * Test adding product to cart with zero quantity
+     * Verifies quantity validation
+     */
+    @Test
+    void addProductToCartShouldRejectZeroQuantity() {
+        // Given
+        AddToCartRequest request = new AddToCartRequest();
+        request.setProductId(productId);
+        request.setQuantity(0);
+
+        when(cartService.addProductToCart(eq(userId), any(AddToCartRequest.class)))
+            .thenThrow(new RuntimeException("Quantity must be greater than 0"));
+
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            cartController.addProductToCart(userId, request);
+        });
     }
 }

@@ -13,16 +13,15 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Test class for ProductController
- * 
+ * JUnit 5 test class for ProductController
  * Tests product search functionality
  * 
  * @author QA Automation Agent
@@ -46,103 +45,92 @@ class test_ProductController {
         ProductResponse product1 = ProductResponse.builder()
             .id(UUID.randomUUID())
             .name("Laptop")
-            .description("High performance laptop")
+            .description("High-performance laptop")
             .price(BigDecimal.valueOf(999.99))
             .availableQty(10)
             .build();
-        
+            
         ProductResponse product2 = ProductResponse.builder()
             .id(UUID.randomUUID())
-            .name("Laptop Bag")
-            .description("Durable laptop bag")
+            .name("Laptop Stand")
+            .description("Ergonomic laptop stand")
             .price(BigDecimal.valueOf(49.99))
             .availableQty(25)
             .build();
-        
+            
         productList.add(product1);
         productList.add(product2);
     }
 
     /**
-     * Test searching products successfully
-     * 
-     * Verifies:
-     * - Products are searched by keyword
-     * - Returns OK status
-     * - ProductService.searchProducts is called with correct keyword
-     * - Results contain matching products
+     * Test searching products with valid keyword
+     * Verifies HTTP 200 status and product list
      */
     @Test
-    void testSearchProducts_Success() {
+    void searchProductsShouldReturnOkStatusWithProductList() {
         // Given
         String keyword = "laptop";
-        when(productService.searchProducts(anyString())).thenReturn(productList);
+        when(productService.searchProducts(keyword)).thenReturn(productList);
 
         // When
         ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
-        assertEquals(2, response.getBody().size(), "Should return 2 products");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
         verify(productService, times(1)).searchProducts(keyword);
     }
 
     /**
      * Test searching products with no results
-     * 
-     * Verifies:
-     * - Empty list is returned when no products match
-     * - Returns OK status with empty list
+     * Verifies empty list is returned
      */
     @Test
-    void testSearchProducts_NoResults() {
+    void searchProductsShouldReturnEmptyListWhenNoMatch() {
         // Given
         String keyword = "nonexistent";
-        when(productService.searchProducts(anyString())).thenReturn(new ArrayList<>());
+        when(productService.searchProducts(keyword)).thenReturn(new ArrayList<>());
 
         // When
         ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
-        assertTrue(response.getBody().isEmpty(), "Result list should be empty");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().isEmpty());
         verify(productService, times(1)).searchProducts(keyword);
     }
 
     /**
      * Test searching products with empty keyword
-     * 
-     * Verifies:
-     * - Validation exception is thrown for empty keyword
+     * Verifies validation exception handling
      */
     @Test
-    void testSearchProducts_EmptyKeyword() {
+    void searchProductsShouldHandleEmptyKeyword() {
         // Given
-        String keyword = "";
-        when(productService.searchProducts(anyString()))
+        String emptyKeyword = "";
+        when(productService.searchProducts(emptyKeyword))
             .thenThrow(new RuntimeException("Search keyword cannot be empty"));
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
-            productController.searchProducts(keyword);
+            productController.searchProducts(emptyKeyword);
         });
+        verify(productService, times(1)).searchProducts(emptyKeyword);
     }
 
     /**
      * Test searching products with null keyword
-     * 
-     * Verifies:
-     * - Validation exception is thrown for null keyword
+     * Verifies null pointer exception handling
      */
     @Test
-    void testSearchProducts_NullKeyword() {
+    void searchProductsShouldHandleNullKeyword() {
         // Given
         when(productService.searchProducts(null))
-            .thenThrow(new RuntimeException("Search keyword cannot be empty"));
+            .thenThrow(new RuntimeException("Search keyword cannot be null"));
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
@@ -152,63 +140,100 @@ class test_ProductController {
 
     /**
      * Test searching products with whitespace keyword
-     * 
-     * Verifies:
-     * - Whitespace is trimmed and validated
+     * Verifies trimming and validation
      */
     @Test
-    void testSearchProducts_WhitespaceKeyword() {
+    void searchProductsShouldHandleWhitespaceKeyword() {
         // Given
-        String keyword = "   ";
-        when(productService.searchProducts(anyString()))
+        String whitespaceKeyword = "   ";
+        when(productService.searchProducts(whitespaceKeyword))
             .thenThrow(new RuntimeException("Search keyword cannot be empty"));
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
-            productController.searchProducts(keyword);
+            productController.searchProducts(whitespaceKeyword);
         });
     }
 
     /**
      * Test searching products with special characters
-     * 
-     * Verifies:
-     * - Special characters in search keyword are handled correctly
+     * Verifies proper handling of special characters in search
      */
     @Test
-    void testSearchProducts_SpecialCharacters() {
+    void searchProductsShouldHandleSpecialCharacters() {
         // Given
         String keyword = "laptop@#$";
-        when(productService.searchProducts(anyString())).thenReturn(new ArrayList<>());
+        when(productService.searchProducts(keyword)).thenReturn(new ArrayList<>());
 
         // When
         ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(productService, times(1)).searchProducts(keyword);
     }
 
     /**
-     * Test searching products case insensitivity
-     * 
-     * Verifies:
-     * - Search is case insensitive
+     * Test searching products with case-insensitive keyword
+     * Verifies case-insensitive search functionality
      */
     @Test
-    void testSearchProducts_CaseInsensitive() {
+    void searchProductsShouldBeCaseInsensitive() {
         // Given
         String keyword = "LAPTOP";
-        when(productService.searchProducts(anyString())).thenReturn(productList);
+        when(productService.searchProducts(keyword)).thenReturn(productList);
 
         // When
         ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertEquals(2, response.getBody().size(), "Should return matching products");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(2, response.getBody().size());
         verify(productService, times(1)).searchProducts(keyword);
+    }
+
+    /**
+     * Test searching products with partial match
+     * Verifies partial keyword matching
+     */
+    @Test
+    void searchProductsShouldSupportPartialMatch() {
+        // Given
+        String keyword = "lap";
+        when(productService.searchProducts(keyword)).thenReturn(productList);
+
+        // When
+        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
+
+        // Then
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(2, response.getBody().size());
+        verify(productService, times(1)).searchProducts(keyword);
+    }
+
+    /**
+     * Test searching products returns correct product details
+     * Verifies product response structure
+     */
+    @Test
+    void searchProductsShouldReturnCompleteProductDetails() {
+        // Given
+        String keyword = "laptop";
+        when(productService.searchProducts(keyword)).thenReturn(productList);
+
+        // When
+        ResponseEntity<List<ProductResponse>> response = productController.searchProducts(keyword);
+
+        // Then
+        assertNotNull(response.getBody());
+        ProductResponse product = response.getBody().get(0);
+        assertNotNull(product.getId());
+        assertNotNull(product.getName());
+        assertNotNull(product.getDescription());
+        assertNotNull(product.getPrice());
+        assertTrue(product.getAvailableQty() >= 0);
     }
 }

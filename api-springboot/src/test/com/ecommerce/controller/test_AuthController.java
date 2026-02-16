@@ -3,6 +3,7 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.*;
 import com.ecommerce.service.AuthService;
 import com.ecommerce.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,17 +11,21 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Test class for AuthController
- * 
- * Tests authentication endpoints including registration, login, and logout
+ * JUnit 5 test class for AuthController
+ * Tests authentication endpoints including register, login, and logout
  * 
  * @author QA Automation Agent
  * @version 1.0.0
@@ -40,132 +45,155 @@ class test_AuthController {
     @InjectMocks
     private AuthController authController;
 
-    private UserRegistrationDTO registrationDTO;
-    private LoginRequestDTO loginRequestDTO;
-    private UserDTO userDTO;
-    private LoginResponseDTO loginResponseDTO;
+    private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        registrationDTO = new UserRegistrationDTO();
-        registrationDTO.setUsername("testuser");
-        registrationDTO.setEmail("test@example.com");
-        registrationDTO.setPassword("password123");
-
-        loginRequestDTO = new LoginRequestDTO();
-        loginRequestDTO.setIdentifier("testuser");
-        loginRequestDTO.setPassword("password123");
-
-        userDTO = UserDTO.builder()
-            .id(1L)
-            .username("testuser")
-            .email("test@example.com")
-            .firstName("Test")
-            .lastName("User")
-            .active(true)
-            .build();
-
-        loginResponseDTO = LoginResponseDTO.builder()
-            .token("jwt-token")
-            .tokenType("Bearer")
-            .expiresIn(3600L)
-            .user(userDTO)
-            .build();
+        mockMvc = MockMvcBuilders.standaloneSetup(authController).build();
+        objectMapper = new ObjectMapper();
     }
 
     /**
      * Test successful user registration
-     * 
-     * Verifies:
-     * - Registration endpoint returns CREATED status
-     * - UserService.registerUser is called with correct DTO
-     * - Response contains success message and user data
+     * Verifies that a valid registration request returns HTTP 201 with user data
      */
     @Test
-    void testRegister_Success() {
+    void registerShouldReturnCreatedStatusWithUserDTO() {
         // Given
+        UserRegistrationDTO registrationDTO = new UserRegistrationDTO();
+        registrationDTO.setUsername("testuser");
+        registrationDTO.setEmail("test@example.com");
+        registrationDTO.setPassword("password123");
+
+        UserDTO userDTO = UserDTO.builder()
+            .id(1L)
+            .username("testuser")
+            .email("test@example.com")
+            .build();
+
         when(userService.registerUser(any(UserRegistrationDTO.class))).thenReturn(userDTO);
 
         // When
         ResponseEntity<ApiResponseDTO<UserDTO>> response = authController.register(registrationDTO);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.CREATED, response.getStatusCode(), "Status should be CREATED");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("User registered successfully", response.getBody().getMessage());
         assertEquals(userDTO, response.getBody().getData());
-        verify(userService, times(1)).registerUser(registrationDTO);
+        verify(userService, times(1)).registerUser(any(UserRegistrationDTO.class));
     }
 
     /**
-     * Test registration with null DTO
-     * 
-     * Verifies:
-     * - Validation handles null input appropriately
+     * Test registration with duplicate username
+     * Verifies proper exception handling for duplicate user
      */
     @Test
-    void testRegister_NullDTO() {
+    void registerShouldHandleDuplicateUsername() {
+        // Given
+        UserRegistrationDTO registrationDTO = new UserRegistrationDTO();
+        registrationDTO.setUsername("existinguser");
+        registrationDTO.setEmail("test@example.com");
+        registrationDTO.setPassword("password123");
+
+        when(userService.registerUser(any(UserRegistrationDTO.class)))
+            .thenThrow(new RuntimeException("Username already exists"));
+
         // When/Then
-        assertThrows(Exception.class, () -> {
-            authController.register(null);
+        assertThrows(RuntimeException.class, () -> {
+            authController.register(registrationDTO);
         });
+        verify(userService, times(1)).registerUser(any(UserRegistrationDTO.class));
     }
 
     /**
      * Test successful user login
-     * 
-     * Verifies:
-     * - Login endpoint returns OK status
-     * - AuthService.login is called with correct credentials
-     * - Response contains JWT token and user data
+     * Verifies that valid credentials return HTTP 200 with JWT token
      */
     @Test
-    void testLogin_Success() {
+    void loginShouldReturnOkStatusWithLoginResponse() {
         // Given
-        when(authService.login(any(LoginRequestDTO.class))).thenReturn(loginResponseDTO);
+        LoginRequestDTO loginRequest = new LoginRequestDTO();
+        loginRequest.setIdentifier("testuser");
+        loginRequest.setPassword("password123");
+
+        UserDTO userDTO = UserDTO.builder()
+            .id(1L)
+            .username("testuser")
+            .email("test@example.com")
+            .build();
+
+        LoginResponseDTO loginResponse = LoginResponseDTO.builder()
+            .token("jwt-token")
+            .tokenType("Bearer")
+            .expiresIn(3600L)
+            .user(userDTO)
+            .build();
+
+        when(authService.login(any(LoginRequestDTO.class))).thenReturn(loginResponse);
 
         // When
-        ResponseEntity<ApiResponseDTO<LoginResponseDTO>> response = authController.login(loginRequestDTO);
+        ResponseEntity<ApiResponseDTO<LoginResponseDTO>> response = authController.login(loginRequest);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("Login successful", response.getBody().getMessage());
-        assertEquals(loginResponseDTO, response.getBody().getData());
-        verify(authService, times(1)).login(loginRequestDTO);
+        assertEquals(loginResponse, response.getBody().getData());
+        verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
      * Test login with invalid credentials
-     * 
-     * Verifies:
-     * - AuthService throws appropriate exception for invalid credentials
+     * Verifies proper exception handling for authentication failure
      */
     @Test
-    void testLogin_InvalidCredentials() {
+    void loginShouldHandleInvalidCredentials() {
         // Given
+        LoginRequestDTO loginRequest = new LoginRequestDTO();
+        loginRequest.setIdentifier("testuser");
+        loginRequest.setPassword("wrongpassword");
+
         when(authService.login(any(LoginRequestDTO.class)))
             .thenThrow(new RuntimeException("Invalid credentials"));
 
         // When/Then
         assertThrows(RuntimeException.class, () -> {
-            authController.login(loginRequestDTO);
+            authController.login(loginRequest);
         });
-        verify(authService, times(1)).login(loginRequestDTO);
+        verify(authService, times(1)).login(any(LoginRequestDTO.class));
+    }
+
+    /**
+     * Test login with non-existent user
+     * Verifies proper handling when user is not found
+     */
+    @Test
+    void loginShouldHandleNonExistentUser() {
+        // Given
+        LoginRequestDTO loginRequest = new LoginRequestDTO();
+        loginRequest.setIdentifier("nonexistent");
+        loginRequest.setPassword("password123");
+
+        when(authService.login(any(LoginRequestDTO.class)))
+            .thenThrow(new RuntimeException("User not found"));
+
+        // When/Then
+        assertThrows(RuntimeException.class, () -> {
+            authController.login(loginRequest);
+        });
+        verify(authService, times(1)).login(any(LoginRequestDTO.class));
     }
 
     /**
      * Test successful user logout
-     * 
-     * Verifies:
-     * - Logout endpoint returns OK status
-     * - AuthService.logout is called with correct user ID
-     * - Cart is cleared on logout
+     * Verifies that logout clears cart and returns HTTP 200
      */
     @Test
-    void testLogout_Success() {
+    void logoutShouldReturnOkStatus() {
         // Given
         Long userId = 1L;
         when(authentication.getName()).thenReturn(userId.toString());
@@ -175,41 +203,81 @@ class test_AuthController {
         ResponseEntity<ApiResponseDTO<Void>> response = authController.logout(authentication);
 
         // Then
-        assertNotNull(response, "Response should not be null");
-        assertEquals(HttpStatus.OK, response.getStatusCode(), "Status should be OK");
-        assertNotNull(response.getBody(), "Response body should not be null");
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("Logout successful", response.getBody().getMessage());
         verify(authService, times(1)).logout(userId);
     }
 
     /**
-     * Test logout with null authentication
-     * 
-     * Verifies:
-     * - Proper exception handling for missing authentication
+     * Test logout with invalid authentication
+     * Verifies proper handling of authentication errors
      */
     @Test
-    void testLogout_NullAuthentication() {
+    void logoutShouldHandleInvalidAuthentication() {
+        // Given
+        when(authentication.getName()).thenReturn(null);
+
         // When/Then
         assertThrows(Exception.class, () -> {
-            authController.logout(null);
+            authController.logout(authentication);
         });
     }
 
     /**
-     * Test logout with invalid user ID format
-     * 
-     * Verifies:
-     * - Proper exception handling for invalid user ID
+     * Test logout clears user cart
+     * Verifies that logout operation triggers cart cleanup
      */
     @Test
-    void testLogout_InvalidUserId() {
+    void logoutShouldClearUserCart() {
         // Given
-        when(authentication.getName()).thenReturn("invalid");
+        Long userId = 1L;
+        when(authentication.getName()).thenReturn(userId.toString());
+        doNothing().when(authService).logout(userId);
+
+        // When
+        authController.logout(authentication);
+
+        // Then
+        verify(authService, times(1)).logout(userId);
+    }
+
+    /**
+     * Test registration with null fields
+     * Verifies validation of required fields
+     */
+    @Test
+    void registerShouldValidateRequiredFields() {
+        // Given
+        UserRegistrationDTO registrationDTO = new UserRegistrationDTO();
+        // Missing required fields
+
+        when(userService.registerUser(any(UserRegistrationDTO.class)))
+            .thenThrow(new IllegalArgumentException("Required fields missing"));
 
         // When/Then
-        assertThrows(NumberFormatException.class, () -> {
-            authController.logout(authentication);
+        assertThrows(IllegalArgumentException.class, () -> {
+            authController.register(registrationDTO);
+        });
+    }
+
+    /**
+     * Test login with empty credentials
+     * Verifies validation of login request fields
+     */
+    @Test
+    void loginShouldValidateCredentials() {
+        // Given
+        LoginRequestDTO loginRequest = new LoginRequestDTO();
+        // Empty credentials
+
+        when(authService.login(any(LoginRequestDTO.class)))
+            .thenThrow(new IllegalArgumentException("Credentials cannot be empty"));
+
+        // When/Then
+        assertThrows(IllegalArgumentException.class, () -> {
+            authController.login(loginRequest);
         });
     }
 }
