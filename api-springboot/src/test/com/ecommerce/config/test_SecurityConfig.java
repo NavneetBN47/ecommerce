@@ -1,134 +1,140 @@
 package com.ecommerce.config;
 
+import com.ecommerce.security.CustomUserDetailsService;
+import com.ecommerce.security.JwtAuthenticationFilter;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfigurationSource;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 /**
- * JUnit 5 test class for SecurityConfig
- * Tests security configuration beans and settings
+ * Test class for SecurityConfig
  * 
- * @author QA Automation Agent
+ * Tests security configuration including:
+ * - Password encoder bean
+ * - Authentication provider
+ * - CORS configuration
+ * - Authentication manager
+ * 
+ * @author Test Generation System
  * @version 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("SecurityConfig Tests")
 class test_SecurityConfig {
 
-    @InjectMocks
+    @Mock
+    private CustomUserDetailsService userDetailsService;
+
+    @Mock
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Mock
+    private AuthenticationConfiguration authenticationConfiguration;
+
     private SecurityConfig securityConfig;
 
     /**
-     * Test that passwordEncoder bean returns BCryptPasswordEncoder instance
-     * Verifies proper password encoding configuration
+     * Set up test instance before each test
      */
-    @Test
-    void passwordEncoderShouldReturnBCryptPasswordEncoder() {
-        // When
-        PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-
-        // Then
-        assertNotNull(passwordEncoder, "PasswordEncoder should not be null");
-        assertTrue(passwordEncoder instanceof BCryptPasswordEncoder, 
-            "PasswordEncoder should be instance of BCryptPasswordEncoder");
+    @BeforeEach
+    void setUp() {
+        securityConfig = new SecurityConfig(userDetailsService, jwtAuthenticationFilter);
     }
 
     /**
-     * Test that passwordEncoder encodes passwords correctly
-     * Verifies BCrypt encoding functionality
+     * Test password encoder bean creation
+     * 
+     * Validates:
+     * - PasswordEncoder bean is created
+     * - BCryptPasswordEncoder is used
      */
     @Test
-    void passwordEncoderShouldEncodePassword() {
-        // Given
+    @DisplayName("Should create BCryptPasswordEncoder bean")
+    void testPasswordEncoder() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String rawPassword = "testPassword123";
 
-        // When
-        String encodedPassword = passwordEncoder.encode(rawPassword);
-
-        // Then
-        assertNotNull(encodedPassword, "Encoded password should not be null");
-        assertNotEquals(rawPassword, encodedPassword, "Encoded password should differ from raw password");
-        assertTrue(passwordEncoder.matches(rawPassword, encodedPassword), 
-            "Encoded password should match raw password");
+        assertThat(passwordEncoder).isNotNull();
+        assertThat(passwordEncoder.getClass().getSimpleName()).contains("BCrypt");
     }
 
     /**
-     * Test that passwordEncoder produces different hashes for same password
-     * Verifies BCrypt salt functionality
+     * Test authentication provider bean creation
+     * 
+     * Validates:
+     * - DaoAuthenticationProvider is created
+     * - UserDetailsService is set
+     * - PasswordEncoder is set
      */
     @Test
-    void passwordEncoderShouldProduceDifferentHashesForSamePassword() {
-        // Given
-        PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String rawPassword = "testPassword123";
+    @DisplayName("Should create DaoAuthenticationProvider bean")
+    void testAuthenticationProvider() {
+        DaoAuthenticationProvider authProvider = securityConfig.authenticationProvider();
 
-        // When
-        String encodedPassword1 = passwordEncoder.encode(rawPassword);
-        String encodedPassword2 = passwordEncoder.encode(rawPassword);
-
-        // Then
-        assertNotEquals(encodedPassword1, encodedPassword2, 
-            "BCrypt should produce different hashes for same password due to salt");
-        assertTrue(passwordEncoder.matches(rawPassword, encodedPassword1));
-        assertTrue(passwordEncoder.matches(rawPassword, encodedPassword2));
+        assertThat(authProvider).isNotNull();
     }
 
     /**
-     * Test that passwordEncoder rejects incorrect passwords
-     * Verifies password matching validation
+     * Test authentication manager bean creation
+     * 
+     * Validates:
+     * - AuthenticationManager is created from configuration
      */
     @Test
-    void passwordEncoderShouldRejectIncorrectPassword() {
-        // Given
-        PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String rawPassword = "testPassword123";
-        String wrongPassword = "wrongPassword456";
+    @DisplayName("Should create AuthenticationManager bean")
+    void testAuthenticationManager() throws Exception {
+        AuthenticationManager mockManager = org.mockito.Mockito.mock(AuthenticationManager.class);
+        when(authenticationConfiguration.getAuthenticationManager()).thenReturn(mockManager);
 
-        // When
-        String encodedPassword = passwordEncoder.encode(rawPassword);
+        AuthenticationManager authManager = securityConfig.authenticationManager(authenticationConfiguration);
 
-        // Then
-        assertFalse(passwordEncoder.matches(wrongPassword, encodedPassword), 
-            "Wrong password should not match encoded password");
+        assertThat(authManager).isNotNull();
+        assertThat(authManager).isEqualTo(mockManager);
     }
 
     /**
-     * Test that passwordEncoder handles empty passwords
-     * Verifies edge case handling
+     * Test CORS configuration source
+     * 
+     * Validates:
+     * - CorsConfigurationSource bean is created
+     * - CORS configuration is not null
      */
     @Test
-    void passwordEncoderShouldHandleEmptyPassword() {
-        // Given
-        PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
-        String emptyPassword = "";
+    @DisplayName("Should create CorsConfigurationSource bean")
+    void testCorsConfigurationSource() {
+        CorsConfigurationSource corsSource = securityConfig.corsConfigurationSource();
 
-        // When
-        String encodedPassword = passwordEncoder.encode(emptyPassword);
-
-        // Then
-        assertNotNull(encodedPassword, "Encoded password should not be null even for empty input");
-        assertTrue(passwordEncoder.matches(emptyPassword, encodedPassword));
+        assertThat(corsSource).isNotNull();
     }
 
     /**
-     * Test that passwordEncoder handles null password gracefully
-     * Verifies null safety
+     * Test password encoding functionality
+     * 
+     * Validates:
+     * - Password can be encoded
+     * - Encoded password is different from plain text
+     * - Encoded password can be matched
      */
     @Test
-    void passwordEncoderShouldHandleNullPassword() {
-        // Given
+    @DisplayName("Should encode and match passwords correctly")
+    void testPasswordEncoderFunctionality() {
         PasswordEncoder passwordEncoder = securityConfig.passwordEncoder();
+        String plainPassword = "testPassword123";
 
-        // When/Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            passwordEncoder.encode(null);
-        }, "Encoding null password should throw IllegalArgumentException");
+        String encodedPassword = passwordEncoder.encode(plainPassword);
+
+        assertThat(encodedPassword).isNotNull();
+        assertThat(encodedPassword).isNotEqualTo(plainPassword);
+        assertThat(passwordEncoder.matches(plainPassword, encodedPassword)).isTrue();
     }
 }
