@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -18,15 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for TokenBlacklistRepository.
- * Tests repository operations for TokenBlacklist entity including custom query methods.
- * 
- * @author QA Automation Team
- * @version 1.0
+ * Tests repository methods for TokenBlacklist entity operations including custom queries.
+ * Uses @DataJpaTest for repository layer testing with in-memory database.
  */
 @DataJpaTest
-@ActiveProfiles("test")
 @DisplayName("TokenBlacklistRepository Tests")
-class test_TokenBlacklistRepository {
+public class test_TokenBlacklistRepository {
 
     @Autowired
     private TokenBlacklistRepository tokenBlacklistRepository;
@@ -34,34 +30,31 @@ class test_TokenBlacklistRepository {
     @Autowired
     private TestEntityManager entityManager;
 
-    private TokenBlacklist testBlacklistToken;
+    private TokenBlacklist testTokenBlacklist;
     private String testToken;
     private Long testUserId;
 
     /**
-     * Set up test data before each test method execution.
+     * Set up test data before each test method.
      */
     @BeforeEach
     void setUp() {
-        testToken = "blacklisted-token-12345";
+        testToken = "test-blacklisted-token-123";
         testUserId = 1L;
-        
-        testBlacklistToken = new TokenBlacklist();
-        testBlacklistToken.setToken(testToken);
-        testBlacklistToken.setExpiresAt(LocalDateTime.now().plusHours(1));
+        testTokenBlacklist = new TokenBlacklist();
+        testTokenBlacklist.setToken(testToken);
+        testTokenBlacklist.setExpiresAt(LocalDateTime.now().plusDays(1));
     }
 
     /**
      * Test finding a blacklisted token by token string when it exists.
-     * Verifies that the custom query method returns the correct token.
+     * Verifies that the repository correctly retrieves a blacklisted token.
      */
     @Test
     @DisplayName("Should find blacklisted token by token string when exists")
-    void testFindByToken_WhenExists_ShouldReturnToken() {
+    void testFindByToken_WhenExists() {
         // Given
-        TokenBlacklist savedToken = tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
-        entityManager.clear();
+        TokenBlacklist savedToken = entityManager.persistAndFlush(testTokenBlacklist);
 
         // When
         Optional<TokenBlacklist> result = tokenBlacklistRepository.findByToken(testToken);
@@ -73,11 +66,11 @@ class test_TokenBlacklistRepository {
 
     /**
      * Test finding a blacklisted token by token string when it does not exist.
-     * Verifies that the method returns an empty Optional.
+     * Verifies that the repository returns empty Optional for non-existent token.
      */
     @Test
-    @DisplayName("Should return empty when token does not exist")
-    void testFindByToken_WhenNotExists_ShouldReturnEmpty() {
+    @DisplayName("Should return empty when blacklisted token does not exist")
+    void testFindByToken_WhenNotExists() {
         // When
         Optional<TokenBlacklist> result = tokenBlacklistRepository.findByToken("non-existent-token");
 
@@ -87,14 +80,13 @@ class test_TokenBlacklistRepository {
 
     /**
      * Test checking if a token exists in blacklist.
-     * Verifies that existsByToken returns true for blacklisted token.
+     * Verifies that the repository correctly checks token existence.
      */
     @Test
-    @DisplayName("Should return true when token exists in blacklist")
-    void testExistsByToken_WhenExists_ShouldReturnTrue() {
+    @DisplayName("Should check if token exists in blacklist")
+    void testExistsByToken_WhenExists() {
         // Given
-        tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
+        entityManager.persistAndFlush(testTokenBlacklist);
 
         // When
         boolean exists = tokenBlacklistRepository.existsByToken(testToken);
@@ -104,33 +96,32 @@ class test_TokenBlacklistRepository {
     }
 
     /**
-     * Test checking if a token exists in blacklist when it does not.
-     * Verifies that existsByToken returns false.
+     * Test checking if a token does not exist in blacklist.
+     * Verifies that the repository correctly returns false for non-blacklisted token.
      */
     @Test
-    @DisplayName("Should return false when token does not exist in blacklist")
-    void testExistsByToken_WhenNotExists_ShouldReturnFalse() {
+    @DisplayName("Should return false when token is not blacklisted")
+    void testExistsByToken_WhenNotExists() {
         // When
-        boolean exists = tokenBlacklistRepository.existsByToken("non-existent-token");
+        boolean exists = tokenBlacklistRepository.existsByToken("non-blacklisted-token");
 
         // Then
         assertThat(exists).isFalse();
     }
 
     /**
-     * Test deleting expired tokens from blacklist.
-     * Verifies that only expired tokens are deleted.
+     * Test deleting expired blacklisted tokens.
+     * Verifies that the repository correctly deletes expired tokens from blacklist.
      */
     @Test
     @Transactional
-    @DisplayName("Should delete expired tokens from blacklist")
-    void testDeleteExpiredTokens_ShouldRemoveExpiredTokens() {
+    @DisplayName("Should delete expired blacklisted tokens")
+    void testDeleteExpiredTokens() {
         // Given
         TokenBlacklist expiredToken = new TokenBlacklist();
         expiredToken.setToken("expired-token");
-        expiredToken.setExpiresAt(LocalDateTime.now().minusHours(1));
-        tokenBlacklistRepository.save(expiredToken);
-        entityManager.flush();
+        expiredToken.setExpiresAt(LocalDateTime.now().minusDays(1));
+        entityManager.persistAndFlush(expiredToken);
 
         // When
         tokenBlacklistRepository.deleteExpiredTokens(LocalDateTime.now());
@@ -142,136 +133,149 @@ class test_TokenBlacklistRepository {
     }
 
     /**
-     * Test deleting expired tokens does not affect valid tokens.
-     * Verifies that non-expired tokens remain after cleanup.
+     * Test that non-expired blacklisted tokens are not deleted.
+     * Verifies that the repository does not delete valid blacklisted tokens.
      */
     @Test
     @Transactional
-    @DisplayName("Should not delete valid tokens when cleaning expired tokens")
-    void testDeleteExpiredTokens_ShouldKeepValidTokens() {
+    @DisplayName("Should not delete non-expired blacklisted tokens")
+    void testDeleteExpiredTokens_DoesNotDeleteValidTokens() {
         // Given
-        TokenBlacklist validToken = new TokenBlacklist();
-        validToken.setToken("valid-token");
-        validToken.setExpiresAt(LocalDateTime.now().plusHours(2));
-        tokenBlacklistRepository.save(validToken);
-        entityManager.flush();
+        TokenBlacklist validToken = entityManager.persistAndFlush(testTokenBlacklist);
 
         // When
         tokenBlacklistRepository.deleteExpiredTokens(LocalDateTime.now());
         entityManager.flush();
 
         // Then
-        Optional<TokenBlacklist> result = tokenBlacklistRepository.findByToken("valid-token");
+        Optional<TokenBlacklist> result = tokenBlacklistRepository.findByToken(testToken);
         assertThat(result).isPresent();
     }
 
     /**
      * Test finding blacklisted tokens by user ID.
-     * Verifies that all tokens for a specific user are returned.
+     * Verifies that the repository correctly retrieves all blacklisted tokens for a user.
      */
     @Test
     @DisplayName("Should find blacklisted tokens by user ID")
-    void testFindByUserId_ShouldReturnUserTokens() {
+    void testFindByUserId() {
         // Given
-        tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
+        entityManager.persistAndFlush(testTokenBlacklist);
 
         // When
-        List<TokenBlacklist> result = tokenBlacklistRepository.findByUserId(testUserId);
+        List<TokenBlacklist> results = tokenBlacklistRepository.findByUserId(testUserId);
 
         // Then
-        assertThat(result).isNotNull();
+        assertThat(results).isNotNull();
     }
 
     /**
-     * Test finding blacklisted tokens by user ID when user has no tokens.
-     * Verifies that an empty list is returned.
+     * Test finding blacklisted tokens by user ID when user has no blacklisted tokens.
+     * Verifies that the repository returns empty list for user without blacklisted tokens.
      */
     @Test
     @DisplayName("Should return empty list when user has no blacklisted tokens")
-    void testFindByUserId_WhenNoTokens_ShouldReturnEmptyList() {
-        // Given
-        Long nonExistentUserId = 999999L;
-
+    void testFindByUserId_WhenNoTokens() {
         // When
-        List<TokenBlacklist> result = tokenBlacklistRepository.findByUserId(nonExistentUserId);
+        List<TokenBlacklist> results = tokenBlacklistRepository.findByUserId(999L);
 
         // Then
-        assertThat(result).isEmpty();
+        assertThat(results).isEmpty();
     }
 
     /**
      * Test saving a blacklisted token.
-     * Verifies that the save operation works correctly.
+     * Verifies that the repository correctly persists a blacklisted token.
      */
     @Test
     @DisplayName("Should save blacklisted token successfully")
-    void testSave_ShouldPersistToken() {
+    void testSave_TokenBlacklist() {
         // When
-        TokenBlacklist savedToken = tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
+        TokenBlacklist savedToken = tokenBlacklistRepository.save(testTokenBlacklist);
 
         // Then
         assertThat(savedToken).isNotNull();
         assertThat(savedToken.getId()).isNotNull();
+        assertThat(savedToken.getToken()).isEqualTo(testToken);
     }
 
     /**
      * Test finding a blacklisted token by ID.
-     * Verifies that findById returns the correct token.
+     * Verifies that the repository correctly retrieves a blacklisted token by its ID.
      */
     @Test
-    @DisplayName("Should find blacklisted token by ID when exists")
-    void testFindById_WhenExists_ShouldReturnToken() {
+    @DisplayName("Should find blacklisted token by ID")
+    void testFindById_WhenExists() {
         // Given
-        TokenBlacklist savedToken = tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
-        Long savedId = savedToken.getId();
+        TokenBlacklist savedToken = entityManager.persistAndFlush(testTokenBlacklist);
 
         // When
-        Optional<TokenBlacklist> result = tokenBlacklistRepository.findById(savedId);
+        Optional<TokenBlacklist> result = tokenBlacklistRepository.findById(savedToken.getId());
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedId);
+        assertThat(result.get().getId()).isEqualTo(savedToken.getId());
     }
 
     /**
      * Test deleting a blacklisted token.
-     * Verifies that the delete operation works correctly.
+     * Verifies that the repository correctly deletes a blacklisted token.
      */
     @Test
     @DisplayName("Should delete blacklisted token successfully")
-    void testDelete_ShouldRemoveToken() {
+    void testDelete_TokenBlacklist() {
         // Given
-        TokenBlacklist savedToken = tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
-        Long savedId = savedToken.getId();
+        TokenBlacklist savedToken = entityManager.persistAndFlush(testTokenBlacklist);
+        Long tokenId = savedToken.getId();
 
         // When
         tokenBlacklistRepository.delete(savedToken);
         entityManager.flush();
 
         // Then
-        Optional<TokenBlacklist> result = tokenBlacklistRepository.findById(savedId);
+        Optional<TokenBlacklist> result = tokenBlacklistRepository.findById(tokenId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test counting all blacklisted tokens.
-     * Verifies that the count operation returns correct number.
+     * Test finding all blacklisted tokens.
+     * Verifies that the repository correctly retrieves all blacklisted tokens.
      */
     @Test
-    @DisplayName("Should count all blacklisted tokens correctly")
-    void testCount_ShouldReturnCorrectCount() {
+    @DisplayName("Should find all blacklisted tokens")
+    void testFindAll_TokenBlacklist() {
         // Given
-        tokenBlacklistRepository.save(testBlacklistToken);
-        entityManager.flush();
+        entityManager.persistAndFlush(testTokenBlacklist);
+        TokenBlacklist anotherToken = new TokenBlacklist();
+        anotherToken.setToken("another-blacklisted-token");
+        anotherToken.setExpiresAt(LocalDateTime.now().plusDays(1));
+        entityManager.persistAndFlush(anotherToken);
+
+        // When
+        List<TokenBlacklist> allTokens = tokenBlacklistRepository.findAll();
+
+        // Then
+        assertThat(allTokens).hasSizeGreaterThanOrEqualTo(2);
+    }
+
+    /**
+     * Test counting blacklisted tokens.
+     * Verifies that the repository correctly counts blacklisted tokens.
+     */
+    @Test
+    @DisplayName("Should count blacklisted tokens")
+    void testCount_TokenBlacklist() {
+        // Given
+        entityManager.persistAndFlush(testTokenBlacklist);
+        TokenBlacklist anotherToken = new TokenBlacklist();
+        anotherToken.setToken("token-2");
+        anotherToken.setExpiresAt(LocalDateTime.now().plusDays(1));
+        entityManager.persistAndFlush(anotherToken);
 
         // When
         long count = tokenBlacklistRepository.count();
 
         // Then
-        assertThat(count).isGreaterThanOrEqualTo(1);
+        assertThat(count).isGreaterThanOrEqualTo(2);
     }
 }

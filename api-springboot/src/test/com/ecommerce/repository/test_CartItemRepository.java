@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -16,15 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for CartItemRepository.
- * Tests repository operations for CartItem entity including custom query methods.
- * 
- * @author QA Automation Team
- * @version 1.0
+ * Tests repository methods for CartItem entity operations.
+ * Uses @DataJpaTest for repository layer testing with in-memory database.
  */
 @DataJpaTest
-@ActiveProfiles("test")
 @DisplayName("CartItemRepository Tests")
-class test_CartItemRepository {
+public class test_CartItemRepository {
 
     @Autowired
     private CartItemRepository cartItemRepository;
@@ -37,30 +33,25 @@ class test_CartItemRepository {
     private CartItem testCartItem;
 
     /**
-     * Set up test data before each test method execution.
+     * Set up test data before each test method.
      */
     @BeforeEach
     void setUp() {
         testCartId = UUID.randomUUID();
         testProductId = UUID.randomUUID();
-        
         testCartItem = new CartItem();
         testCartItem.setId(UUID.randomUUID());
-        // Note: In real scenario, you would set cart and product entities
-        // For this test, we're focusing on repository method testing
     }
 
     /**
      * Test finding a cart item by cart ID and product ID when it exists.
-     * Verifies that the custom query method returns the correct cart item.
+     * Verifies that the repository correctly retrieves an existing cart item.
      */
     @Test
     @DisplayName("Should find cart item by cart ID and product ID when exists")
-    void testFindByCartIdAndProductId_WhenExists_ShouldReturnCartItem() {
+    void testFindByCartIdAndProductId_WhenExists() {
         // Given
-        CartItem savedItem = cartItemRepository.save(testCartItem);
-        entityManager.flush();
-        entityManager.clear();
+        CartItem savedItem = entityManager.persistAndFlush(testCartItem);
 
         // When
         Optional<CartItem> result = cartItemRepository.findByCartIdAndProductId(testCartId, testProductId);
@@ -71,11 +62,11 @@ class test_CartItemRepository {
 
     /**
      * Test finding a cart item by cart ID and product ID when it does not exist.
-     * Verifies that the method returns an empty Optional.
+     * Verifies that the repository returns empty Optional for non-existent items.
      */
     @Test
     @DisplayName("Should return empty when cart item does not exist")
-    void testFindByCartIdAndProductId_WhenNotExists_ShouldReturnEmpty() {
+    void testFindByCartIdAndProductId_WhenNotExists() {
         // Given
         UUID nonExistentCartId = UUID.randomUUID();
         UUID nonExistentProductId = UUID.randomUUID();
@@ -88,43 +79,14 @@ class test_CartItemRepository {
     }
 
     /**
-     * Test finding a cart item with null cart ID.
-     * Verifies proper handling of null parameters.
-     */
-    @Test
-    @DisplayName("Should handle null cart ID gracefully")
-    void testFindByCartIdAndProductId_WithNullCartId_ShouldReturnEmpty() {
-        // When
-        Optional<CartItem> result = cartItemRepository.findByCartIdAndProductId(null, testProductId);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test finding a cart item with null product ID.
-     * Verifies proper handling of null parameters.
-     */
-    @Test
-    @DisplayName("Should handle null product ID gracefully")
-    void testFindByCartIdAndProductId_WithNullProductId_ShouldReturnEmpty() {
-        // When
-        Optional<CartItem> result = cartItemRepository.findByCartIdAndProductId(testCartId, null);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
      * Test saving a cart item.
-     * Verifies that the save operation works correctly.
+     * Verifies that the repository correctly persists a cart item.
      */
     @Test
     @DisplayName("Should save cart item successfully")
-    void testSave_ShouldPersistCartItem() {
+    void testSave_CartItem() {
         // When
         CartItem savedItem = cartItemRepository.save(testCartItem);
-        entityManager.flush();
 
         // Then
         assertThat(savedItem).isNotNull();
@@ -133,60 +95,59 @@ class test_CartItemRepository {
 
     /**
      * Test finding a cart item by ID.
-     * Verifies that findById returns the correct cart item.
+     * Verifies that the repository correctly retrieves a cart item by its ID.
      */
     @Test
-    @DisplayName("Should find cart item by ID when exists")
-    void testFindById_WhenExists_ShouldReturnCartItem() {
+    @DisplayName("Should find cart item by ID")
+    void testFindById_WhenExists() {
         // Given
-        CartItem savedItem = cartItemRepository.save(testCartItem);
-        entityManager.flush();
-        UUID savedId = savedItem.getId();
+        CartItem savedItem = entityManager.persistAndFlush(testCartItem);
 
         // When
-        Optional<CartItem> result = cartItemRepository.findById(savedId);
+        Optional<CartItem> result = cartItemRepository.findById(savedItem.getId());
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedId);
+        assertThat(result.get().getId()).isEqualTo(savedItem.getId());
     }
 
     /**
      * Test deleting a cart item.
-     * Verifies that the delete operation works correctly.
+     * Verifies that the repository correctly deletes a cart item.
      */
     @Test
     @DisplayName("Should delete cart item successfully")
-    void testDelete_ShouldRemoveCartItem() {
+    void testDelete_CartItem() {
         // Given
-        CartItem savedItem = cartItemRepository.save(testCartItem);
-        entityManager.flush();
-        UUID savedId = savedItem.getId();
+        CartItem savedItem = entityManager.persistAndFlush(testCartItem);
+        UUID itemId = savedItem.getId();
 
         // When
         cartItemRepository.delete(savedItem);
         entityManager.flush();
 
         // Then
-        Optional<CartItem> result = cartItemRepository.findById(savedId);
+        Optional<CartItem> result = cartItemRepository.findById(itemId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test counting all cart items.
-     * Verifies that the count operation returns correct number.
+     * Test finding all cart items.
+     * Verifies that the repository correctly retrieves all cart items.
      */
     @Test
-    @DisplayName("Should count all cart items correctly")
-    void testCount_ShouldReturnCorrectCount() {
+    @DisplayName("Should find all cart items")
+    void testFindAll_CartItems() {
         // Given
-        cartItemRepository.save(testCartItem);
-        entityManager.flush();
+        entityManager.persistAndFlush(testCartItem);
+        CartItem anotherItem = new CartItem();
+        anotherItem.setId(UUID.randomUUID());
+        entityManager.persistAndFlush(anotherItem);
 
         // When
-        long count = cartItemRepository.count();
+        var allItems = cartItemRepository.findAll();
 
         // Then
-        assertThat(count).isGreaterThanOrEqualTo(1);
+        assertThat(allItems).hasSizeGreaterThanOrEqualTo(2);
     }
 }

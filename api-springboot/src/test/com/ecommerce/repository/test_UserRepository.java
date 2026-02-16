@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -16,15 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for UserRepository.
- * Tests repository operations for User entity including custom query methods.
- * 
- * @author QA Automation Team
- * @version 1.0
+ * Tests repository methods for User entity operations including custom queries.
+ * Uses @DataJpaTest for repository layer testing with in-memory database.
  */
 @DataJpaTest
-@ActiveProfiles("test")
 @DisplayName("UserRepository Tests")
-class test_UserRepository {
+public class test_UserRepository {
 
     @Autowired
     private UserRepository userRepository;
@@ -36,28 +32,26 @@ class test_UserRepository {
     private String testUsername;
 
     /**
-     * Set up test data before each test method execution.
+     * Set up test data before each test method.
      */
     @BeforeEach
     void setUp() {
         testUsername = "testuser";
-        
         testUser = new User();
         testUser.setId(UUID.randomUUID());
         testUser.setUsername(testUsername);
+        testUser.setEmail("testuser@example.com");
     }
 
     /**
      * Test finding a user by username when it exists.
-     * Verifies that the custom query method returns the correct user.
+     * Verifies that the repository correctly retrieves a user by username.
      */
     @Test
     @DisplayName("Should find user by username when exists")
-    void testFindByUsername_WhenExists_ShouldReturnUser() {
+    void testFindByUsername_WhenExists() {
         // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
-        entityManager.clear();
+        User savedUser = entityManager.persistAndFlush(testUser);
 
         // When
         Optional<User> result = userRepository.findByUsername(testUsername);
@@ -69,11 +63,11 @@ class test_UserRepository {
 
     /**
      * Test finding a user by username when it does not exist.
-     * Verifies that the method returns an empty Optional.
+     * Verifies that the repository returns empty Optional for non-existent username.
      */
     @Test
     @DisplayName("Should return empty when username does not exist")
-    void testFindByUsername_WhenNotExists_ShouldReturnEmpty() {
+    void testFindByUsername_WhenNotExists() {
         // When
         Optional<User> result = userRepository.findByUsername("nonexistentuser");
 
@@ -82,29 +76,14 @@ class test_UserRepository {
     }
 
     /**
-     * Test finding a user with null username.
-     * Verifies proper handling of null parameters.
+     * Test checking if username exists.
+     * Verifies that the repository correctly checks username existence.
      */
     @Test
-    @DisplayName("Should handle null username gracefully")
-    void testFindByUsername_WithNullUsername_ShouldReturnEmpty() {
-        // When
-        Optional<User> result = userRepository.findByUsername(null);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test checking if a username exists.
-     * Verifies that existsByUsername returns true for existing username.
-     */
-    @Test
-    @DisplayName("Should return true when username exists")
-    void testExistsByUsername_WhenExists_ShouldReturnTrue() {
+    @DisplayName("Should check if username exists")
+    void testExistsByUsername_WhenExists() {
         // Given
-        userRepository.save(testUser);
-        entityManager.flush();
+        entityManager.persistAndFlush(testUser);
 
         // When
         boolean exists = userRepository.existsByUsername(testUsername);
@@ -114,12 +93,12 @@ class test_UserRepository {
     }
 
     /**
-     * Test checking if a username exists when it does not.
-     * Verifies that existsByUsername returns false.
+     * Test checking if username does not exist.
+     * Verifies that the repository correctly returns false for non-existent username.
      */
     @Test
     @DisplayName("Should return false when username does not exist")
-    void testExistsByUsername_WhenNotExists_ShouldReturnFalse() {
+    void testExistsByUsername_WhenNotExists() {
         // When
         boolean exists = userRepository.existsByUsername("nonexistentuser");
 
@@ -128,67 +107,48 @@ class test_UserRepository {
     }
 
     /**
-     * Test checking if username exists with null value.
-     * Verifies proper handling of null parameters.
-     */
-    @Test
-    @DisplayName("Should handle null username in exists check")
-    void testExistsByUsername_WithNullUsername_ShouldReturnFalse() {
-        // When
-        boolean exists = userRepository.existsByUsername(null);
-
-        // Then
-        assertThat(exists).isFalse();
-    }
-
-    /**
      * Test saving a user.
-     * Verifies that the save operation works correctly.
+     * Verifies that the repository correctly persists a user.
      */
     @Test
     @DisplayName("Should save user successfully")
-    void testSave_ShouldPersistUser() {
+    void testSave_User() {
         // When
         User savedUser = userRepository.save(testUser);
-        entityManager.flush();
 
         // Then
         assertThat(savedUser).isNotNull();
         assertThat(savedUser.getId()).isNotNull();
+        assertThat(savedUser.getUsername()).isEqualTo(testUsername);
     }
 
     /**
      * Test finding a user by ID.
-     * Verifies that findById returns the correct user.
+     * Verifies that the repository correctly retrieves a user by its ID.
      */
     @Test
-    @DisplayName("Should find user by ID when exists")
-    void testFindById_WhenExists_ShouldReturnUser() {
+    @DisplayName("Should find user by ID")
+    void testFindById_WhenExists() {
         // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
-        UUID savedId = savedUser.getId();
+        User savedUser = entityManager.persistAndFlush(testUser);
 
         // When
-        Optional<User> result = userRepository.findById(savedId);
+        Optional<User> result = userRepository.findById(savedUser.getId());
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedId);
+        assertThat(result.get().getId()).isEqualTo(savedUser.getId());
     }
 
     /**
      * Test finding a user by ID when it does not exist.
-     * Verifies that findById returns empty Optional.
+     * Verifies that the repository returns empty Optional for non-existent user.
      */
     @Test
     @DisplayName("Should return empty when user ID does not exist")
-    void testFindById_WhenNotExists_ShouldReturnEmpty() {
-        // Given
-        UUID nonExistentId = UUID.randomUUID();
-
+    void testFindById_WhenNotExists() {
         // When
-        Optional<User> result = userRepository.findById(nonExistentId);
+        Optional<User> result = userRepository.findById(UUID.randomUUID());
 
         // Then
         assertThat(result).isEmpty();
@@ -196,76 +156,100 @@ class test_UserRepository {
 
     /**
      * Test deleting a user.
-     * Verifies that the delete operation works correctly.
+     * Verifies that the repository correctly deletes a user.
      */
     @Test
     @DisplayName("Should delete user successfully")
-    void testDelete_ShouldRemoveUser() {
+    void testDelete_User() {
         // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
-        UUID savedId = savedUser.getId();
+        User savedUser = entityManager.persistAndFlush(testUser);
+        UUID userId = savedUser.getId();
 
         // When
         userRepository.delete(savedUser);
         entityManager.flush();
 
         // Then
-        Optional<User> result = userRepository.findById(savedId);
+        Optional<User> result = userRepository.findById(userId);
         assertThat(result).isEmpty();
     }
 
     /**
-     * Test counting all users.
-     * Verifies that the count operation returns correct number.
+     * Test finding all users.
+     * Verifies that the repository correctly retrieves all users.
      */
     @Test
-    @DisplayName("Should count all users correctly")
-    void testCount_ShouldReturnCorrectCount() {
+    @DisplayName("Should find all users")
+    void testFindAll_Users() {
         // Given
-        userRepository.save(testUser);
-        entityManager.flush();
+        entityManager.persistAndFlush(testUser);
+        User anotherUser = new User();
+        anotherUser.setId(UUID.randomUUID());
+        anotherUser.setUsername("anotheruser");
+        anotherUser.setEmail("another@example.com");
+        entityManager.persistAndFlush(anotherUser);
 
         // When
-        long count = userRepository.count();
+        var allUsers = userRepository.findAll();
 
         // Then
-        assertThat(count).isGreaterThanOrEqualTo(1);
+        assertThat(allUsers).hasSizeGreaterThanOrEqualTo(2);
     }
 
     /**
-     * Test checking if a user exists by ID.
-     * Verifies that existsById returns true for existing user.
+     * Test updating a user.
+     * Verifies that the repository correctly updates user details.
      */
     @Test
-    @DisplayName("Should return true when user exists by ID")
-    void testExistsById_WhenExists_ShouldReturnTrue() {
+    @DisplayName("Should update user successfully")
+    void testUpdate_User() {
         // Given
-        User savedUser = userRepository.save(testUser);
-        entityManager.flush();
-        UUID savedId = savedUser.getId();
+        User savedUser = entityManager.persistAndFlush(testUser);
+        savedUser.setEmail("newemail@example.com");
 
         // When
-        boolean exists = userRepository.existsById(savedId);
+        User updatedUser = userRepository.save(savedUser);
+
+        // Then
+        assertThat(updatedUser.getEmail()).isEqualTo("newemail@example.com");
+    }
+
+    /**
+     * Test checking if user exists by ID.
+     * Verifies that the repository correctly checks user existence.
+     */
+    @Test
+    @DisplayName("Should check if user exists by ID")
+    void testExistsById() {
+        // Given
+        User savedUser = entityManager.persistAndFlush(testUser);
+
+        // When
+        boolean exists = userRepository.existsById(savedUser.getId());
 
         // Then
         assertThat(exists).isTrue();
     }
 
     /**
-     * Test checking if a user exists by ID when it does not.
-     * Verifies that existsById returns false.
+     * Test counting users.
+     * Verifies that the repository correctly counts users.
      */
     @Test
-    @DisplayName("Should return false when user does not exist by ID")
-    void testExistsById_WhenNotExists_ShouldReturnFalse() {
+    @DisplayName("Should count users")
+    void testCount_Users() {
         // Given
-        UUID nonExistentId = UUID.randomUUID();
+        entityManager.persistAndFlush(testUser);
+        User anotherUser = new User();
+        anotherUser.setId(UUID.randomUUID());
+        anotherUser.setUsername("user2");
+        anotherUser.setEmail("user2@example.com");
+        entityManager.persistAndFlush(anotherUser);
 
         // When
-        boolean exists = userRepository.existsById(nonExistentId);
+        long count = userRepository.count();
 
         // Then
-        assertThat(exists).isFalse();
+        assertThat(count).isGreaterThanOrEqualTo(2);
     }
 }

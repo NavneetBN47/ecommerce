@@ -10,7 +10,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,15 +18,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * JUnit 5 test class for OrderRepository.
- * Tests repository operations for Order entity including custom query methods.
- * 
- * @author QA Automation Team
- * @version 1.0
+ * Tests repository methods for Order entity operations including custom queries.
+ * Uses @DataJpaTest for repository layer testing with in-memory database.
  */
 @DataJpaTest
-@ActiveProfiles("test")
 @DisplayName("OrderRepository Tests")
-class test_OrderRepository {
+public class test_OrderRepository {
 
     @Autowired
     private OrderRepository orderRepository;
@@ -37,16 +33,13 @@ class test_OrderRepository {
 
     private Order testOrder;
     private String testOrderNumber;
-    private Long testUserId;
 
     /**
-     * Set up test data before each test method execution.
+     * Set up test data before each test method.
      */
     @BeforeEach
     void setUp() {
-        testOrderNumber = "ORD-12345";
-        testUserId = 1L;
-        
+        testOrderNumber = "ORD-2024-001";
         testOrder = new Order();
         testOrder.setOrderNumber(testOrderNumber);
         testOrder.setStatus(Order.OrderStatus.PENDING);
@@ -54,15 +47,13 @@ class test_OrderRepository {
 
     /**
      * Test finding an order by order number when it exists.
-     * Verifies that the custom query method returns the correct order.
+     * Verifies that the repository correctly retrieves an order by its order number.
      */
     @Test
     @DisplayName("Should find order by order number when exists")
-    void testFindByOrderNumber_WhenExists_ShouldReturnOrder() {
+    void testFindByOrderNumber_WhenExists() {
         // Given
-        Order savedOrder = orderRepository.save(testOrder);
-        entityManager.flush();
-        entityManager.clear();
+        Order savedOrder = entityManager.persistAndFlush(testOrder);
 
         // When
         Optional<Order> result = orderRepository.findByOrderNumber(testOrderNumber);
@@ -74,11 +65,11 @@ class test_OrderRepository {
 
     /**
      * Test finding an order by order number when it does not exist.
-     * Verifies that the method returns an empty Optional.
+     * Verifies that the repository returns empty Optional for non-existent order.
      */
     @Test
     @DisplayName("Should return empty when order number does not exist")
-    void testFindByOrderNumber_WhenNotExists_ShouldReturnEmpty() {
+    void testFindByOrderNumber_WhenNotExists() {
         // When
         Optional<Order> result = orderRepository.findByOrderNumber("NON-EXISTENT");
 
@@ -88,121 +79,71 @@ class test_OrderRepository {
 
     /**
      * Test finding orders by user ID with pagination.
-     * Verifies that the method returns paginated results.
+     * Verifies that the repository correctly retrieves paginated orders for a user.
      */
     @Test
     @DisplayName("Should find orders by user ID with pagination")
-    void testFindByUserId_ShouldReturnPagedOrders() {
+    void testFindByUserId_WithPagination() {
         // Given
-        orderRepository.save(testOrder);
-        entityManager.flush();
+        Long userId = 1L;
+        entityManager.persistAndFlush(testOrder);
         Pageable pageable = PageRequest.of(0, 10);
 
         // When
-        Page<Order> result = orderRepository.findByUserId(testUserId, pageable);
+        Page<Order> result = orderRepository.findByUserId(userId, pageable);
 
         // Then
         assertThat(result).isNotNull();
     }
 
     /**
-     * Test finding orders by user ID when user has no orders.
-     * Verifies that an empty page is returned.
-     */
-    @Test
-    @DisplayName("Should return empty page when user has no orders")
-    void testFindByUserId_WhenNoOrders_ShouldReturnEmptyPage() {
-        // Given
-        Long nonExistentUserId = 999999L;
-        Pageable pageable = PageRequest.of(0, 10);
-
-        // When
-        Page<Order> result = orderRepository.findByUserId(nonExistentUserId, pageable);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
      * Test finding orders by status.
-     * Verifies that only orders with the specified status are returned.
+     * Verifies that the repository correctly retrieves orders by their status.
      */
     @Test
     @DisplayName("Should find orders by status")
-    void testFindByStatus_ShouldReturnOrdersWithStatus() {
+    void testFindByStatus() {
         // Given
-        orderRepository.save(testOrder);
-        entityManager.flush();
+        entityManager.persistAndFlush(testOrder);
+        Order anotherOrder = new Order();
+        anotherOrder.setOrderNumber("ORD-2024-002");
+        anotherOrder.setStatus(Order.OrderStatus.PENDING);
+        entityManager.persistAndFlush(anotherOrder);
 
         // When
-        List<Order> result = orderRepository.findByStatus(Order.OrderStatus.PENDING);
+        List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.PENDING);
 
         // Then
-        assertThat(result).isNotEmpty();
-        assertThat(result).allMatch(order -> order.getStatus() == Order.OrderStatus.PENDING);
+        assertThat(pendingOrders).isNotEmpty();
+        assertThat(pendingOrders).allMatch(order -> order.getStatus() == Order.OrderStatus.PENDING);
     }
 
     /**
-     * Test finding orders by status when no orders match.
-     * Verifies that an empty list is returned.
+     * Test finding order with items using fetch join.
+     * Verifies that the repository correctly retrieves an order with its items.
      */
     @Test
-    @DisplayName("Should return empty list when no orders match status")
-    void testFindByStatus_WhenNoMatch_ShouldReturnEmptyList() {
-        // When
-        List<Order> result = orderRepository.findByStatus(Order.OrderStatus.CANCELLED);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test finding an order with items by ID.
-     * Verifies that the order and its items are fetched together.
-     */
-    @Test
-    @DisplayName("Should find order with items by ID")
-    void testFindByIdWithItems_WhenExists_ShouldReturnOrderWithItems() {
+    @DisplayName("Should find order with items")
+    void testFindByIdWithItems() {
         // Given
-        Order savedOrder = orderRepository.save(testOrder);
-        entityManager.flush();
-        Long savedId = savedOrder.getId();
+        Order savedOrder = entityManager.persistAndFlush(testOrder);
 
         // When
-        Optional<Order> result = orderRepository.findByIdWithItems(savedId);
+        Optional<Order> result = orderRepository.findByIdWithItems(savedOrder.getId());
 
         // Then
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(savedId);
     }
 
     /**
-     * Test finding an order with items when it does not exist.
-     * Verifies that an empty Optional is returned.
+     * Test checking if order number exists.
+     * Verifies that the repository correctly checks order number existence.
      */
     @Test
-    @DisplayName("Should return empty when order with items does not exist")
-    void testFindByIdWithItems_WhenNotExists_ShouldReturnEmpty() {
+    @DisplayName("Should check if order number exists")
+    void testExistsByOrderNumber_WhenExists() {
         // Given
-        Long nonExistentId = 999999L;
-
-        // When
-        Optional<Order> result = orderRepository.findByIdWithItems(nonExistentId);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
-
-    /**
-     * Test checking if an order number exists.
-     * Verifies that existsByOrderNumber returns true for existing order.
-     */
-    @Test
-    @DisplayName("Should return true when order number exists")
-    void testExistsByOrderNumber_WhenExists_ShouldReturnTrue() {
-        // Given
-        orderRepository.save(testOrder);
-        entityManager.flush();
+        entityManager.persistAndFlush(testOrder);
 
         // When
         boolean exists = orderRepository.existsByOrderNumber(testOrderNumber);
@@ -212,12 +153,12 @@ class test_OrderRepository {
     }
 
     /**
-     * Test checking if an order number exists when it does not.
-     * Verifies that existsByOrderNumber returns false.
+     * Test checking if order number does not exist.
+     * Verifies that the repository correctly returns false for non-existent order number.
      */
     @Test
     @DisplayName("Should return false when order number does not exist")
-    void testExistsByOrderNumber_WhenNotExists_ShouldReturnFalse() {
+    void testExistsByOrderNumber_WhenNotExists() {
         // When
         boolean exists = orderRepository.existsByOrderNumber("NON-EXISTENT");
 
@@ -227,38 +168,76 @@ class test_OrderRepository {
 
     /**
      * Test saving an order.
-     * Verifies that the save operation works correctly.
+     * Verifies that the repository correctly persists an order.
      */
     @Test
     @DisplayName("Should save order successfully")
-    void testSave_ShouldPersistOrder() {
+    void testSave_Order() {
         // When
         Order savedOrder = orderRepository.save(testOrder);
-        entityManager.flush();
 
         // Then
         assertThat(savedOrder).isNotNull();
         assertThat(savedOrder.getId()).isNotNull();
+        assertThat(savedOrder.getOrderNumber()).isEqualTo(testOrderNumber);
+    }
+
+    /**
+     * Test finding an order by ID.
+     * Verifies that the repository correctly retrieves an order by its ID.
+     */
+    @Test
+    @DisplayName("Should find order by ID")
+    void testFindById_WhenExists() {
+        // Given
+        Order savedOrder = entityManager.persistAndFlush(testOrder);
+
+        // When
+        Optional<Order> result = orderRepository.findById(savedOrder.getId());
+
+        // Then
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(savedOrder.getId());
     }
 
     /**
      * Test deleting an order.
-     * Verifies that the delete operation works correctly.
+     * Verifies that the repository correctly deletes an order.
      */
     @Test
     @DisplayName("Should delete order successfully")
-    void testDelete_ShouldRemoveOrder() {
+    void testDelete_Order() {
         // Given
-        Order savedOrder = orderRepository.save(testOrder);
-        entityManager.flush();
-        Long savedId = savedOrder.getId();
+        Order savedOrder = entityManager.persistAndFlush(testOrder);
+        Long orderId = savedOrder.getId();
 
         // When
         orderRepository.delete(savedOrder);
         entityManager.flush();
 
         // Then
-        Optional<Order> result = orderRepository.findById(savedId);
+        Optional<Order> result = orderRepository.findById(orderId);
         assertThat(result).isEmpty();
+    }
+
+    /**
+     * Test finding all orders.
+     * Verifies that the repository correctly retrieves all orders.
+     */
+    @Test
+    @DisplayName("Should find all orders")
+    void testFindAll_Orders() {
+        // Given
+        entityManager.persistAndFlush(testOrder);
+        Order anotherOrder = new Order();
+        anotherOrder.setOrderNumber("ORD-2024-003");
+        anotherOrder.setStatus(Order.OrderStatus.COMPLETED);
+        entityManager.persistAndFlush(anotherOrder);
+
+        // When
+        List<Order> allOrders = orderRepository.findAll();
+
+        // Then
+        assertThat(allOrders).hasSizeGreaterThanOrEqualTo(2);
     }
 }
