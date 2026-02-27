@@ -1,0 +1,37 @@
+```mermaid
+erDiagram
+    USERS ||--o| CART : "has"
+    CART ||--|{ CART_ITEMS : "contains"
+    CART_ITEMS }o--|| PRODUCTS : "references"
+
+    USERS {
+        SERIAL user_id PK
+        VARCHAR username UK "UNIQUE, NOT NULL"
+        VARCHAR password "NOT NULL"
+        VARCHAR full_name
+        VARCHAR email
+        TIMESTAMP created_at "DEFAULT CURRENT_TIMESTAMP"
+    }
+
+    PRODUCTS {
+        SERIAL product_id PK
+        VARCHAR product_name "NOT NULL"
+        VARCHAR description
+        DECIMAL price "NOT NULL"
+        INT available_qty "NOT NULL"
+        TIMESTAMP created_at "DEFAULT CURRENT_TIMESTAMP"
+    }
+
+    CART {
+        SERIAL cart_id PK
+        INT user_id FK,UK "UNIQUE, NOT NULL, REFERENCES users(user_id) ON DELETE CASCADE"
+        TIMESTAMP created_at "DEFAULT CURRENT_TIMESTAMP"
+    }
+
+    CART_ITEMS {
+        SERIAL cart_item_id PK
+        INT cart_id FK "NOT NULL, REFERENCES cart(cart_id) ON DELETE CASCADE"
+        INT product_id FK "NOT NULL, REFERENCES products(product_id) ON DELETE CASCADE"
+        INT quantity "NOT NULL, CHECK (quantity > 0)"
+    }
+```
