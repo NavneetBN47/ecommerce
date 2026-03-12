@@ -1,0 +1,35 @@
+erDiagram
+    USERS ||--o| CART : "has (lazy)"
+    CART ||--o{ CART_ITEMS : contains
+    PRODUCTS ||--o{ CART_ITEMS : "included in"
+
+    USERS {
+        SERIAL user_id PK
+        VARCHAR username UK "UNIQUE, NOT NULL"
+        VARCHAR password "NOT NULL"
+        VARCHAR full_name
+        VARCHAR email
+        TIMESTAMP created_at
+    }
+
+    PRODUCTS {
+        SERIAL product_id PK
+        VARCHAR product_name "NOT NULL"
+        VARCHAR description
+        DECIMAL price "NOT NULL, > 0"
+        INT available_qty "NOT NULL, >= 0"
+        TIMESTAMP created_at
+    }
+
+    CART {
+        SERIAL cart_id PK
+        INT user_id FK,UK "UNIQUE, NOT NULL"
+        TIMESTAMP created_at
+    }
+
+    CART_ITEMS {
+        SERIAL cart_item_id PK
+        INT cart_id FK "NOT NULL, CASCADE DELETE"
+        INT product_id FK "NOT NULL"
+        INT quantity "NOT NULL, > 0"
+    }
