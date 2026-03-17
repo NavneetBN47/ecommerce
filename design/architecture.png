@@ -1,0 +1,214 @@
+```mermaid
+graph TB
+    subgraph "External Clients"
+        WEB[Web Application]
+        MOBILE[Mobile Application]
+        API_CLIENT[API Clients]
+    end
+
+    subgraph "Security Layer"
+        WAF[Web Application Firewall]
+        AUTH[Authentication Service]
+        AUTHZ[Authorization Service]
+    end
+
+    subgraph "Presentation Layer - API Gateway"
+        GATEWAY[API Gateway / Load Balancer]
+        RATE[Rate Limiter]
+        CORS[CORS Handler]
+    end
+
+    subgraph "Application Layer - REST Controllers"
+        CART_CTRL[Shopping Cart Controller]
+        PRODUCT_CTRL[Product Controller]
+        ORDER_CTRL[Order Controller]
+        USER_CTRL[User Controller]
+    end
+
+    subgraph "Application Layer - Service Orchestration"
+        CART_SVC[Cart Service]
+        PRODUCT_SVC[Product Service]
+        ORDER_SVC[Order Service]
+        USER_SVC[User Service]
+        PAYMENT_SVC[Payment Service]
+        NOTIFICATION_SVC[Notification Service]
+    end
+
+    subgraph "Domain Layer - Business Logic"
+        CART_DOMAIN[Cart Domain Model]
+        PRODUCT_DOMAIN[Product Domain Model]
+        ORDER_DOMAIN[Order Domain Model]
+        USER_DOMAIN[User Domain Model]
+        PRICING_ENGINE[Pricing Engine]
+        INVENTORY_MGR[Inventory Manager]
+        VALIDATION[Business Rules Validator]
+    end
+
+    subgraph "Domain Layer - Domain Events"
+        EVENT_BUS[Event Bus]
+        CART_EVENTS[Cart Events]
+        ORDER_EVENTS[Order Events]
+        INVENTORY_EVENTS[Inventory Events]
+    end
+
+    subgraph "Infrastructure Layer - Data Access"
+        CART_REPO[Cart Repository]
+        PRODUCT_REPO[Product Repository]
+        ORDER_REPO[Order Repository]
+        USER_REPO[User Repository]
+        CACHE_MGR[Cache Manager]
+    end
+
+    subgraph "Infrastructure Layer - External Integrations"
+        PAYMENT_GATEWAY[Payment Gateway Integration]
+        EMAIL_SVC[Email Service Integration]
+        SMS_SVC[SMS Service Integration]
+        ANALYTICS[Analytics Service]
+    end
+
+    subgraph "Data Layer"
+        PRIMARY_DB[(Primary Database<br/>PostgreSQL)]
+        READ_REPLICA[(Read Replica<br/>PostgreSQL)]
+        CACHE[(Redis Cache)]
+        SEARCH[(Elasticsearch)]
+    end
+
+    subgraph "Cross-Cutting Concerns"
+        LOGGING[Centralized Logging]
+        MONITORING[Monitoring & Metrics]
+        TRACING[Distributed Tracing]
+        CONFIG[Configuration Service]
+    end
+
+    %% External to Security
+    WEB --> WAF
+    MOBILE --> WAF
+    API_CLIENT --> WAF
+    
+    %% Security to Gateway
+    WAF --> AUTH
+    AUTH --> GATEWAY
+    GATEWAY --> AUTHZ
+    GATEWAY --> RATE
+    GATEWAY --> CORS
+
+    %% Gateway to Controllers
+    RATE --> CART_CTRL
+    RATE --> PRODUCT_CTRL
+    RATE --> ORDER_CTRL
+    RATE --> USER_CTRL
+
+    %% Controllers to Services
+    CART_CTRL --> CART_SVC
+    PRODUCT_CTRL --> PRODUCT_SVC
+    ORDER_CTRL --> ORDER_SVC
+    USER_CTRL --> USER_SVC
+
+    %% Services to Domain
+    CART_SVC --> CART_DOMAIN
+    CART_SVC --> PRICING_ENGINE
+    PRODUCT_SVC --> PRODUCT_DOMAIN
+    PRODUCT_SVC --> INVENTORY_MGR
+    ORDER_SVC --> ORDER_DOMAIN
+    ORDER_SVC --> PRICING_ENGINE
+    USER_SVC --> USER_DOMAIN
+
+    %% Services to Payment & Notification
+    ORDER_SVC --> PAYMENT_SVC
+    ORDER_SVC --> NOTIFICATION_SVC
+    CART_SVC --> NOTIFICATION_SVC
+
+    %% Domain to Validation
+    CART_DOMAIN --> VALIDATION
+    ORDER_DOMAIN --> VALIDATION
+    PRODUCT_DOMAIN --> VALIDATION
+
+    %% Domain to Events
+    CART_DOMAIN --> EVENT_BUS
+    ORDER_DOMAIN --> EVENT_BUS
+    INVENTORY_MGR --> EVENT_BUS
+    EVENT_BUS --> CART_EVENTS
+    EVENT_BUS --> ORDER_EVENTS
+    EVENT_BUS --> INVENTORY_EVENTS
+
+    %% Events to Services
+    CART_EVENTS --> NOTIFICATION_SVC
+    ORDER_EVENTS --> NOTIFICATION_SVC
+    INVENTORY_EVENTS --> PRODUCT_SVC
+
+    %% Domain to Repositories
+    CART_DOMAIN --> CART_REPO
+    PRODUCT_DOMAIN --> PRODUCT_REPO
+    ORDER_DOMAIN --> ORDER_REPO
+    USER_DOMAIN --> USER_REPO
+
+    %% Repositories to Cache Manager
+    CART_REPO --> CACHE_MGR
+    PRODUCT_REPO --> CACHE_MGR
+    ORDER_REPO --> CACHE_MGR
+    USER_REPO --> CACHE_MGR
+
+    %% Cache Manager to Cache
+    CACHE_MGR --> CACHE
+
+    %% Repositories to Databases
+    CART_REPO --> PRIMARY_DB
+    PRODUCT_REPO --> PRIMARY_DB
+    ORDER_REPO --> PRIMARY_DB
+    USER_REPO --> PRIMARY_DB
+    
+    PRODUCT_REPO --> READ_REPLICA
+    CART_REPO --> READ_REPLICA
+
+    %% Search Integration
+    PRODUCT_REPO --> SEARCH
+    ORDER_REPO --> SEARCH
+
+    %% External Integrations
+    PAYMENT_SVC --> PAYMENT_GATEWAY
+    NOTIFICATION_SVC --> EMAIL_SVC
+    NOTIFICATION_SVC --> SMS_SVC
+    ORDER_SVC --> ANALYTICS
+    CART_SVC --> ANALYTICS
+
+    %% Cross-Cutting Concerns
+    GATEWAY -.-> LOGGING
+    CART_CTRL -.-> LOGGING
+    PRODUCT_CTRL -.-> LOGGING
+    ORDER_CTRL -.-> LOGGING
+    CART_SVC -.-> LOGGING
+    ORDER_SVC -.-> LOGGING
+    
+    GATEWAY -.-> MONITORING
+    CART_SVC -.-> MONITORING
+    ORDER_SVC -.-> MONITORING
+    PRIMARY_DB -.-> MONITORING
+    
+    GATEWAY -.-> TRACING
+    CART_CTRL -.-> TRACING
+    CART_SVC -.-> TRACING
+    CART_REPO -.-> TRACING
+    
+    CART_SVC -.-> CONFIG
+    ORDER_SVC -.-> CONFIG
+    PAYMENT_SVC -.-> CONFIG
+
+    %% Styling
+    classDef external fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef security fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef presentation fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef application fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef domain fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef infrastructure fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef data fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    classDef crosscutting fill:#efebe9,stroke:#3e2723,stroke-width:2px
+
+    class WEB,MOBILE,API_CLIENT external
+    class WAF,AUTH,AUTHZ security
+    class GATEWAY,RATE,CORS presentation
+    class CART_CTRL,PRODUCT_CTRL,ORDER_CTRL,USER_CTRL,CART_SVC,PRODUCT_SVC,ORDER_SVC,USER_SVC,PAYMENT_SVC,NOTIFICATION_SVC application
+    class CART_DOMAIN,PRODUCT_DOMAIN,ORDER_DOMAIN,USER_DOMAIN,PRICING_ENGINE,INVENTORY_MGR,VALIDATION,EVENT_BUS,CART_EVENTS,ORDER_EVENTS,INVENTORY_EVENTS domain
+    class CART_REPO,PRODUCT_REPO,ORDER_REPO,USER_REPO,CACHE_MGR,PAYMENT_GATEWAY,EMAIL_SVC,SMS_SVC,ANALYTICS infrastructure
+    class PRIMARY_DB,READ_REPLICA,CACHE,SEARCH data
+    class LOGGING,MONITORING,TRACING,CONFIG crosscutting
+```
