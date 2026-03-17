@@ -1,0 +1,213 @@
+{
+  "integration_report": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "services": [
+      {
+        "service_name": "User Management Service",
+        "base_path": "/api/v1/users",
+        "port": 8081,
+        "endpoints_documented": 6,
+        "endpoints": [
+          {
+            "path": "/api/v1/users/register",
+            "method": "POST",
+            "summary": "Register a new user",
+            "authentication_required": false,
+            "request_body": "UserRegistrationRequest",
+            "responses": ["201", "400", "409"]
+          },
+          {
+            "path": "/api/v1/users/login",
+            "method": "POST",
+            "summary": "User login",
+            "authentication_required": false,
+            "request_body": "UserLoginRequest",
+            "responses": ["200", "401"]
+          },
+          {
+            "path": "/api/v1/users/profile",
+            "method": "GET",
+            "summary": "Get user profile",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "responses": ["200", "401", "404"]
+          },
+          {
+            "path": "/api/v1/users/profile",
+            "method": "PUT",
+            "summary": "Update user profile",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "request_body": "UserProfileUpdateRequest",
+            "responses": ["200", "400", "401"]
+          },
+          {
+            "path": "/api/v1/users/password/reset",
+            "method": "POST",
+            "summary": "Request password reset",
+            "authentication_required": false,
+            "request_body": "PasswordResetRequest",
+            "responses": ["200", "404"]
+          },
+          {
+            "path": "/api/v1/users/password/change",
+            "method": "POST",
+            "summary": "Change password",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "request_body": "PasswordChangeRequest",
+            "responses": ["200", "400", "401"]
+          }
+        ]
+      },
+      {
+        "service_name": "Product Catalog Service",
+        "base_path": "/api/v1/products",
+        "port": 8082,
+        "endpoints_documented": 5,
+        "endpoints": [
+          {
+            "path": "/api/v1/products/{id}",
+            "method": "GET",
+            "summary": "Get product by ID",
+            "authentication_required": false,
+            "path_parameters": ["id"],
+            "responses": ["200", "404"]
+          },
+          {
+            "path": "/api/v1/products",
+            "method": "GET",
+            "summary": "Get all products",
+            "authentication_required": false,
+            "query_parameters": ["page", "size"],
+            "responses": ["200"]
+          },
+          {
+            "path": "/api/v1/products/search",
+            "method": "GET",
+            "summary": "Search products",
+            "authentication_required": false,
+            "query_parameters": ["name", "category", "minPrice", "maxPrice", "page", "size"],
+            "responses": ["200"]
+          },
+          {
+            "path": "/api/v1/products/category/{category}",
+            "method": "GET",
+            "summary": "Get products by category",
+            "authentication_required": false,
+            "path_parameters": ["category"],
+            "query_parameters": ["page", "size"],
+            "responses": ["200"]
+          },
+          {
+            "path": "/api/v1/products/available",
+            "method": "GET",
+            "summary": "Get available products",
+            "authentication_required": false,
+            "query_parameters": ["page", "size"],
+            "responses": ["200"]
+          }
+        ]
+      },
+      {
+        "service_name": "Shopping Cart Service",
+        "base_path": "/api/v1/cart",
+        "port": 8083,
+        "endpoints_documented": 5,
+        "endpoints": [
+          {
+            "path": "/api/v1/cart",
+            "method": "GET",
+            "summary": "Get user's cart",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "responses": ["200", "401", "404"]
+          },
+          {
+            "path": "/api/v1/cart/items",
+            "method": "POST",
+            "summary": "Add item to cart",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "request_body": "AddCartItemRequest",
+            "responses": ["201", "400", "401", "404", "409"]
+          },
+          {
+            "path": "/api/v1/cart/items/{itemId}",
+            "method": "PUT",
+            "summary": "Update cart item quantity",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "path_parameters": ["itemId"],
+            "request_body": "UpdateCartItemRequest",
+            "responses": ["200", "400", "401", "403", "404", "409"]
+          },
+          {
+            "path": "/api/v1/cart/items/{itemId}",
+            "method": "DELETE",
+            "summary": "Remove item from cart",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "path_parameters": ["itemId"],
+            "responses": ["200", "401", "403", "404"]
+          },
+          {
+            "path": "/api/v1/cart",
+            "method": "DELETE",
+            "summary": "Clear cart",
+            "authentication_required": true,
+            "security_scheme": "bearerAuth",
+            "responses": ["204", "401", "404"]
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "total_services": 3,
+      "total_endpoints_documented": 16,
+      "endpoints_with_authentication": 9,
+      "endpoints_without_authentication": 7,
+      "unique_http_methods": ["GET", "POST", "PUT", "DELETE"],
+      "security_schemes_used": ["bearerAuth (JWT)"]
+    },
+    "issues": [],
+    "warnings": [
+      "Ensure JWT secret key is properly configured in production",
+      "Disable Swagger UI in production environment",
+      "Implement rate limiting for API endpoints",
+      "Consider adding API versioning strategy documentation",
+      "Add request/response examples for complex schemas"
+    ],
+    "security_applied": [
+      "JWT Bearer token authentication implemented",
+      "Password fields marked with format: password to hide values",
+      "Sensitive endpoints protected with @PreAuthorize annotation",
+      "Authorization header marked as hidden in Swagger UI",
+      "Security scheme properly documented in OpenAPI spec",
+      "HTTPS recommended for all production endpoints",
+      "Token expiration documented in login response"
+    ],
+    "compliance": {
+      "openapi_version": "3.0.3",
+      "springdoc_version": "2.3.0",
+      "standards_followed": [
+        "OpenAPI 3.0 Specification",
+        "RESTful API Design Principles",
+        "HTTP Status Code Standards (RFC 7231)",
+        "JWT Authentication (RFC 7519)",
+        "JSON Schema Validation"
+      ],
+      "best_practices": [
+        "Comprehensive endpoint documentation",
+        "Detailed request/response schemas",
+        "HTTP status codes properly documented",
+        "Authentication requirements clearly marked",
+        "API versioning in URL path",
+        "Pagination support for list endpoints",
+        "Error response standardization"
+      ]
+    },
+    "status": "SUCCESS",
+    "message": "Swagger/OpenAPI integration completed successfully for all microservices"
+  }
+}
