@@ -1,0 +1,90 @@
+graph TB
+    subgraph "Client Layer"
+        CLIENT[Web/Mobile Client]
+    end
+
+    subgraph "API Gateway / Load Balancer"
+        LB[Load Balancer]
+    end
+
+    subgraph "Presentation Layer"
+        AUTH[JWT Authentication Filter]
+        UC[UserController]
+        PC[ProductController]
+        CC[CartController]
+    end
+
+    subgraph "Application Layer"
+        US[UserService]
+        PS[ProductService]
+        CS[CartService]
+        AS[AuthenticationService]
+        ENC[EncryptionService]
+        AUDIT[AuditService]
+    end
+
+    subgraph "Domain Layer"
+        USER[User Entity]
+        PROD[Product Entity]
+        CART[Cart Entity]
+        ITEM[CartItem Entity]
+    end
+
+    subgraph "Infrastructure Layer"
+        UR[UserRepository]
+        PR[ProductRepository]
+        CR[CartRepository]
+        CIR[CartItemRepository]
+    end
+
+    subgraph "Data Layer"
+        DB[(PostgreSQL Database)]
+    end
+
+    subgraph "External Systems"
+        JWT_PROVIDER[JWT Token Provider]
+        AUDIT_LOG[Audit Log System]
+        CACHE[Cache - Caffeine]
+    end
+
+    CLIENT -->|HTTPS/REST| LB
+    LB --> AUTH
+    AUTH -->|Validate Token| JWT_PROVIDER
+    AUTH -->|Authorized| UC
+    AUTH -->|Authorized| PC
+    AUTH -->|Authorized| CC
+
+    UC -->|User Operations| US
+    PC -->|Product Operations| PS
+    CC -->|Cart Operations| CS
+
+    US -->|Authenticate| AS
+    US -->|Encrypt/Decrypt PII| ENC
+    US -->|Log Events| AUDIT
+    CS -->|Log Events| AUDIT
+    PS -->|Cache| CACHE
+
+    US -->|CRUD| USER
+    PS -->|CRUD| PROD
+    CS -->|CRUD| CART
+    CS -->|CRUD| ITEM
+
+    USER -->|JPA/Hibernate| UR
+    PROD -->|JPA/Hibernate| PR
+    CART -->|JPA/Hibernate| CR
+    ITEM -->|JPA/Hibernate| CIR
+
+    UR -->|SQL| DB
+    PR -->|SQL| DB
+    CR -->|SQL| DB
+    CIR -->|SQL| DB
+
+    AUDIT -->|Write Logs| AUDIT_LOG
+
+    style CLIENT fill:#e1f5ff
+    style LB fill:#fff3e0
+    style AUTH fill:#fff3e0
+    style DB fill:#f3e5f5
+    style JWT_PROVIDER fill:#e8f5e9
+    style AUDIT_LOG fill:#e8f5e9
+    style CACHE fill:#e8f5e9
