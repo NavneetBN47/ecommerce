@@ -1,0 +1,44 @@
+openapi: 3.0.3
+info:
+  title: E-Commerce Platform API
+  description: |
+    Complete API documentation for the E-Commerce Platform microservices architecture.
+    
+    This platform consists of three main microservices:
+    - **User Management Service**: Handles user registration, authentication, and profile management
+    - **Product Catalog Service**: Manages product inventory, catalog, and search functionality
+    - **Shopping Cart Service**: Manages shopping cart operations and checkout
+    
+    ## Authentication
+    Most endpoints require JWT Bearer token authentication. Obtain a token by:
+    1. Register a new user via `/api/users/register`
+    2. Login via `/api/users/login`
+    3. Use the returned token in the Authorization header: `Bearer <token>`
+  version: 1.0.0
+  contact:
+    name: E-Commerce Platform Team
+    email: support@ecommerce.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8081
+    description: User Management Service (Development)
+  - url: http://localhost:8082
+    description: Product Catalog Service (Development)
+  - url: http://localhost:8083
+    description: Shopping Cart Service (Development)
+  - url: https://api.ecommerce.com
+    description: Production Server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: User Management
+    description: User registration, authentication, and profile management
+  - name: Product Catalog
+    description: Product inventory and catalog management
+  - name: Shopping Cart
+    description: Shopping cart and checkout operations
