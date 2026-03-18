@@ -1,0 +1,384 @@
+openapi: 3.0.3
+info:
+  title: Shopping Cart Service API
+  version: 1.0.0
+  description: RESTful API for shopping cart management in the E-Commerce platform
+  contact:
+    name: E-Commerce Platform Team
+    email: support@ecommerce.com
+    url: https://ecommerce.com/support
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8082
+    description: Development Server
+  - url: https://api-dev.ecommerce.com/cart
+    description: Development Environment
+  - url: https://api.ecommerce.com/cart
+    description: Production Environment
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/cart:
+    get:
+      tags:
+        - Shopping Cart
+      summary: Get user cart
+      description: Retrieves the authenticated user's shopping cart with all items
+      operationId: getCart
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cart retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Shopping Cart
+      summary: Clear cart
+      description: Removes all items from the authenticated user's shopping cart
+      operationId: clearCart
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Cart cleared successfully
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Shopping Cart
+      summary: Add item to cart
+      description: Adds a product to the authenticated user's shopping cart
+      operationId: addItemToCart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '201':
+          description: Item added to cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid request data or insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/cart/items/{itemId}:
+    put:
+      tags:
+        - Shopping Cart
+      summary: Update cart item
+      description: Updates the quantity of an item in the authenticated user's shopping cart
+      operationId: updateCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          description: Cart item ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 67890
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid quantity or insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Item does not belong to user's cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Shopping Cart
+      summary: Remove item from cart
+      description: Removes an item from the authenticated user's shopping cart
+      operationId: removeItemFromCart
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          description: Cart item ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 67890
+      responses:
+        '200':
+          description: Item removed from cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Item does not belong to user's cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication token
+
+  schemas:
+    CartResponse:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          format: int64
+          description: Unique cart identifier
+          example: 54321
+        userId:
+          type: integer
+          format: int64
+          description: User identifier
+          example: 12345
+        items:
+          type: array
+          description: List of cart items
+          items:
+            $ref: '#/components/schemas/CartItemResponse'
+        totalAmount:
+          type: number
+          format: double
+          description: Total cart amount
+          example: 2599.98
+        itemCount:
+          type: integer
+          description: Total number of items in cart
+          example: 2
+        createdAt:
+          type: string
+          format: date-time
+          description: Cart creation timestamp
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: 2024-01-15T10:30:00Z
+
+    CartItemResponse:
+      type: object
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          description: Unique cart item identifier
+          example: 67890
+        productId:
+          type: integer
+          format: int64
+          description: Product identifier
+          example: 12345
+        productName:
+          type: string
+          description: Product name
+          example: Dell XPS 15 Laptop
+        productPrice:
+          type: number
+          format: double
+          description: Product unit price
+          example: 1299.99
+        quantity:
+          type: integer
+          description: Item quantity
+          example: 2
+        subtotal:
+          type: number
+          format: double
+          description: Item subtotal (price × quantity)
+          example: 2599.98
+        imageUrl:
+          type: string
+          format: uri
+          description: Product image URL
+          example: https://cdn.ecommerce.com/products/12345.jpg
+
+    AddCartItemRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: Product identifier
+          example: 12345
+        quantity:
+          type: integer
+          minimum: 1
+          description: Item quantity
+          example: 2
+
+    UpdateCartItemRequest:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          description: Updated item quantity
+          example: 3
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          example: 2024-01-15T10:30:00Z
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        error:
+          type: string
+          description: Error type or category
+          example: BAD_REQUEST
+        message:
+          type: string
+          description: Detailed error message
+          example: Invalid input data
+        path:
+          type: string
+          description: API path where the error occurred
+          example: /api/v1/cart/items

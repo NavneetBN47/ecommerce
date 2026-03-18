@@ -1,0 +1,347 @@
+openapi: 3.0.3
+info:
+  title: Product Catalog Service API
+  version: 1.0.0
+  description: RESTful API for product search, retrieval, and catalog management in the E-Commerce platform
+  contact:
+    name: E-Commerce Platform Team
+    email: support@ecommerce.com
+    url: https://ecommerce.com/support
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8081
+    description: Development Server
+  - url: https://api-dev.ecommerce.com/products
+    description: Development Environment
+  - url: https://api.ecommerce.com/products
+    description: Production Environment
+
+paths:
+  /api/v1/products/search:
+    get:
+      tags:
+        - Product Catalog
+      summary: Search products
+      description: Search products by keyword with pagination support. Searches across product name, description, and category.
+      operationId: searchProducts
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword for product name, description, or category
+          required: false
+          schema:
+            type: string
+            example: laptop
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of items per page (max 100)
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+            example: 20
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+        '400':
+          description: Invalid search parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/products/{productId}:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get product details
+      description: Retrieves detailed information about a specific product by its ID
+      operationId: getProductById
+      parameters:
+        - name: productId
+          in: path
+          description: Unique product identifier
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 12345
+      responses:
+        '200':
+          description: Product details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/products/category/{category}:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get products by category
+      description: Retrieves all products in a specific category with pagination support
+      operationId: getProductsByCategory
+      parameters:
+        - name: category
+          in: path
+          description: Product category name
+          required: true
+          schema:
+            type: string
+            example: Electronics
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of items per page (max 100)
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+            example: 20
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+        '400':
+          description: Invalid category or pagination parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/products/available:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get available products
+      description: Retrieves all products that are currently in stock with pagination support
+      operationId: getAvailableProducts
+      parameters:
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of items per page (max 100)
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+            example: 20
+      responses:
+        '200':
+          description: Available products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+        '400':
+          description: Invalid pagination parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ProductResponse:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: Unique product identifier
+          example: 12345
+        name:
+          type: string
+          description: Product name
+          example: Dell XPS 15 Laptop
+        description:
+          type: string
+          description: Detailed product description
+          example: High-performance laptop with Intel i7 processor
+        category:
+          type: string
+          description: Product category
+          example: Electronics
+        price:
+          type: number
+          format: double
+          description: Product price
+          example: 1299.99
+        stockQuantity:
+          type: integer
+          description: Available stock quantity
+          example: 50
+        imageUrl:
+          type: string
+          format: uri
+          description: Product image URL
+          example: https://cdn.ecommerce.com/products/12345.jpg
+        createdAt:
+          type: string
+          format: date-time
+          description: Product creation timestamp
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: 2024-01-15T10:30:00Z
+
+    ProductSearchResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          description: List of products
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+
+    ProductSummary:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: Unique product identifier
+          example: 12345
+        name:
+          type: string
+          description: Product name
+          example: Dell XPS 15 Laptop
+        category:
+          type: string
+          description: Product category
+          example: Electronics
+        price:
+          type: number
+          format: double
+          description: Product price
+          example: 1299.99
+        stockQuantity:
+          type: integer
+          description: Available stock quantity
+          example: 50
+        imageUrl:
+          type: string
+          format: uri
+          description: Product image URL
+          example: https://cdn.ecommerce.com/products/12345.jpg
+
+    PaginationMetadata:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          description: Current page number (0-indexed)
+          example: 0
+        pageSize:
+          type: integer
+          description: Number of items per page
+          example: 20
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 5
+        totalItems:
+          type: integer
+          format: int64
+          description: Total number of items
+          example: 100
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          example: 2024-01-15T10:30:00Z
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        error:
+          type: string
+          description: Error type or category
+          example: BAD_REQUEST
+        message:
+          type: string
+          description: Detailed error message
+          example: Invalid input data
+        path:
+          type: string
+          description: API path where the error occurred
+          example: /api/v1/products/search
