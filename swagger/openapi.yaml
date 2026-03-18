@@ -1,0 +1,530 @@
+openapi: 3.0.3
+info:
+  title: E-commerce Platform API
+  description: |
+    Complete API documentation for the E-commerce Platform microservices architecture.
+    
+    ## Architecture Overview
+    The platform consists of three main microservices:
+    - **User Management Service** (Port 8081): Handles user registration, authentication, and profile management
+    - **Product Catalog Service** (Port 8082): Manages product catalog, search, and inventory
+    - **Shopping Cart Service** (Port 8083): Manages shopping cart operations with inter-service communication
+    
+    ## Authentication
+    Most endpoints require JWT Bearer token authentication. Obtain a token by calling the `/api/v1/users/login` endpoint.
+    
+    ## Security Features
+    - BCrypt password hashing (cost factor 12)
+    - JWT tokens with RSA-256 signing
+    - ABAC (Attribute-Based Access Control) for cart operations
+    - Comprehensive audit logging with 7-year retention
+    
+    ## Performance Optimizations
+    - Redis caching for product data (10-minute TTL)
+    - PostgreSQL full-text search with GIN indexes
+    - HikariCP connection pooling
+    - Circuit breaker pattern for inter-service communication
+    
+    ## Rate Limiting
+    API rate limits apply per user/IP:
+    - Public endpoints: 100 requests/minute
+    - Authenticated endpoints: 1000 requests/minute
+  version: 1.0.0
+  contact:
+    name: E-commerce Platform Team
+    email: support@ecommerce-platform.com
+    url: https://ecommerce-platform.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8081
+    description: User Management Service (Development)
+  - url: http://localhost:8082
+    description: Product Catalog Service (Development)
+  - url: http://localhost:8083
+    description: Shopping Cart Service (Development)
+  - url: https://api-dev.ecommerce-platform.com
+    description: Development Environment
+  - url: https://api.ecommerce-platform.com
+    description: Production Environment
+
+tags:
+  - name: User Management
+    description: User registration, authentication, and profile management
+  - name: Product Catalog
+    description: Product search, retrieval, and catalog management
+  - name: Shopping Cart
+    description: Shopping cart operations and management
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer Token obtained from /api/v1/users/login endpoint
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+        error:
+          type: string
+          description: Error type/code
+        status:
+          type: integer
+          description: HTTP status code
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+      required:
+        - message
+        - status
+        - timestamp
+
+    UserRegistrationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address (must be unique)
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Password (min 8 characters, must contain uppercase, lowercase, number, special char)
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: Phone number in E.164 format
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+
+    UserRegistrationResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+
+    UserLoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+      required:
+        - email
+        - password
+
+    UserLoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+        tokenType:
+          type: string
+          default: Bearer
+        expiresIn:
+          type: integer
+          description: Token expiration time in seconds
+        userId:
+          type: integer
+          format: int64
+        email:
+          type: string
+
+    UserProfileResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phoneNumber:
+          type: string
+        address:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProductResponse:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        category:
+          type: string
+        stockQuantity:
+          type: integer
+        imageUrl:
+          type: string
+          format: uri
+        available:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    ProductSearchResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductResponse'
+        pagination:
+          type: object
+          properties:
+            currentPage:
+              type: integer
+            totalPages:
+              type: integer
+            totalItems:
+              type: integer
+            itemsPerPage:
+              type: integer
+
+    CartResponse:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId:
+                type: integer
+                format: int64
+              productId:
+                type: integer
+                format: int64
+              productName:
+                type: string
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+                format: double
+              totalPrice:
+                type: number
+                format: double
+        totalItems:
+          type: integer
+        totalAmount:
+          type: number
+          format: double
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AddCartItemRequest:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+      required:
+        - productId
+        - quantity
+
+    UpdateCartItemRequest:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+      required:
+        - quantity
+
+paths:
+  /api/v1/users/register:
+    post:
+      tags:
+        - User Management
+      summary: Register a new user
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRegistrationResponse'
+        '400':
+          description: Invalid input or user already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+
+  /api/v1/users/login:
+    post:
+      tags:
+        - User Management
+      summary: User login
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+
+  /api/v1/users/profile:
+    get:
+      tags:
+        - User Management
+      summary: Get user profile
+      operationId: getUserProfile
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/products/search:
+    get:
+      tags:
+        - Product Catalog
+      summary: Search products
+      operationId: searchProducts
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+      security: []
+
+  /api/v1/products/{productId}:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get product details
+      operationId: getProductById
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+
+  /api/v1/cart:
+    get:
+      tags:
+        - Shopping Cart
+      summary: Get user's shopping cart
+      operationId: getCart
+      responses:
+        '200':
+          description: Cart retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Shopping Cart
+      summary: Add item to cart
+      operationId: addItemToCart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '201':
+          description: Item added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/cart/items/{itemId}:
+    put:
+      tags:
+        - Shopping Cart
+      summary: Update cart item quantity
+      operationId: updateCartItem
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+    delete:
+      tags:
+        - Shopping Cart
+      summary: Remove item from cart
+      operationId: removeItemFromCart
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Item removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
