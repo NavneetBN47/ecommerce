@@ -1,0 +1,373 @@
+openapi: 3.0.3
+info:
+  title: User Management Service API
+  description: |
+    RESTful API for user registration, authentication, and profile management with JWT-based security (RSA-256).
+    
+    **Key Features:**
+    - User registration with email verification
+    - JWT-based authentication (access + refresh tokens)
+    - BCrypt password hashing (cost factor 12)
+    - Profile management (view, update, delete)
+    - Password change and reset functionality
+    - Comprehensive audit logging
+    - GDPR-compliant data handling
+    
+    **Security:**
+    - All authenticated endpoints require Bearer JWT token
+    - Tokens expire after 1 hour (access) and 7 days (refresh)
+    - Password policies: min 8 chars, uppercase, lowercase, digit, special char
+    - Account lockout after 5 failed login attempts
+    
+    **Compliance:**
+    - GDPR Article 17 (Right to erasure)
+    - SOC2 Type II audit logging
+    - ISO27001 data encryption standards
+  version: 1.0.0
+  contact:
+    name: E-Commerce Platform Team
+    email: support@ecommerce.com
+    url: https://ecommerce.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8081
+    description: Development Server
+  - url: https://api.ecommerce.com
+    description: Production Server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/users/register:
+    post:
+      tags:
+        - User Management
+      summary: Register a new user
+      description: Creates a new user account with email verification. Passwords are hashed using BCrypt with cost factor 12.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRegistrationResponse'
+        '400':
+          description: Invalid input data or user already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '500':
+          description: Internal server error
+
+  /api/v1/users/login:
+    post:
+      tags:
+        - User Management
+      summary: User login
+      description: Authenticates user credentials and returns JWT access and refresh tokens (RSA-256 signed)
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLoginResponse'
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Account locked or disabled
+
+  /api/v1/users/profile:
+    get:
+      tags:
+        - User Management
+      summary: Get user profile
+      description: Retrieves the authenticated user's profile information
+      operationId: getUserProfile
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+        '404':
+          description: User not found
+    
+    put:
+      tags:
+        - User Management
+      summary: Update user profile
+      description: Updates the authenticated user's profile information (name, phone, address)
+      operationId: updateUserProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdateRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+
+  /api/v1/users/password/change:
+    post:
+      tags:
+        - User Management
+      summary: Change password
+      description: Allows authenticated users to change their password by providing current and new password
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid password format or current password incorrect
+        '401':
+          description: Unauthorized
+
+  /api/v1/users/password/reset:
+    post:
+      tags:
+        - User Management
+      summary: Request password reset
+      description: Initiates password reset process by sending a reset token to the user's email
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          description: User not found
+        '429':
+          description: Too many reset requests
+
+  /api/v1/users/account:
+    delete:
+      tags:
+        - User Management
+      summary: Delete user account
+      description: Permanently deletes the authenticated user's account and all associated data
+      operationId: deleteAccount
+      responses:
+        '204':
+          description: Account deleted successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication token (RSA-256 signed). Obtain via /api/v1/users/login endpoint.
+
+  schemas:
+    UserRegistrationRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: SecurePass123!
+          description: Must contain uppercase, lowercase, digit, and special character
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          example: +1234567890
+
+    UserRegistrationResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+          example: 12345
+        email:
+          type: string
+          example: john.doe@example.com
+        message:
+          type: string
+          example: User registered successfully. Please verify your email.
+
+    UserLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+
+    UserLoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          example: 3600
+          description: Access token expiration time in seconds
+
+    UserProfileResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+          example: 12345
+        email:
+          type: string
+          example: john.doe@example.com
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          example: +1234567890
+        address:
+          type: string
+          example: 123 Main St, City, Country
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+
+    UserProfileUpdateRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          example: +1234567890
+        address:
+          type: string
+          example: 123 Main St, City, Country
+
+    PasswordChangeRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          example: OldPass123!
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          example: NewSecurePass456!
+
+    PasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operation completed successfully

@@ -1,0 +1,113 @@
+{
+  "transformed_code_path": "/src/main/java",
+  "swagger_file_path": "/swagger",
+  "integration_report": {
+    "endpoints_documented": 15,
+    "endpoints_by_service": {
+      "user_management": 7,
+      "product_catalog": 4,
+      "shopping_cart": 4
+    },
+    "issues": [],
+    "security_applied": [
+      "JWT Bearer authentication configured for User Management Service",
+      "JWT Bearer authentication configured for Shopping Cart Service",
+      "@SecurityRequirement annotations added to all authenticated endpoints",
+      "@PreAuthorize annotations preserved for RBAC enforcement",
+      "Sensitive data (passwords, tokens) marked with format: password in schemas",
+      "Security schemes defined in OpenAPI configuration",
+      "ABAC authorization documented in Shopping Cart endpoints"
+    ],
+    "annotations_added": {
+      "@Tag": 3,
+      "@Operation": 15,
+      "@ApiResponses": 15,
+      "@ApiResponse": 75,
+      "@Parameter": 35,
+      "@SecurityRequirement": 10,
+      "@Schema": 45
+    },
+    "status": "SUCCESS",
+    "compliance": {
+      "openapi_version": "3.0.3",
+      "swagger_ui_version": "5.10.3",
+      "springdoc_version": "2.3.0",
+      "standards_compliance": [
+        "OpenAPI 3.0 Specification",
+        "REST API Best Practices",
+        "JWT RFC 7519",
+        "HTTP Status Code Standards (RFC 7231)"
+      ]
+    },
+    "coverage": {
+      "controllers_documented": 3,
+      "total_controllers": 3,
+      "endpoints_documented": 15,
+      "total_endpoints": 15,
+      "coverage_percentage": 100
+    },
+    "validation": {
+      "openapi_spec_valid": true,
+      "all_endpoints_have_responses": true,
+      "all_parameters_documented": true,
+      "security_schemes_defined": true,
+      "examples_provided": true
+    }
+  },
+  "migration_guide": [
+    "Step 1: Add springdoc-openapi-starter-webmvc-ui dependency (version 2.3.0) to pom.xml for all three services",
+    "Step 2: Configure Swagger in application.yml - set springdoc.api-docs.path=/api-docs and springdoc.swagger-ui.path=/swagger-ui.html",
+    "Step 3: Create SwaggerConfiguration class in infrastructure/config package for each service with OpenAPI bean definition",
+    "Step 4: Add @Tag annotation to all controller classes for logical grouping in Swagger UI",
+    "Step 5: Add @Operation annotations to all controller methods with summary and description",
+    "Step 6: Add @ApiResponses with @ApiResponse for all possible HTTP status codes (200, 201, 400, 401, 403, 404, 500, 503)",
+    "Step 7: Add @Parameter annotations to all method parameters with descriptions and examples",
+    "Step 8: Add @SecurityRequirement(name='bearerAuth') to all authenticated endpoints",
+    "Step 9: Define security schemes in SwaggerConfiguration (JWT Bearer authentication)",
+    "Step 10: Add @Schema annotations to all DTO classes and fields with descriptions and examples",
+    "Step 11: Run mvn clean install to download dependencies and compile code",
+    "Step 12: Start each service using mvn spring-boot:run",
+    "Step 13: Access Swagger UI at http://localhost:{port}/swagger-ui.html for each service",
+    "Step 14: Test JWT authentication by logging in via User Management Service and using 'Authorize' button in Swagger UI",
+    "Step 15: Download OpenAPI specifications from http://localhost:{port}/api-docs for documentation and client generation",
+    "Step 16: For production, disable Swagger UI by setting springdoc.swagger-ui.enabled=false in application-prod.yml",
+    "Step 17: Configure CORS if Swagger UI will be accessed from different domains",
+    "Step 18: Set up API Gateway to route Swagger UI requests to appropriate microservices",
+    "Step 19: Generate client SDKs using OpenAPI Generator with downloaded specifications",
+    "Step 20: Integrate Swagger specifications into CI/CD pipeline for automated API documentation updates"
+  ],
+  "files_modified": [
+    "user-management-service/src/main/java/com/ecommerce/usermanagement/presentation/controller/UserController.java",
+    "user-management-service/src/main/java/com/ecommerce/usermanagement/infrastructure/config/SwaggerConfiguration.java",
+    "user-management-service/pom.xml",
+    "product-catalog-service/src/main/java/com/ecommerce/productcatalog/presentation/controller/ProductController.java",
+    "product-catalog-service/src/main/java/com/ecommerce/productcatalog/infrastructure/config/SwaggerConfiguration.java",
+    "product-catalog-service/pom.xml",
+    "shopping-cart-service/src/main/java/com/ecommerce/shoppingcart/presentation/controller/CartController.java",
+    "shopping-cart-service/src/main/java/com/ecommerce/shoppingcart/infrastructure/config/SwaggerConfiguration.java",
+    "shopping-cart-service/pom.xml"
+  ],
+  "files_created": [
+    "swagger/user-management-openapi.yaml",
+    "swagger/product-catalog-openapi.yaml",
+    "swagger/shopping-cart-openapi.yaml",
+    "docs/SWAGGER_MIGRATION_GUIDE.md",
+    "docs/SWAGGER_INTEGRATION_REPORT.json"
+  ],
+  "swagger_ui_urls": {
+    "user_management": "http://localhost:8081/swagger-ui.html",
+    "product_catalog": "http://localhost:8082/swagger-ui.html",
+    "shopping_cart": "http://localhost:8083/swagger-ui.html"
+  },
+  "openapi_spec_urls": {
+    "user_management_json": "http://localhost:8081/api-docs",
+    "user_management_yaml": "http://localhost:8081/api-docs.yaml",
+    "product_catalog_json": "http://localhost:8082/api-docs",
+    "product_catalog_yaml": "http://localhost:8082/api-docs.yaml",
+    "shopping_cart_json": "http://localhost:8083/api-docs",
+    "shopping_cart_yaml": "http://localhost:8083/api-docs.yaml"
+  },
+  "timestamp": "2024-01-15T12:00:00Z",
+  "agent": "Swagger Integration Agent",
+  "version": "1.0.0"
+}

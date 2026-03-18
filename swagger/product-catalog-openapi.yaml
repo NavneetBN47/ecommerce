@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: Product Catalog Service API
+  description: |
+    RESTful API for product search and retrieval with Redis caching.
+    
+    **Key Features:**
+    - Full-text product search (case-insensitive)
+    - Category-based filtering
+    - Pagination support
+    - Redis caching (5-10 minute TTL)
+    - Stock availability checking
+    
+    **Performance:**
+    - Search results cached for 5 minutes
+    - Product details cached for 10 minutes
+    - Average response time: <100ms (cached), <500ms (uncached)
+    
+    **Data Model:**
+    - Products include: ID, name, description, price, category, stock quantity
+    - Supports multiple product categories
+    - Real-time stock availability
+  version: 1.0.0
+  contact:
+    name: E-Commerce Platform Team
+    email: support@ecommerce.com
+    url: https://ecommerce.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8082
+    description: Development Server
+  - url: https://api.ecommerce.com
+    description: Production Server
+
+paths:
+  /api/v1/products/search:
+    get:
+      tags:
+        - Product Catalog
+      summary: Search products
+      description: Search products by keyword with pagination support. Supports case-insensitive full-text search across product names and descriptions. Results are cached in Redis for 5 minutes.
+      operationId: searchProducts
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword (searches in product name and description)
+          required: false
+          schema:
+            type: string
+            example: laptop
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            example: 20
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+        '400':
+          description: Invalid pagination parameters
+        '500':
+          description: Internal server error
+
+  /api/v1/products/{productId}:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get product details
+      description: Retrieves detailed information about a specific product by ID. Product data is cached in Redis with 10-minute TTL.
+      operationId: getProductById
+      parameters:
+        - name: productId
+          in: path
+          description: Unique product identifier
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 12345
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+        '500':
+          description: Internal server error
+
+  /api/v1/products/category/{category}:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get products by category
+      description: Retrieves all products in a specific category with pagination support. Results are cached.
+      operationId: getProductsByCategory
+      parameters:
+        - name: category
+          in: path
+          description: Product category
+          required: true
+          schema:
+            type: string
+            example: Electronics
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            example: 20
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+        '400':
+          description: Invalid category or pagination parameters
+
+  /api/v1/products/available:
+    get:
+      tags:
+        - Product Catalog
+      summary: Get available products
+      description: Retrieves all products that are currently in stock (availableQuantity > 0)
+      operationId: getAvailableProducts
+      parameters:
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            example: 20
+      responses:
+        '200':
+          description: Available products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResponse'
+
+components:
+  schemas:
+    ProductSearchResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+
+    ProductSummary:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+          example: 12345
+        name:
+          type: string
+          example: Dell XPS 15 Laptop
+        description:
+          type: string
+          example: High-performance laptop with Intel i7 processor
+        price:
+          type: number
+          format: double
+          example: 1299.99
+        category:
+          type: string
+          example: Electronics
+        availableQuantity:
+          type: integer
+          example: 50
+        imageUrl:
+          type: string
+          example: https://cdn.ecommerce.com/products/12345.jpg
+
+    ProductResponse:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+          example: 12345
+        name:
+          type: string
+          example: Dell XPS 15 Laptop
+        description:
+          type: string
+          example: High-performance laptop with Intel i7 processor, 16GB RAM, 512GB SSD
+        price:
+          type: number
+          format: double
+          example: 1299.99
+        category:
+          type: string
+          example: Electronics
+        availableQuantity:
+          type: integer
+          example: 50
+        imageUrl:
+          type: string
+          example: https://cdn.ecommerce.com/products/12345.jpg
+        specifications:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            processor: Intel Core i7-11800H
+            ram: 16GB DDR4
+            storage: 512GB NVMe SSD
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+
+    PaginationMetadata:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          example: 0
+        pageSize:
+          type: integer
+          example: 20
+        totalPages:
+          type: integer
+          example: 5
+        totalItems:
+          type: integer
+          format: int64
+          example: 95

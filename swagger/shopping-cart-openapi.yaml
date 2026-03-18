@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: Shopping Cart Service API
+  description: |
+    RESTful API for shopping cart management with ABAC authorization and resilience patterns.
+    
+    **Key Features:**
+    - Lazy cart creation (created on first item addition)
+    - Cart item operations (add, update, remove, clear)
+    - User and product validation via external services
+    - Circuit breaker pattern for resilience
+    - ABAC authorization (users can only access their own carts)
+    - Comprehensive audit logging
+    
+    **Security:**
+    - All endpoints require JWT authentication
+    - ABAC enforcement: users can only modify their own carts
+    - Audit logging for all cart operations
+    
+    **Resilience:**
+    - Circuit breaker for User Service calls
+    - Circuit breaker for Product Service calls
+    - Graceful degradation on service failures
+    - Retry logic with exponential backoff
+    
+    **Integration:**
+    - User Service: User validation
+    - Product Service: Product availability and pricing
+  version: 1.0.0
+  contact:
+    name: E-Commerce Platform Team
+    email: support@ecommerce.com
+    url: https://ecommerce.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8083
+    description: Development Server
+  - url: https://api.ecommerce.com
+    description: Production Server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/cart:
+    get:
+      tags:
+        - Shopping Cart
+      summary: Get user's cart
+      description: Retrieves the authenticated user's shopping cart with all items, prices, and totals. Cart is created lazily if it doesn't exist.
+      operationId: getCart
+      responses:
+        '200':
+          description: Cart retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+        '500':
+          description: Internal server error or service unavailable
+    
+    delete:
+      tags:
+        - Shopping Cart
+      summary: Clear cart
+      description: Removes all items from the user's cart. The cart entity itself is retained for future use.
+      operationId: clearCart
+      responses:
+        '204':
+          description: Cart cleared successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: Cart not found
+
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Shopping Cart
+      summary: Add item to cart
+      description: Adds a product to the user's cart with specified quantity. Validates product availability and stock via Product Service (with circuit breaker). Creates cart if it doesn't exist.
+      operationId: addItemToCart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '201':
+          description: Item added to cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid request - product not available or insufficient stock
+        '401':
+          description: Unauthorized
+        '404':
+          description: Product not found
+        '503':
+          description: Product service unavailable (circuit breaker open)
+
+  /api/v1/cart/items/{cartItemId}:
+    put:
+      tags:
+        - Shopping Cart
+      summary: Update cart item quantity
+      description: Updates the quantity of an existing cart item. Validates stock availability before update. Enforces ABAC - users can only update their own cart items.
+      operationId: updateCartItem
+      parameters:
+        - name: cartItemId
+          in: path
+          description: Cart item ID to update
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid quantity or insufficient stock
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - cart item belongs to another user
+        '404':
+          description: Cart item not found
+    
+    delete:
+      tags:
+        - Shopping Cart
+      summary: Remove item from cart
+      description: Removes a specific item from the user's cart. Enforces ABAC - users can only remove items from their own cart.
+      operationId: removeItemFromCart
+      parameters:
+        - name: cartItemId
+          in: path
+          description: Cart item ID to remove
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 123
+      responses:
+        '200':
+          description: Item removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - cart item belongs to another user
+        '404':
+          description: Cart item not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication token (RSA-256 signed). Obtain via User Management Service /api/v1/users/login endpoint.
+
+  schemas:
+    CartResponse:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          format: int64
+          example: 456
+        userId:
+          type: integer
+          format: int64
+          example: 12345
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemResponse'
+        totalItems:
+          type: integer
+          example: 3
+        subtotal:
+          type: number
+          format: double
+          example: 2599.97
+        tax:
+          type: number
+          format: double
+          example: 259.99
+        total:
+          type: number
+          format: double
+          example: 2859.96
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T11:45:00Z
+
+    CartItemResponse:
+      type: object
+      properties:
+        cartItemId:
+          type: integer
+          format: int64
+          example: 789
+        productId:
+          type: integer
+          format: int64
+          example: 12345
+        productName:
+          type: string
+          example: Dell XPS 15 Laptop
+        productPrice:
+          type: number
+          format: double
+          example: 1299.99
+        quantity:
+          type: integer
+          example: 2
+        subtotal:
+          type: number
+          format: double
+          example: 2599.98
+        imageUrl:
+          type: string
+          example: https://cdn.ecommerce.com/products/12345.jpg
+
+    AddCartItemRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+          format: int64
+          example: 12345
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    UpdateCartItemRequest:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          example: 3
