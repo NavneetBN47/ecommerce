@@ -1,0 +1,554 @@
+openapi: 3.0.3
+info:
+  title: Healthcare Management System API
+  version: 1.0.0
+  description: |
+    HIPAA-compliant Healthcare Management System with comprehensive patient, appointment, and medical record management.
+    
+    ## Features
+    - Patient management with full demographic information
+    - Appointment scheduling and management
+    - Medical record creation and retrieval with encryption
+    - Patient consent management for HIPAA compliance
+    - Secure authentication using JWT tokens
+    - Comprehensive audit logging
+    
+    ## Security
+    All endpoints require JWT Bearer token authentication.
+    
+    ## Compliance
+    This API is designed to meet HIPAA compliance requirements including:
+    - Data encryption at rest and in transit
+    - Comprehensive audit trails
+    - Access control and authorization
+    - Patient consent management
+  contact:
+    name: Healthcare System Support
+    email: support@healthcare.com
+    url: https://healthcare.com
+  license:
+    name: Proprietary
+    url: https://healthcare.com/license
+
+servers:
+  - url: http://localhost:8080
+    description: Development Server
+  - url: https://api.healthcare.com
+    description: Production Server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Patient Management
+    description: APIs for managing patient information
+  - name: Appointment Management
+    description: APIs for managing patient appointments
+  - name: Medical Record Management
+    description: APIs for managing patient medical records
+  - name: Consent Management
+    description: APIs for managing patient consents for HIPAA compliance
+
+paths:
+  /api/v1/patients:
+    post:
+      tags:
+        - Patient Management
+      summary: Create a new patient
+      description: Creates a new patient record in the system with all required information
+      operationId: createPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDTO'
+      responses:
+        '201':
+          description: Patient created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDTO'
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '409':
+          description: Patient with email already exists
+    get:
+      tags:
+        - Patient Management
+      summary: Get all patients
+      description: Retrieves a list of all patients in the system
+      operationId: getAllPatients
+      responses:
+        '200':
+          description: List of patients retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientDTO'
+        '401':
+          description: Unauthorized
+
+  /api/v1/patients/{id}:
+    get:
+      tags:
+        - Patient Management
+      summary: Get patient by ID
+      description: Retrieves a patient's complete information by their unique identifier
+      operationId: getPatientById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Patient ID
+      responses:
+        '200':
+          description: Patient found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDTO'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Patient not found
+    put:
+      tags:
+        - Patient Management
+      summary: Update patient information
+      description: Updates an existing patient's information
+      operationId: updatePatient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Patient ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDTO'
+      responses:
+        '200':
+          description: Patient updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDTO'
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '404':
+          description: Patient not found
+    delete:
+      tags:
+        - Patient Management
+      summary: Delete patient
+      description: Soft deletes a patient by marking them as inactive
+      operationId: deletePatient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Patient ID
+      responses:
+        '204':
+          description: Patient deleted successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: Patient not found
+
+  /api/v1/appointments:
+    post:
+      tags:
+        - Appointment Management
+      summary: Schedule a new appointment
+      description: Creates a new appointment for a patient with a healthcare provider
+      operationId: scheduleAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentDTO'
+      responses:
+        '201':
+          description: Appointment scheduled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentDTO'
+        '400':
+          description: Invalid input data or time slot unavailable
+        '401':
+          description: Unauthorized
+        '404':
+          description: Patient not found
+
+  /api/v1/appointments/{id}:
+    get:
+      tags:
+        - Appointment Management
+      summary: Get appointment by ID
+      description: Retrieves appointment details by appointment ID
+      operationId: getAppointmentById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Appointment ID
+      responses:
+        '200':
+          description: Appointment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentDTO'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Appointment not found
+
+  /api/v1/medical-records:
+    post:
+      tags:
+        - Medical Record Management
+      summary: Create a new medical record
+      description: Creates a new medical record for a patient with diagnosis, treatment, and medication information
+      operationId: createMedicalRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicalRecordDTO'
+      responses:
+        '201':
+          description: Medical record created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecordDTO'
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '404':
+          description: Patient not found
+
+  /api/v1/medical-records/{id}:
+    get:
+      tags:
+        - Medical Record Management
+      summary: Get medical record by ID
+      description: Retrieves a specific medical record by its unique identifier
+      operationId: getMedicalRecordById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Medical record ID
+      responses:
+        '200':
+          description: Medical record found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecordDTO'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Access denied - insufficient permissions
+        '404':
+          description: Medical record not found
+
+  /api/v1/consents:
+    post:
+      tags:
+        - Consent Management
+      summary: Record a new patient consent
+      description: Records a new consent from a patient for treatment, disclosure, research, or marketing purposes
+      operationId: recordConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentDTO'
+      responses:
+        '201':
+          description: Consent recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentDTO'
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '404':
+          description: Patient not found
+
+  /api/v1/consents/{id}:
+    get:
+      tags:
+        - Consent Management
+      summary: Get consent by ID
+      description: Retrieves a specific consent record by its unique identifier
+      operationId: getConsentById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Consent ID
+      responses:
+        '200':
+          description: Consent found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentDTO'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Consent not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    PatientDTO:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - dateOfBirth
+        - gender
+        - email
+        - phoneNumber
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Patient ID
+          example: 1
+        firstName:
+          type: string
+          maxLength: 100
+          description: Patient's first name
+          example: John
+        lastName:
+          type: string
+          maxLength: 100
+          description: Patient's last name
+          example: Doe
+        dateOfBirth:
+          type: string
+          format: date
+          description: Patient's date of birth
+          example: '1990-01-15'
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+          description: Patient's gender
+          example: MALE
+        email:
+          type: string
+          format: email
+          description: Patient's email address
+          example: john.doe@email.com
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: Patient's phone number
+          example: '+1234567890'
+        bloodType:
+          type: string
+          maxLength: 50
+          description: Patient's blood type
+          example: 'A+'
+        allergies:
+          type: string
+          description: Patient's known allergies
+          example: 'Penicillin, Peanuts'
+        medicalHistory:
+          type: string
+          description: Patient's medical history summary
+        active:
+          type: boolean
+          description: Patient account active status
+          example: true
+
+    AppointmentDTO:
+      type: object
+      required:
+        - patientId
+        - providerId
+        - providerName
+        - appointmentDateTime
+        - durationMinutes
+        - appointmentType
+        - status
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Appointment ID
+          example: 1
+        patientId:
+          type: integer
+          format: int64
+          description: Patient ID
+          example: 123
+        providerId:
+          type: string
+          description: Healthcare provider identifier
+          example: PROV123
+        providerName:
+          type: string
+          description: Healthcare provider name
+          example: Dr. Jane Smith
+        appointmentDateTime:
+          type: string
+          format: date-time
+          description: Appointment date and time
+          example: '2024-02-15T14:30:00'
+        durationMinutes:
+          type: integer
+          description: Appointment duration in minutes
+          example: 30
+        appointmentType:
+          type: string
+          enum: [CONSULTATION, FOLLOW_UP, EMERGENCY, ROUTINE, SPECIALIST]
+          description: Type of appointment
+          example: CONSULTATION
+        status:
+          type: string
+          enum: [SCHEDULED, CONFIRMED, CANCELLED, COMPLETED, NO_SHOW]
+          description: Appointment status
+          example: SCHEDULED
+        reason:
+          type: string
+          description: Reason for appointment
+        notes:
+          type: string
+          description: Additional notes
+
+    MedicalRecordDTO:
+      type: object
+      required:
+        - patientId
+        - recordType
+        - recordDate
+        - providerId
+        - providerName
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Medical record ID
+          example: 1
+        patientId:
+          type: integer
+          format: int64
+          description: Patient ID
+          example: 123
+        recordType:
+          type: string
+          description: Type of medical record
+          example: DIAGNOSIS
+        recordDate:
+          type: string
+          format: date-time
+          description: Date of the medical record
+          example: '2024-01-15T10:30:00'
+        providerId:
+          type: string
+          description: Healthcare provider identifier
+          example: PROV123
+        providerName:
+          type: string
+          description: Healthcare provider name
+          example: Dr. Jane Smith
+        diagnosis:
+          type: string
+          description: Diagnosis information
+        treatment:
+          type: string
+          description: Treatment information
+        medications:
+          type: string
+          description: Prescribed medications
+        notes:
+          type: string
+          description: Additional notes
+
+    ConsentDTO:
+      type: object
+      required:
+        - patientId
+        - consentType
+        - granted
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Consent ID
+          example: 1
+        patientId:
+          type: integer
+          format: int64
+          description: Patient ID
+          example: 123
+        consentType:
+          type: string
+          enum: [TREATMENT, DISCLOSURE, RESEARCH, MARKETING]
+          description: Type of consent
+          example: TREATMENT
+        granted:
+          type: boolean
+          description: Consent granted status
+          example: true
+        description:
+          type: string
+          description: Consent description or terms
+        expirationDate:
+          type: string
+          format: date-time
+          description: Timestamp when consent expires
+          example: '2025-01-15T10:30:00'
+        obtainedBy:
+          type: string
+          description: Person who obtained the consent
+          example: Dr. Smith
